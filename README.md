@@ -1,23 +1,35 @@
 # CotizaPro SaaS - Sistema de Cotizaciones Profesionales
 
+## 🚀 Deploy en Cloudflare Pages
+
+### Paso 1: Crear repo en GitHub
+```bash
+cd "C:\dev\COTIZA PRO"
+git remote add origin https://github.com/TU-USUARIO/cotizapro-saas.git
+git push -u origin master
+```
+
+### Paso 2: Conectar en Cloudflare Pages
+1. Ve a [Cloudflare Pages](https://pages.cloudflare.com/)
+2. "Create a project" → "Connect to Git"
+3. Selecciona tu repo `cotizapro-saas`
+4. Build settings: dejar vacío (es estático)
+5. ¡Deploy!
+
 ## 📂 Estructura del Proyecto
 
 ```
 COTIZA PRO/
-├── firebase-config.js       # Configuración de Firebase
-├── public/                  # Landing + Login/Registro
-│   ├── index.html           # Landing page
-│   ├── styles-landing.css   # Estilos landing
-│   └── auth.js              # Autenticación
-├── admin/                   # Panel Super Administrador
-│   ├── index.html           # Dashboard admin
-│   ├── styles-admin.css     # Estilos admin
-│   └── admin.js             # Lógica admin
-├── app/                     # Panel de Usuario
-│   ├── index.html           # App de cotizaciones
-│   ├── styles-app.css       # Estilos app
-│   └── app-user.js          # Lógica usuario
-└── README.md                # Este archivo
+├── index.html              # Landing + Login/Registro
+├── admin.html              # Panel Super Administrador
+├── app.html                # Panel de Usuario (cotizaciones)
+├── firebase-config.js      # Configuración de Firebase
+├── auth.js                 # Autenticación
+├── admin.js                # Lógica del admin
+├── app-user.js             # Lógica de usuario
+├── validators.js           # Validaciones (RUC, DNI)
+├── styles-*.css            # Estilos
+└── README.md               # Este archivo
 ```
 
 ## 🔧 Configuración
