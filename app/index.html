@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="theme-color" content="#1e40af">
+  <title>CotizaPro - Mi Panel</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles-app.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Plan Limit Banner -->
+  <div id="plan-banner" class="plan-banner hidden">
+    <div class="container">
+      <span id="plan-banner-text"></span>
+      <button onclick="showUpgradeModal()" class="btn btn-sm btn-primary">Mejorar Plan</button>
+    </div>
+  </div>
+
+  <!-- Sidebar (Desktop) -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">📊</span>
+      <span class="sidebar-title">CotizaPro</span>
+    </div>
+    <div class="sidebar-plan">
+      <span id="user-plan-badge" class="badge badge-free">Gratis</span>
+      <div class="plan-progress">
+        <div id="plan-progress-bar" class="plan-progress-bar" style="width: 0%"></div>
+      </div>
+      <p class="plan-progress-text"><span id="quotes-used">0</span> / <span id="quotes-limit">5</span> cotizaciones</p>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-screen="dashboard">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Inicio</span>
+      </button>
+      <button class="nav-item" data-screen="new-quote">
+        <span class="nav-icon">➕</span>
+        <span class="nav-label">Nueva</span>
+      </button>
+      <button class="nav-item" data-screen="history">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">Historial</span>
+      </button>
+      <button class="nav-item" data-screen="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Ajustes</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button onclick="logout()" class="btn btn-outline btn-sm btn-block">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar (Mobile) -->
+    <header class="topbar-mobile">
+      <span class="topbar-logo">📊 CotizaPro</span>
+      <button onclick="logout()" class="btn-icon">🚪</button>
+    </header>
+
+    <!-- Dashboard -->
+    <section id="screen-dashboard" class="screen active">
+      <div class="container">
+        <h2 class="section-title">Hola, <span id="user-name">Usuario</span> 👋</h2>
+        
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">📄</div>
+            <div class="stat-info">
+              <p class="stat-label">Cotizaciones del mes</p>
+              <h3 class="stat-value"><span id="stat-quotes-month">0</span></h3>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-info">
+              <p class="stat-label">Total cotizado</p>
+              <h3 class="stat-value" id="stat-total-amount">S/ 0.00</h3>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">⏰</div>
+            <div class="stat-info">
+              <p class="stat-label">Plan vence</p>
+              <h3 class="stat-value" id="stat-plan-expires">-</h3>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <h3 class="section-title">Últimas Cotizaciones</h3>
+          <button class="btn btn-text" data-screen="history">Ver todo →</button>
+        </div>
+
+        <div id="dashboard-recent-quotes" class="quotes-list">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h3>No hay cotizaciones aún</h3>
+            <p>Crea tu primera cotización profesional</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- New Quote -->
+    <section id="screen-new-quote" class="screen">
+      <div class="container">
+        <!-- Wizard Progress -->
+        <div class="wizard-progress">
+          <div class="wizard-steps">
+            <div class="wizard-step active" data-step="1">
+              <div class="step-number">1</div>
+              <span class="step-label">Cliente</span>
+            </div>
+            <div class="wizard-step" data-step="2">
+              <div class="step-number">2</div>
+              <span class="step-label">Items</span>
+            </div>
+            <div class="wizard-step" data-step="3">
+              <div class="step-number">3</div>
+              <span class="step-label">Revisar</span>
+            </div>
+          </div>
+          <div class="wizard-bar">
+            <div id="wizard-bar-progress" class="wizard-bar-progress" style="width: 33.33%"></div>
+          </div>
+        </div>
+
+        <!-- Step 1: Client -->
+        <div id="quote-step-1" class="wizard-step-content active">
+          <h3 class="form-section-title">Datos del Cliente</h3>
+          <form id="form-client" class="form">
+            <div class="form-group">
+              <label class="form-label">Nombre / Razón Social *</label>
+              <input type="text" id="client-name" class="form-input" placeholder="Ej: Empresa SAC" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">RUC o DNI</label>
+              <input type="text" id="client-document" class="form-input" placeholder="20123456789" maxlength="11" inputmode="numeric">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" id="client-email" class="form-input" placeholder="cliente@ejemplo.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Teléfono</label>
+              <input type="tel" id="client-phone" class="form-input" placeholder="987654321">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Dirección</label>
+              <input type="text" id="client-address" class="form-input" placeholder="Av. Principal 123, Lima">
+            </div>
+          </form>
+        </div>
+
+        <!-- Step 2: Items -->
+        <div id="quote-step-2" class="wizard-step-content">
+          <h3 class="form-section-title">Items</h3>
+          <div id="items-container" class="items-container"></div>
+          <button id="btn-add-item" class="btn btn-outline btn-block">➕ Agregar Item</button>
+          <div class="quote-summary">
+            <div class="summary-row">
+              <span>Subtotal:</span>
+              <span id="summary-subtotal">S/ 0.00</span>
+            </div>
+            <div class="summary-row">
+              <span>IGV (18%):</span>
+              <span id="summary-igv">S/ 0.00</span>
+            </div>
+            <div class="summary-row summary-total">
+              <span>TOTAL:</span>
+              <span id="summary-total">S/ 0.00</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Review -->
+        <div id="quote-step-3" class="wizard-step-content">
+          <h3 class="form-section-title">Revisar</h3>
+          <div id="quote-review" class="quote-review-container"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Fecha Emisión</label>
+              <input type="date" id="quote-issue-date" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha Vencimiento</label>
+              <input type="date" id="quote-due-date" class="form-input">
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-actions">
+          <button id="btn-prev-step" class="btn btn-secondary hidden">← Anterior</button>
+          <button id="btn-next-step" class="btn btn-primary">Siguiente →</button>
+          <button id="btn-generate-pdf" class="btn btn-success hidden">📄 Generar PDF</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- History -->
+    <section id="screen-history" class="screen">
+      <div class="container">
+        <div class="search-bar">
+          <input type="text" id="search-quotes" class="search-input" placeholder="Buscar cotización...">
+        </div>
+        <div id="history-quotes-list" class="quotes-list">
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <h3>No hay cotizaciones</h3>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="screen-settings" class="screen">
+      <div class="container">
+        <h3 class="section-title">Datos de mi Empresa</h3>
+        <form id="form-company" class="form">
+          <div class="form-group">
+            <label class="form-label">Nombre / Razón Social *</label>
+            <input type="text" id="company-name" class="form-input" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">RUC *</label>
+            <input type="text" id="company-ruc" class="form-input" maxlength="11" inputmode="numeric" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Dirección</label>
+            <input type="text" id="company-address" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Teléfono</label>
+            <input type="tel" id="company-phone" class="form-input">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="company-email" class="form-input">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">💾 Guardar</button>
+        </form>
+
+        <h3 class="section-title mt-6">Mi Plan</h3>
+        <div class="plan-card-user">
+          <div class="plan-header">
+            <h4 id="current-plan-name">Prueba Gratis</h4>
+            <span id="current-plan-price" class="plan-price">S/ 0</span>
+          </div>
+          <p id="current-plan-desc">5 cotizaciones por mes</p>
+          <button onclick="showUpgradeModal()" class="btn btn-primary">Mejorar Plan</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bottom Nav (Mobile) -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-screen="dashboard">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Inicio</span>
+    </button>
+    <button class="nav-item" data-screen="new-quote">
+      <span class="nav-icon">➕</span>
+      <span class="nav-label">Nueva</span>
+    </button>
+    <button class="nav-item" data-screen="history">
+      <span class="nav-icon">📋</span>
+      <span class="nav-label">Historial</span>
+    </button>
+    <button class="nav-item" data-screen="settings">
+      <span class="nav-icon">⚙️</span>
+      <span class="nav-label">Ajustes</span>
+    </button>
+  </nav>
+
+  <!-- Upgrade Modal -->
+  <div id="modal-upgrade" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title">Mejorar Plan</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="upgrade-plans">
+          <div class="upgrade-plan-card" onclick="selectPlan('basic')">
+            <h4>📋 Básico</h4>
+            <p class="upgrade-price">S/ 20/mes</p>
+            <p class="upgrade-desc">20 cotizaciones</p>
+          </div>
+          <div class="upgrade-plan-card featured" onclick="selectPlan('business')">
+            <h4>💼 Business</h4>
+            <p class="upgrade-price">S/ 40/mes</p>
+            <p class="upgrade-desc">50 cotizaciones</p>
+          </div>
+          <div class="upgrade-plan-card" onclick="selectPlan('pro')">
+            <h4>🚀 Pro</h4>
+            <p class="upgrade-price">S/ 60/mes</p>
+            <p class="upgrade-desc">Ilimitado</p>
+          </div>
+        </div>
+        <p class="upgrade-note">💬 Contacta al administrador para activar tu plan</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="../firebase-config.js"></script>
+  <script src="../public/validators.js"></script>
+  <script src="app-user.js"></script>
+</body>
+</html>

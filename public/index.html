@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="theme-color" content="#1e40af">
+  <title>CotizaPro - Generador de Cotizaciones Profesionales</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles-landing.css">
+</head>
+<body>
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="container">
+      <div class="navbar-brand">
+        <span class="navbar-logo">📊</span>
+        <span class="navbar-title">CotizaPro</span>
+      </div>
+      <div class="navbar-actions">
+        <button id="btn-login-nav" class="btn btn-outline">Iniciar Sesión</button>
+        <button id="btn-register-nav" class="btn btn-primary">Crear Cuenta Gratis</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container">
+      <div class="hero-content">
+        <h1 class="hero-title">
+          Cotizaciones Profesionales en 
+          <span class="text-gradient">PDF</span> 
+          en Segundos
+        </h1>
+        <p class="hero-subtitle">
+          Crea, envía y gestiona cotizaciones profesionales para tu empresa. 
+          Diseñado para negocios peruanos.
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary btn-lg" onclick="showRegister()">
+            🚀 Comenzar Gratis
+          </button>
+          <button class="btn btn-outline btn-lg" onclick="scrollToPlans()">
+            Ver Planes
+          </button>
+        </div>
+        <div class="hero-stats">
+          <div class="stat">
+            <span class="stat-number">100%</span>
+            <span class="stat-label">Online</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number">S/ 0</span>
+            <span class="stat-label">Para empezar</span>
+          </div>
+          <div class="stat">
+            <span class="stat-number">30s</span>
+            <span class="stat-label">Por cotización</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features">
+    <div class="container">
+      <h2 class="section-title">Todo lo que necesitas</h2>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📄</div>
+          <h3 class="feature-title">PDF Profesional</h3>
+          <p class="feature-desc">Cotizaciones con diseño profesional, logo, datos de empresa y cuentas bancarias.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3 class="feature-title">Rápido y Fácil</h3>
+          <p class="feature-desc">Crea cotizaciones en 30 segundos con nuestro wizard intuitivo.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💾</div>
+          <h3 class="feature-title">Guardado Automático</h3>
+          <p class="feature-desc">Todas tus cotizaciones se guardan en la nube, accesibles desde cualquier dispositivo.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📱</div>
+          <h3 class="feature-title">100% Responsive</h3>
+          <p class="feature-desc">Funciona perfecto en móvil, tablet y PC. Crea cotizaciones desde cualquier lugar.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <h3 class="feature-title">Seguro</h3>
+          <p class="feature-desc">Tus datos protegidos con autenticación y encriptación de nivel bancario.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🇵🇪</div>
+          <h3 class="feature-title">Para Perú</h3>
+          <p class="feature-desc">Validación de RUC/DNI, IGV 18%, soles peruanos y formato local.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Plans Section -->
+  <section class="plans" id="plans">
+    <div class="container">
+      <h2 class="section-title">Planes y Precios</h2>
+      <p class="section-subtitle">Empieza gratis, escala cuando lo necesites</p>
+      
+      <div class="plans-grid">
+        <!-- Free Plan -->
+        <div class="plan-card">
+          <div class="plan-header">
+            <h3 class="plan-name">Prueba Gratis</h3>
+            <div class="plan-price">
+              <span class="price-currency">S/</span>
+              <span class="price-amount">0</span>
+            </div>
+            <p class="plan-period">Para siempre</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ 5 cotizaciones/mes</li>
+            <li>✓ PDF básico</li>
+            <li>✓ 1 cuenta bancaria</li>
+            <li>✓ Historial 30 días</li>
+          </ul>
+          <button class="btn btn-outline btn-block" onclick="showRegister()">Comenzar Gratis</button>
+        </div>
+
+        <!-- Basic Plan -->
+        <div class="plan-card">
+          <div class="plan-badge">Popular</div>
+          <div class="plan-header">
+            <h3 class="plan-name">Básico</h3>
+            <div class="plan-price">
+              <span class="price-currency">S/</span>
+              <span class="price-amount">20</span>
+            </div>
+            <p class="plan-period">por mes</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ 20 cotizaciones/mes</li>
+            <li>✓ PDF profesional</li>
+            <li>✓ 3 cuentas bancarias</li>
+            <li>✓ Historial completo</li>
+            <li>✓ Soporte por email</li>
+          </ul>
+          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Básico</button>
+        </div>
+
+        <!-- Business Plan -->
+        <div class="plan-card featured">
+          <div class="plan-badge featured-badge">Mejor Valor</div>
+          <div class="plan-header">
+            <h3 class="plan-name">Business</h3>
+            <div class="plan-price">
+              <span class="price-currency">S/</span>
+              <span class="price-amount">40</span>
+            </div>
+            <p class="plan-period">por mes</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ 50 cotizaciones/mes</li>
+            <li>✓ PDF premium</li>
+            <li>✓ Cuentas ilimitadas</li>
+            <li>✓ Duplicar cotizaciones</li>
+            <li>✓ Exportar/Importar</li>
+            <li>✓ Soporte prioritario</li>
+          </ul>
+          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Business</button>
+        </div>
+
+        <!-- Pro Plan -->
+        <div class="plan-card">
+          <div class="plan-header">
+            <h3 class="plan-name">Pro</h3>
+            <div class="plan-price">
+              <span class="price-currency">S/</span>
+              <span class="price-amount">60</span>
+            </div>
+            <p class="plan-period">por mes</p>
+          </div>
+          <ul class="plan-features">
+            <li>✓ Cotizaciones ILIMITADAS</li>
+            <li>✓ PDF personalizado</li>
+            <li>✓ Todo ilimitado</li>
+            <li>✓ Marca de agua</li>
+            <li>✓ Multi-usuario</li>
+            <li>✓ Soporte VIP 24/7</li>
+          </ul>
+          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Pro</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA Section -->
+  <section class="cta">
+    <div class="container">
+      <h2 class="cta-title">¿Listo para profesionalizar tus cotizaciones?</h2>
+      <p class="cta-subtitle">Crea tu cuenta gratis en 30 segundos</p>
+      <button class="btn btn-primary btn-lg" onclick="showRegister()">
+        Crear Cuenta Gratis →
+      </button>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <p>© 2026 CotizaPro. Todos los derechos reservados.</p>
+    </div>
+  </footer>
+
+  <!-- Login Modal -->
+  <div id="modal-login" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title">Iniciar Sesión</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-login" class="form">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="login-email" class="form-input" placeholder="tu@email.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contraseña</label>
+            <input type="password" id="login-password" class="form-input" placeholder="Tu contraseña" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Iniciar Sesión</button>
+        </form>
+        <p class="modal-footer-text">
+          ¿No tienes cuenta? <a href="#" onclick="switchToRegister()">Regístrate gratis</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Register Modal -->
+  <div id="modal-register" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title">Crear Cuenta</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-register" class="form">
+          <div class="form-group">
+            <label class="form-label">Nombre Completo</label>
+            <input type="text" id="register-name" class="form-input" placeholder="Tu nombre" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="register-email" class="form-input" placeholder="tu@email.com" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contraseña</label>
+            <input type="password" id="register-password" class="form-input" placeholder="Mínimo 6 caracteres" required minlength="6">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Empresa (opcional)</label>
+            <input type="text" id="register-company" class="form-input" placeholder="Nombre de tu empresa">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Crear Cuenta Gratis</button>
+        </form>
+        <p class="modal-footer-text">
+          ¿Ya tienes cuenta? <a href="#" onclick="switchToLogin()">Inicia sesión</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="../firebase-config.js"></script>
+  <script src="auth.js"></script>
+</body>
+</html>
