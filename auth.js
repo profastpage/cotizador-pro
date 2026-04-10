@@ -108,9 +108,9 @@ document.getElementById('form-register').addEventListener('submit', async (e) =>
     // Redirect based on role
     setTimeout(() => {
       if (isSuperAdmin) {
-        window.location.href = '../admin/index.html';
+        window.location.href = 'admin.html';
       } else {
-        window.location.href = 'app/index.html';
+        window.location.href = 'app.html';
       }
     }, 1000);
     
@@ -177,16 +177,16 @@ auth.onAuthStateChanged(async (user) => {
             window.location.pathname === '/public/') {
           
           if (userData.role === 'superadmin') {
-            window.location.href = '../admin/index.html';
+            window.location.href = 'admin.html';
           } else {
             // Check if plan is active
             if (userData.plan === 'free') {
-              window.location.href = 'app/index.html';
+              window.location.href = 'app.html';
             } else if (userData.planEndDate && new Date(userData.planEndDate) > new Date()) {
-              window.location.href = 'app/index.html';
+              window.location.href = 'app.html';
             } else {
               // Plan expired, redirect to app but show upgrade
-              window.location.href = 'app/index.html?upgrade=true';
+              window.location.href = 'app.html?upgrade=true';
             }
           }
         }
@@ -203,6 +203,6 @@ auth.onAuthStateChanged(async (user) => {
 
 function logout() {
   auth.signOut().then(() => {
-    window.location.href = '../public/index.html';
+    window.location.href = 'index.html';
   });
 }

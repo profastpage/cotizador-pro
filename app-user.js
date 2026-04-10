@@ -15,7 +15,7 @@ let currentWizardStep = 1;
 
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
-    window.location.href = '../public/index.html';
+    window.location.href = 'index.html';
     return;
   }
   
@@ -23,7 +23,7 @@ auth.onAuthStateChanged(async (user) => {
   
   const userDoc = await db.collection('users').doc(user.uid).get();
   if (!userDoc.exists) {
-    window.location.href = '../public/index.html';
+    window.location.href = 'index.html';
     return;
   }
   

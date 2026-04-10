@@ -9,13 +9,13 @@ let allUsers = [];
 // Auth check
 auth.onAuthStateChanged(async (user) => {
   if (!user) {
-    window.location.href = '../public/index.html';
+    window.location.href = 'index.html';
     return;
   }
   
   const userDoc = await db.collection('users').doc(user.uid).get();
   if (!userDoc.exists || userDoc.data().role !== 'superadmin') {
-    window.location.href = '../public/index.html';
+    window.location.href = 'index.html';
     return;
   }
   

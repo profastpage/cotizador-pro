@@ -1,0 +1,4 @@
+# Cloudflare Pages redirects
+# SPA fallbacks
+/admin.html    /admin.html   200
+/app.html      /app.html     200
