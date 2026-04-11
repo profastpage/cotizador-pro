@@ -10,23 +10,28 @@ function showLogin() {
   document.getElementById('modal-login').classList.remove('hidden');
   document.getElementById('modal-register').classList.add('hidden');
 }
+window.showLogin = showLogin;
 
 function showRegister() {
   document.getElementById('modal-register').classList.remove('hidden');
   document.getElementById('modal-login').classList.add('hidden');
 }
+window.showRegister = showRegister;
 
 function switchToLogin() {
   showLogin();
 }
+window.switchToLogin = switchToLogin;
 
 function switchToRegister() {
   showRegister();
 }
+window.switchToRegister = switchToRegister;
 
 function scrollToPlans() {
   document.getElementById('plans').scrollIntoView({ behavior: 'smooth' });
 }
+window.scrollToPlans = scrollToPlans;
 
 function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
