@@ -12,6 +12,16 @@
 <body>
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- Not Approved Notice -->
+  <div id="not-approved-notice" class="not-approved hidden">
+    <div class="not-approved-content">
+      <div style="font-size:3rem;margin-bottom:1rem">⏳</div>
+      <h2>Tu cuenta está pendiente de aprobación</h2>
+      <p>El administrador debe aprobar tu cuenta antes de que puedas usar la app.</p>
+      <button onclick="logout()" class="btn btn-primary">Volver al inicio</button>
+    </div>
+  </div>
+
   <!-- Plan Limit Banner -->
   <div id="plan-banner" class="plan-banner hidden">
     <div class="container">

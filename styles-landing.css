@@ -334,3 +334,64 @@ body {
   from { opacity: 0; transform: translateX(100%); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* Password Toggle */
+.password-wrapper {
+  position: relative;
+}
+.password-wrapper .form-input {
+  padding-right: 3rem;
+}
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.125rem;
+  color: var(--color-gray-500);
+  padding: 0.25rem;
+  line-height: 1;
+}
+.password-toggle:hover {
+  color: var(--color-gray-700);
+}
+
+/* Google Button */
+.btn-google {
+  background: white;
+  border: 2px solid var(--color-gray-200);
+  color: var(--color-gray-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 500;
+}
+.btn-google:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+}
+.btn-google svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Divider */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  color: var(--color-gray-500);
+  font-size: 0.75rem;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-gray-200);
+}

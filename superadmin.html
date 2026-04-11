@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta name="theme-color" content="#1e40af">
+  <title>CotizaPro - Super Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles-admin.css">
+  <link rel="stylesheet" href="styles-superadmin.css">
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-logo">📊</span>
+      <span class="sidebar-title">CotizaPro</span>
+    </div>
+    <nav class="sidebar-nav">
+      <button class="nav-item active" data-tab="dashboard">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-item" data-tab="pending">
+        <span class="nav-icon">⏳</span>
+        <span class="nav-label">Pendientes</span>
+        <span class="nav-badge" id="pending-count">0</span>
+      </button>
+      <button class="nav-item" data-tab="clients">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">Clientes</span>
+      </button>
+      <button class="nav-item" data-tab="plans">
+        <span class="nav-icon">💎</span>
+        <span class="nav-label">Planes</span>
+      </button>
+      <button class="nav-item" data-tab="settings">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Configuración</span>
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <button onclick="logout()" class="btn btn-outline btn-sm">🚪 Cerrar Sesión</button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <h1 class="topbar-title" id="page-title">Dashboard</h1>
+      <div class="topbar-user">
+        <span id="admin-name">Admin</span>
+      </div>
+    </header>
+
+    <!-- Dashboard Tab -->
+    <section id="tab-dashboard" class="tab-content active">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-info">
+            <p class="stat-label">Total Usuarios</p>
+            <h3 class="stat-value" id="stat-total-users">0</h3>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-info">
+            <p class="stat-label">Usuarios Activos</p>
+            <h3 class="stat-value" id="stat-active-users">0</h3>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-info">
+            <p class="stat-label">Pendientes Aprobación</p>
+            <h3 class="stat-value" id="stat-pending-users">0</h3>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">💰</div>
+          <div class="stat-info">
+            <p class="stat-label">Ingreso Mensual</p>
+            <h3 class="stat-value" id="stat-monthly-revenue">S/ 0</h3>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="card-title">Usuarios Recientes</h3>
+        <div id="recent-users-list" class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Nombre</th>
+                <th>Email</th>
+                <th>Plan</th>
+                <th>Registro</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="recent-users-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pending Approvals Tab -->
+    <section id="tab-pending" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Clientes Pendientes de Aprobación</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Empresa</th>
+                <th>Registro</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="pending-users-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Clients Tab -->
+    <section id="tab-clients" class="tab-content">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Todos los Clientes</h3>
+          <div class="search-box">
+            <input type="text" id="search-clients" class="search-input" placeholder="Buscar cliente...">
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Cliente</th>
+                <th>Email</th>
+                <th>Plan</th>
+                <th>Licencia</th>
+                <th>Cotizaciones/Mes</th>
+                <th>Estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="clients-tbody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Plans Tab -->
+    <section id="tab-plans" class="tab-content">
+      <div class="plans-overview">
+        <div class="plan-summary-card">
+          <h3>🆓 Prueba Gratis</h3>
+          <p class="plan-price-tag">S/ 0</p>
+          <p class="plan-desc">5 cotizaciones/mes • 1 cuenta bancaria</p>
+          <p class="plan-feature-list">
+            ✓ PDF básico<br>
+            ✓ Historial 30 días<br>
+            ✓ Sin duplicar cotizaciones
+          </p>
+        </div>
+        <div class="plan-summary-card">
+          <h3>📋 Básico</h3>
+          <p class="plan-price-tag">S/ 20/mes</p>
+          <p class="plan-desc">20 cotizaciones/mes • 3 cuentas bancarias</p>
+          <p class="plan-feature-list">
+            ✓ PDF profesional<br>
+            ✓ Historial completo<br>
+            ✓ Soporte por email
+          </p>
+        </div>
+        <div class="plan-summary-card featured">
+          <div class="plan-badge">Mejor Valor</div>
+          <h3>💼 Business</h3>
+          <p class="plan-price-tag">S/ 40/mes</p>
+          <p class="plan-desc">50 cotizaciones/mes • Ilimitado</p>
+          <p class="plan-feature-list">
+            ✓ PDF premium<br>
+            ✓ Duplicar cotizaciones<br>
+            ✓ Exportar/Importar<br>
+            ✓ Soporte prioritario
+          </p>
+        </div>
+        <div class="plan-summary-card">
+          <h3>🚀 Pro</h3>
+          <p class="plan-price-tag">S/ 60/mes</p>
+          <p class="plan-desc">Ilimitado • Todo incluido</p>
+          <p class="plan-feature-list">
+            ✓ Todo ilimitado<br>
+            ✓ Marca de agua<br>
+            ✓ Multi-usuario<br>
+            ✓ Soporte VIP 24/7
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings Tab -->
+    <section id="tab-settings" class="tab-content">
+      <div class="card">
+        <h3 class="card-title">Configuración General</h3>
+        <form id="admin-settings-form" class="form-grid">
+          <div class="form-group">
+            <label class="form-label">Email de Super Admin</label>
+            <input type="email" id="setting-admin-email" class="form-input" value="">
+          </div>
+          <button type="submit" class="btn btn-primary">💾 Guardar</button>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <!-- Approve/Assign License Modal -->
+  <div id="modal-approve" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title">Aprobar Cliente y Asignar Licencia</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="approve-client-info" id="approve-client-info"></div>
+        <form id="form-approve" class="form">
+          <input type="hidden" id="approve-user-id">
+
+          <div class="form-section">
+            <h4 class="form-section-title">📋 Plan</h4>
+            <div class="plan-selector">
+              <label class="plan-option">
+                <input type="radio" name="approve-plan" value="free" checked>
+                <div class="plan-option-card">
+                  <span class="plan-option-name">🆓 Prueba Gratis</span>
+                  <span class="plan-option-price">S/ 0</span>
+                </div>
+              </label>
+              <label class="plan-option">
+                <input type="radio" name="approve-plan" value="basic">
+                <div class="plan-option-card">
+                  <span class="plan-option-name">📋 Básico</span>
+                  <span class="plan-option-price">S/ 20/mes</span>
+                </div>
+              </label>
+              <label class="plan-option">
+                <input type="radio" name="approve-plan" value="business">
+                <div class="plan-option-card featured">
+                  <span class="plan-option-name">💼 Business</span>
+                  <span class="plan-option-price">S/ 40/mes</span>
+                </div>
+              </label>
+              <label class="plan-option">
+                <input type="radio" name="approve-plan" value="pro">
+                <div class="plan-option-card">
+                  <span class="plan-option-name">🚀 Pro</span>
+                  <span class="plan-option-price">S/ 60/mes</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">⏰ Duración de Licencia</h4>
+            <div class="duration-selector">
+              <label class="duration-option">
+                <input type="radio" name="approve-duration" value="1" checked>
+                <span>1 Mes</span>
+              </label>
+              <label class="duration-option">
+                <input type="radio" name="approve-duration" value="3">
+                <span>3 Meses <small>(-10%)</small></span>
+              </label>
+              <label class="duration-option">
+                <input type="radio" name="approve-duration" value="6">
+                <span>6 Meses <small>(-15%)</small></span>
+              </label>
+              <label class="duration-option">
+                <input type="radio" name="approve-duration" value="12">
+                <span>12 Meses <small>(-20%)</small></span>
+              </label>
+              <label class="duration-option unlimited">
+                <input type="radio" name="approve-duration" value="0">
+                <span>∞ Ilimitado</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
+            <h4 class="form-section-title">💳 Resumen del Pedido</h4>
+            <div id="approve-summary" class="approve-summary"></div>
+          </div>
+
+          <div class="approve-actions">
+            <button type="button" onclick="rejectClient()" class="btn btn-danger">❌ Rechazar</button>
+            <button type="submit" class="btn btn-primary">✅ Aprobar y Activar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Client Modal -->
+  <div id="modal-edit-client" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <h2 class="modal-title">Editar Cliente</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-edit-client" class="form">
+          <input type="hidden" id="edit-client-id">
+
+          <div class="form-group">
+            <label class="form-label">Nombre</label>
+            <input type="text" id="edit-client-name" class="form-input" readonly>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="edit-client-email" class="form-input" readonly>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Plan</label>
+              <select id="edit-client-plan" class="form-input form-select">
+                <option value="free">🆓 Prueba Gratis (S/ 0)</option>
+                <option value="basic">📋 Básico (S/ 20/mes)</option>
+                <option value="business">💼 Business (S/ 40/mes)</option>
+                <option value="pro">🚀 Pro (S/ 60/mes)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Duración (meses)</label>
+              <input type="number" id="edit-client-duration" class="form-input" value="1" min="0" max="12">
+              <small>0 = Ilimitado</small>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Estado</label>
+            <select id="edit-client-active" class="form-input form-select">
+              <option value="true">✅ Activo</option>
+              <option value="false">❌ Desactivado</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Cotizaciones usadas este mes</label>
+              <input type="number" id="edit-client-quotes-used" class="form-input" min="0">
+            </div>
+            <div class="form-group">
+              <button type="button" id="btn-reset-quotes" class="btn btn-outline">🔄 Resetear Cotizaciones</button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-block">💾 Guardar Cambios</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="superadmin.js"></script>
+</body>
+</html>

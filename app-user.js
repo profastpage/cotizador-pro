@@ -18,16 +18,32 @@ auth.onAuthStateChanged(async (user) => {
     window.location.href = 'index.html';
     return;
   }
-  
+
   currentUser = user;
-  
+
   const userDoc = await db.collection('users').doc(user.uid).get();
   if (!userDoc.exists) {
     window.location.href = 'index.html';
     return;
   }
-  
+
   userData = userDoc.data();
+
+  // Check if user is approved
+  if (!userData.approved) {
+    document.getElementById('not-approved-notice').classList.remove('hidden');
+    document.querySelector('.sidebar').classList.add('hidden');
+    document.querySelector('.main-content').classList.add('hidden');
+    document.querySelector('.bottom-nav').classList.add('hidden');
+    return;
+  }
+
+  // Check if user is active
+  if (!userData.isActive) {
+    showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
+    auth.signOut();
+    return;
+  }
   
   // Check if plan is expired
   if (userData.plan !== 'free' && userData.planEndDate) {

@@ -1,0 +1,278 @@
+/* Super Admin Panel - Estilos adicionales */
+
+/* Nav Badge */
+.nav-badge {
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-left: auto;
+}
+
+/* Modal Large */
+.modal-lg {
+  max-width: 650px;
+}
+
+/* Approve Client Info */
+.approve-client-info {
+  background: var(--color-gray-50);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.approve-client-info p {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.approve-client-info strong {
+  color: var(--color-gray-800);
+}
+
+/* Form Section */
+.form-section {
+  margin-bottom: 1.5rem;
+}
+
+.form-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-gray-700);
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--color-gray-200);
+}
+
+/* Plan Selector */
+.plan-selector {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+}
+
+.plan-option {
+  cursor: pointer;
+}
+
+.plan-option input {
+  display: none;
+}
+
+.plan-option-card {
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all 0.2s;
+}
+
+.plan-option-card.featured {
+  border-color: var(--color-primary);
+  background: #eff6ff;
+}
+
+.plan-option input:checked + .plan-option-card {
+  border-color: var(--color-primary);
+  background: #dbeafe;
+}
+
+.plan-option-name {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.plan-option-price {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+/* Duration Selector */
+.duration-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.duration-option {
+  cursor: pointer;
+}
+
+.duration-option input {
+  display: none;
+}
+
+.duration-option span {
+  display: block;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+  text-align: center;
+}
+
+.duration-option input:checked + span {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.duration-option.unlimited span {
+  border-color: var(--color-warning);
+}
+
+.duration-option.unlimited input:checked + span {
+  background: var(--color-warning);
+  color: white;
+}
+
+.duration-option small {
+  color: var(--color-gray-500);
+}
+
+.duration-option input:checked + span small {
+  color: rgba(255,255,255,0.8);
+}
+
+/* Approve Summary */
+.approve-summary {
+  background: white;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+}
+
+.summary-line.total {
+  border-top: 2px solid var(--color-gray-200);
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.summary-line.total span:last-child {
+  color: var(--color-primary);
+}
+
+.summary-line .discount {
+  color: var(--color-success);
+}
+
+/* Approve Actions */
+.approve-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.approve-actions .btn {
+  flex: 1;
+}
+
+/* Plan Feature List */
+.plan-feature-list {
+  margin-top: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--color-gray-600);
+  text-align: left;
+}
+
+.plan-feature-list br {
+  margin-bottom: 0.25rem;
+}
+
+/* Password Toggle */
+.password-wrapper {
+  position: relative;
+}
+
+.password-wrapper .form-input {
+  padding-right: 3rem;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.125rem;
+  color: var(--color-gray-500);
+  padding: 0.25rem;
+  line-height: 1;
+}
+
+.password-toggle:hover {
+  color: var(--color-gray-700);
+}
+
+/* Google Button */
+.btn-google {
+  background: white;
+  border: 2px solid var(--color-gray-200);
+  color: var(--color-gray-700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-google:hover {
+  background: var(--color-gray-50);
+  border-color: var(--color-gray-300);
+}
+
+.btn-google svg {
+  width: 18px;
+  height: 18px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  color: var(--color-gray-500);
+  font-size: 0.75rem;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-gray-200);
+}
+
+/* License Badge */
+.license-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--color-gray-100);
+  color: var(--color-gray-600);
+}
+
+.license-badge.monthly { background: #dbeafe; color: #1e40af; }
+.license-badge.quarterly { background: #d1fae5; color: #059669; }
+.license-badge.semiannual { background: #fef3c7; color: #d97706; }
+.license-badge.annual { background: #ede9fe; color: #7c3aed; }
+.license-badge.unlimited { background: #fce7f3; color: #db2777; }
+.license-badge.expired { background: #fee2e2; color: #dc2626; }
