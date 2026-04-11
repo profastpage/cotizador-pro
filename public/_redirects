@@ -1,5 +1,4 @@
-# Cloudflare Pages redirects - simplified to prevent loops
-/superadmin    /superadmin.html    200
-/app           /app.html           200
-/admin         /superadmin.html    200
-/clientes      /app.html           200
+/superadmin /superadmin.html 200
+/app /app.html 200
+/admin /superadmin.html 200
+/clientes /app.html 200
