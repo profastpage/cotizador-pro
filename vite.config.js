@@ -12,9 +12,6 @@ export default defineConfig({
         index: resolve(__dirname, 'src/index.html'),
         superadmin: resolve(__dirname, 'src/superadmin.html'),
         app: resolve(__dirname, 'src/app.html')
-      },
-      output: {
-        crossorigin: undefined
       }
     }
   },
