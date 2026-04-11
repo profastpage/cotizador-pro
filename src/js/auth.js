@@ -89,7 +89,7 @@ async function signInWithGoogle() {
 async function handleRedirectResult() {
   try {
     const result = await getRedirectResult(auth);
-    if (!result) return;
+    if (!result) return null;
 
     const user = result.user;
     const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -114,12 +114,10 @@ async function handleRedirectResult() {
         updatedAt: new Date().toISOString()
       });
 
-      if (isSuperAdmin) {
-        window.location.href = 'superadmin.html';
-      } else {
-        showToast('¡Cuenta creada! Redirigiendo...');
-        setTimeout(() => { window.location.href = 'app.html'; }, 1000);
-      }
+      showToast('¡Bienvenido! Redirigiendo...');
+      setTimeout(() => {
+        window.location.href = isSuperAdmin ? 'superadmin.html' : 'app.html';
+      }, 500);
     } else {
       const userData = userDoc.data();
       if (userData.role === 'superadmin') {
@@ -131,16 +129,19 @@ async function handleRedirectResult() {
         window.location.href = 'app.html';
       }
     }
+    return result;
   } catch (error) {
     console.error('Error handling redirect:', error);
-    if (error.code !== 'auth/popup-closed-by-user') {
-      showToast('Error al iniciar sesión con Google', 'error');
+    if (error.code === 'auth/popup-closed-by-user') {
+      return null;
     }
+    showToast('Error al iniciar sesión con Google', 'error');
+    return null;
   }
 }
 
 // Check redirect result on load
-handleRedirectResult();
+handleRedirectResult().catch(console.error);
 
 const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
