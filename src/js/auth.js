@@ -44,11 +44,6 @@ function showToast(message, type = 'success') {
   }, 3000);
 }
 
-function closePendingModal() {
-  document.getElementById('modal-pending').classList.add('hidden');
-  signOut(auth);
-}
-
 // Close modals
 document.querySelectorAll('[data-close-modal]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -103,8 +98,8 @@ async function signInWithGoogle() {
         planEndDate: null,
         quotesUsedThisMonth: 0,
         lastQuoteReset: new Date().toISOString(),
-        isActive: isSuperAdmin,
-        approved: isSuperAdmin,
+        isActive: true,
+        approved: true,
         providerId: 'google.com',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -113,15 +108,16 @@ async function signInWithGoogle() {
       if (isSuperAdmin) {
         window.location.href = 'superadmin.html';
       } else {
-        document.getElementById('modal-pending').classList.remove('hidden');
+        showToast('¡Cuenta creada! Redirigiendo...');
+        setTimeout(() => {
+          window.location.href = 'app.html';
+        }, 1000);
       }
     } else {
       const userData = userDoc.data();
 
       if (userData.role === 'superadmin') {
         window.location.href = 'superadmin.html';
-      } else if (!userData.approved) {
-        document.getElementById('modal-pending').classList.remove('hidden');
       } else if (!userData.isActive) {
         showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
         signOut(auth);
@@ -192,8 +188,8 @@ if (formRegister) {
         planEndDate: null,
         quotesUsedThisMonth: 0,
         lastQuoteReset: new Date().toISOString(),
-        isActive: isSuperAdmin,
-        approved: isSuperAdmin,
+        isActive: true,
+        approved: true,
         providerId: 'email',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
@@ -205,9 +201,10 @@ if (formRegister) {
           window.location.href = 'superadmin.html';
         }, 1000);
       } else {
-        showToast('¡Cuenta creada! Pendiente de aprobación.');
-        document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-        document.getElementById('modal-pending').classList.remove('hidden');
+        showToast('¡Cuenta creada! Redirigiendo...');
+        setTimeout(() => {
+          window.location.href = 'app.html';
+        }, 1000);
       }
 
     } catch (error) {
@@ -274,9 +271,6 @@ onAuthStateChanged(auth, async (user) => {
         if (currentPath.includes('index.html') || currentPath === '/' || currentPath === '') {
           if (userData.role === 'superadmin') {
             window.location.href = 'superadmin.html';
-          } else if (!userData.approved) {
-            signOut(auth);
-            document.getElementById('modal-pending').classList.remove('hidden');
           } else if (!userData.isActive) {
             showToast('Tu cuenta está desactivada.', 'error');
             signOut(auth);

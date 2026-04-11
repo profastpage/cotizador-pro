@@ -36,33 +36,6 @@ body {
 .hidden { display: none !important; }
 .mt-6 { margin-top: 1.5rem; }
 
-/* Not Approved Notice */
-.not-approved {
-  position: fixed;
-  inset: 0;
-  background: var(--color-gray-100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-.not-approved-content {
-  background: white;
-  border-radius: var(--radius-lg);
-  padding: 3rem 2rem;
-  text-align: center;
-  box-shadow: var(--shadow-xl);
-  max-width: 400px;
-}
-.not-approved-content h2 {
-  font-size: 1.25rem;
-  margin-bottom: 0.75rem;
-}
-.not-approved-content p {
-  color: var(--color-gray-600);
-  margin-bottom: 1.5rem;
-}
-
 /* Plan Banner */
 .plan-banner {
   background: linear-gradient(135deg, var(--color-warning) 0%, #ea580c 100%);

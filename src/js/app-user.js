@@ -26,17 +26,9 @@ onAuthStateChanged(auth, async (user) => {
 
   userData = userDoc.data();
 
-  // Check approval
-  if (!userData.approved) {
-    document.getElementById('not-approved-notice').classList.remove('hidden');
-    document.querySelector('.sidebar')?.classList.add('hidden');
-    document.querySelector('.main-content')?.classList.add('hidden');
-    document.querySelector('.bottom-nav')?.classList.add('hidden');
-    return;
-  }
-
+  // Check if user is active
   if (!userData.isActive) {
-    showToast('Tu cuenta está desactivada.', 'error');
+    showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
     signOut(auth);
     return;
   }

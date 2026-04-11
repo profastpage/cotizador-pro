@@ -23,7 +23,6 @@ onAuthStateChanged(auth, async (user) => {
   if (settingEmail) settingEmail.value = SUPER_ADMIN_EMAIL;
 
   loadDashboard();
-  loadPendingUsers();
   loadClients();
 });
 
@@ -38,7 +37,6 @@ document.querySelectorAll('[data-tab]').forEach(btn => {
 
     const titles = {
       dashboard: 'Dashboard',
-      pending: 'Pendientes de Aprobación',
       clients: 'Clientes',
       plans: 'Planes',
       settings: 'Configuración'
@@ -63,7 +61,8 @@ async function loadDashboard() {
   const users = [];
   let monthlyRevenue = 0;
   let activeUsers = 0;
-  let pendingCount = 0;
+  let freeUsers = 0;
+  let paidUsers = 0;
 
   snapshot.forEach(docSnap => {
     const user = { id: docSnap.id, ...docSnap.data() };
@@ -71,33 +70,27 @@ async function loadDashboard() {
 
     if (user.role === 'superadmin') return;
 
-    if (user.approved && user.isActive) {
+    if (user.isActive) {
       activeUsers++;
-      if (user.plan !== 'free') {
+      if (user.plan === 'free') {
+        freeUsers++;
+      } else {
+        paidUsers++;
         const prices = { basic: 20, business: 40, pro: 60 };
         monthlyRevenue += prices[user.plan] || 0;
       }
     }
-    if (!user.approved && user.role !== 'superadmin') {
-      pendingCount++;
-    }
   });
 
   allUsers = users.filter(u => u.role !== 'superadmin');
-  pendingUsers = allUsers.filter(u => !u.approved);
 
   document.getElementById('stat-total-users').textContent = allUsers.length;
   document.getElementById('stat-active-users').textContent = activeUsers;
-  document.getElementById('stat-pending-users').textContent = pendingCount;
+  document.getElementById('stat-free-users').textContent = freeUsers;
+  document.getElementById('stat-paid-users').textContent = paidUsers;
   document.getElementById('stat-monthly-revenue').textContent = `S/ ${monthlyRevenue}`;
 
-  const pendingBadge = document.getElementById('pending-count');
-  if (pendingBadge) {
-    pendingBadge.textContent = pendingCount;
-    pendingBadge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
-  }
-
-  const recentUsers = allUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 5);
+  const recentUsers = allUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
   const tbody = document.getElementById('recent-users-tbody');
   if (tbody) {
     tbody.innerHTML = recentUsers.map(user => `
@@ -107,134 +100,14 @@ async function loadDashboard() {
         <td><span class="badge badge-${user.plan}">${getPlanName(user.plan)}</span></td>
         <td>${formatDate(user.createdAt)}</td>
         <td>
-          <span class="badge ${user.approved ? (user.isActive ? 'badge-active' : 'badge-inactive') : 'badge-pending'}">
-            ${user.approved ? (user.isActive ? 'Activo' : 'Inactivo') : '⏳ Pendiente'}
+          <span class="badge ${user.isActive ? 'badge-active' : 'badge-inactive'}">
+            ${user.isActive ? 'Activo' : 'Inactivo'}
           </span>
         </td>
       </tr>
     `).join('');
   }
 }
-
-// ==========================================================
-// PENDING USERS
-// ==========================================================
-
-async function loadPendingUsers() {
-  const tbody = document.getElementById('pending-users-tbody');
-  if (!tbody) return;
-
-  if (pendingUsers.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:2rem;color:var(--color-gray-500)">No hay clientes pendientes 🎉</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = pendingUsers.map(user => `
-    <tr>
-      <td>
-        <strong>${user.name}</strong>
-        ${user.providerId === 'google.com' ? '<span class="badge badge-google" style="margin-left:0.5rem">Google</span>' : ''}
-      </td>
-      <td>${user.email}</td>
-      <td>${user.company || '-'}</td>
-      <td>${formatDate(user.createdAt)}</td>
-      <td>
-        <button class="btn btn-sm btn-success" onclick="window.approveUser('${user.id}')">✅ Aprobar</button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-// Approve user
-function approveUser(userId) {
-  const user = allUsers.find(u => u.id === userId);
-  if (!user) return;
-
-  document.getElementById('approve-user-id').value = userId;
-  document.getElementById('approve-client-info').innerHTML = `
-    <p><strong>${user.name}</strong></p>
-    <p>${user.email}</p>
-    ${user.company ? `<p>Empresa: ${user.company}</p>` : ''}
-    <p>Registrado: ${formatDate(user.createdAt)}</p>
-  `;
-
-  updateApproveSummary();
-  document.getElementById('modal-approve').classList.remove('hidden');
-}
-
-window.approveUser = approveUser;
-
-// Update approval summary
-function updateApproveSummary() {
-  const plan = document.querySelector('input[name="approve-plan"]:checked').value;
-  const duration = parseInt(document.querySelector('input[name="approve-duration"]:checked').value);
-  const prices = { free: 0, basic: 20, business: 40, pro: 60 };
-  const planName = getPlanName(plan);
-  const basePrice = prices[plan];
-  const discounts = { 1: 0, 3: 0.10, 6: 0.15, 12: 0.20, 0: 0 };
-  const discount = discounts[duration];
-  const months = duration === 0 ? 'Ilimitado' : `${duration} mes${duration > 1 ? 'es' : ''}`;
-
-  let subtotal = duration === 0 ? basePrice : basePrice * duration;
-  let discountAmount = subtotal * discount;
-  let total = subtotal - discountAmount;
-
-  document.getElementById('approve-summary').innerHTML = `
-    <div class="summary-line"><span>Plan:</span><span>${planName}</span></div>
-    <div class="summary-line"><span>Duración:</span><span>${months}</span></div>
-    ${duration > 0 ? `
-    <div class="summary-line"><span>Precio base:</span><span>S/ ${basePrice.toFixed(2)} × ${duration} = S/ ${subtotal.toFixed(2)}</span></div>
-    ${discount > 0 ? `<div class="summary-line"><span>Descuento (${discount * 100}%):</span><span class="discount">- S/ ${discountAmount.toFixed(2)}</span></div>` : ''}
-    ` : `<div class="summary-line"><span>Tipo:</span><span>Licencia ilimitada</span></div>`}
-    <div class="summary-line total"><span>Total:</span><span>S/ ${total.toFixed(2)}</span></div>
-  `;
-}
-
-document.querySelectorAll('input[name="approve-plan"], input[name="approve-duration"]').forEach(input => {
-  input.addEventListener('change', updateApproveSummary);
-});
-
-// Approve form
-const formApprove = document.getElementById('form-approve');
-if (formApprove) {
-  formApprove.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const userId = document.getElementById('approve-user-id').value;
-    const plan = document.querySelector('input[name="approve-plan"]:checked').value;
-    const duration = parseInt(document.querySelector('input[name="approve-duration"]:checked').value);
-    const now = new Date();
-    let planEndDate = duration > 0 ? new Date(now.setMonth(now.getMonth() + duration)).toISOString() : null;
-
-    try {
-      await updateDoc(doc(db, 'users', userId), {
-        approved: true, isActive: true, plan,
-        planStartDate: new Date().toISOString(),
-        planEndDate, licenseDuration: duration,
-        quotesUsedThisMonth: 0, lastQuoteReset: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      showToast('Cliente aprobado ✅');
-      document.getElementById('modal-approve').classList.add('hidden');
-      loadDashboard(); loadPendingUsers(); loadClients();
-    } catch (error) {
-      showToast('Error al aprobar', 'error');
-    }
-  });
-}
-
-// Reject client
-window.rejectClient = async function() {
-  const userId = document.getElementById('approve-user-id').value;
-  if (!confirm('¿Rechazar este cliente?')) return;
-  try {
-    await deleteDoc(doc(db, 'users', userId));
-    showToast('Cliente rechazado');
-    document.getElementById('modal-approve').classList.add('hidden');
-    loadDashboard(); loadPendingUsers(); loadClients();
-  } catch (error) {
-    showToast('Error al rechazar', 'error');
-  }
-};
 
 // ==========================================================
 // CLIENTS
@@ -249,7 +122,7 @@ function renderClients(users) {
   if (!tbody) return;
 
   if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--color-gray-500)">No hay clientes</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--color-gray-500)">No hay clientes registrados</td></tr>';
     return;
   }
 
@@ -261,12 +134,12 @@ function renderClients(users) {
         <td><strong>${user.name}</strong>${user.company ? `<br><small style="color:var(--color-gray-500)">${user.company}</small>` : ''}</td>
         <td>${user.email}</td>
         <td><span class="badge badge-${user.plan}">${getPlanName(user.plan)}</span></td>
-        <td>${!user.approved ? '<span class="license-badge expired">⏳ Pendiente</span>' : user.licenseDuration === 0 ? '<span class="license-badge unlimited">∞ Ilimitado</span>' : isExpired ? '<span class="license-badge expired">Vencido</span>' : planEndDate ? `<span class="license-badge">${formatDateShort(planEndDate)}</span>` : '-'}</td>
+        <td>${user.licenseDuration === 0 ? '<span class="license-badge unlimited">∞ Ilimitado</span>' : planEndDate && !isExpired ? `<span class="license-badge">${formatDateShort(planEndDate)}</span>` : isExpired ? '<span class="license-badge expired">Vencido</span>' : '<span class="license-badge">Gratis</span>'}</td>
         <td>${user.quotesUsedThisMonth || 0} / ${getPlanQuota(user.plan)}</td>
-        <td><span class="badge ${user.approved && user.isActive && !isExpired ? 'badge-active' : 'badge-inactive'}">${user.approved ? (user.isActive ? 'Activo' : 'Inactivo') : 'Pendiente'}</span></td>
+        <td><span class="badge ${user.isActive && !isExpired ? 'badge-active' : 'badge-inactive'}">${user.isActive ? 'Activo' : 'Inactivo'}</span></td>
         <td>
           <button class="btn btn-sm btn-primary" onclick="window.editClient('${user.id}')">✏️</button>
-          ${user.approved ? `<button class="btn btn-sm btn-warning" onclick="window.toggleClient('${user.id}', ${!user.isActive})">${user.isActive ? '⏸️' : '▶️'}</button>` : `<button class="btn btn-sm btn-success" onclick="window.approveUser('${user.id}')">✅</button>`}
+          <button class="btn btn-sm btn-warning" onclick="window.toggleClient('${user.id}', ${!user.isActive})">${user.isActive ? '⏸️' : '▶️'}</button>
         </td>
       </tr>
     `;
@@ -315,11 +188,11 @@ if (formEditClient) {
         plan, isActive, licenseDuration: duration,
         planStartDate: new Date().toISOString(), planEndDate,
         quotesUsedThisMonth: quotesUsed, lastQuoteReset: new Date().toISOString(),
-        approved: true, updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString()
       });
       showToast('Cliente actualizado ✅');
       document.getElementById('modal-edit-client').classList.add('hidden');
-      loadDashboard(); loadPendingUsers(); loadClients();
+      loadDashboard(); loadClients();
     } catch (error) {
       showToast('Error al actualizar', 'error');
     }
@@ -346,7 +219,7 @@ window.toggleClient = async function(userId, newState) {
   try {
     await updateDoc(doc(db, 'users', userId), { isActive: newState, updatedAt: new Date().toISOString() });
     showToast(`Cliente ${newState ? 'activado' : 'desactivado'}`);
-    loadDashboard(); loadPendingUsers(); loadClients();
+    loadDashboard(); loadClients();
   } catch (error) {
     showToast('Error', 'error');
   }

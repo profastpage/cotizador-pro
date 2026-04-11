@@ -24,11 +24,6 @@
         <span class="nav-icon">📈</span>
         <span class="nav-label">Dashboard</span>
       </button>
-      <button class="nav-item" data-tab="pending">
-        <span class="nav-icon">⏳</span>
-        <span class="nav-label">Pendientes</span>
-        <span class="nav-badge" id="pending-count">0</span>
-      </button>
       <button class="nav-item" data-tab="clients">
         <span class="nav-icon">👥</span>
         <span class="nav-label">Clientes</span>
@@ -63,22 +58,22 @@
         <div class="stat-card">
           <div class="stat-icon">👥</div>
           <div class="stat-info">
-            <p class="stat-label">Total Usuarios</p>
+            <p class="stat-label">Total Clientes</p>
             <h3 class="stat-value" id="stat-total-users">0</h3>
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-icon">✅</div>
           <div class="stat-info">
-            <p class="stat-label">Usuarios Activos</p>
+            <p class="stat-label">Clientes Activos</p>
             <h3 class="stat-value" id="stat-active-users">0</h3>
           </div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon">⏳</div>
+          <div class="stat-icon">🆓</div>
           <div class="stat-info">
-            <p class="stat-label">Pendientes Aprobación</p>
-            <h3 class="stat-value" id="stat-pending-users">0</h3>
+            <p class="stat-label">Plan Gratis</p>
+            <h3 class="stat-value" id="stat-free-users">0</h3>
           </div>
         </div>
         <div class="stat-card">
@@ -104,30 +99,6 @@
               </tr>
             </thead>
             <tbody id="recent-users-tbody">
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- Pending Approvals Tab -->
-    <section id="tab-pending" class="tab-content">
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Clientes Pendientes de Aprobación</h3>
-        </div>
-        <div class="table-responsive">
-          <table class="table">
-            <thead>
-              <tr>
-                <th>Usuario</th>
-                <th>Email</th>
-                <th>Empresa</th>
-                <th>Registro</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="pending-users-tbody">
             </tbody>
           </table>
         </div>
@@ -226,93 +197,6 @@
       </div>
     </section>
   </main>
-
-  <!-- Approve/Assign License Modal -->
-  <div id="modal-approve" class="modal hidden">
-    <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-dialog modal-lg">
-      <div class="modal-header">
-        <h2 class="modal-title">Aprobar Cliente y Asignar Licencia</h2>
-        <button class="modal-close" data-close-modal>✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="approve-client-info" id="approve-client-info"></div>
-        <form id="form-approve" class="form">
-          <input type="hidden" id="approve-user-id">
-
-          <div class="form-section">
-            <h4 class="form-section-title">📋 Plan</h4>
-            <div class="plan-selector">
-              <label class="plan-option">
-                <input type="radio" name="approve-plan" value="free" checked>
-                <div class="plan-option-card">
-                  <span class="plan-option-name">🆓 Prueba Gratis</span>
-                  <span class="plan-option-price">S/ 0</span>
-                </div>
-              </label>
-              <label class="plan-option">
-                <input type="radio" name="approve-plan" value="basic">
-                <div class="plan-option-card">
-                  <span class="plan-option-name">📋 Básico</span>
-                  <span class="plan-option-price">S/ 20/mes</span>
-                </div>
-              </label>
-              <label class="plan-option">
-                <input type="radio" name="approve-plan" value="business">
-                <div class="plan-option-card featured">
-                  <span class="plan-option-name">💼 Business</span>
-                  <span class="plan-option-price">S/ 40/mes</span>
-                </div>
-              </label>
-              <label class="plan-option">
-                <input type="radio" name="approve-plan" value="pro">
-                <div class="plan-option-card">
-                  <span class="plan-option-name">🚀 Pro</span>
-                  <span class="plan-option-price">S/ 60/mes</span>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <h4 class="form-section-title">⏰ Duración de Licencia</h4>
-            <div class="duration-selector">
-              <label class="duration-option">
-                <input type="radio" name="approve-duration" value="1" checked>
-                <span>1 Mes</span>
-              </label>
-              <label class="duration-option">
-                <input type="radio" name="approve-duration" value="3">
-                <span>3 Meses <small>(-10%)</small></span>
-              </label>
-              <label class="duration-option">
-                <input type="radio" name="approve-duration" value="6">
-                <span>6 Meses <small>(-15%)</small></span>
-              </label>
-              <label class="duration-option">
-                <input type="radio" name="approve-duration" value="12">
-                <span>12 Meses <small>(-20%)</small></span>
-              </label>
-              <label class="duration-option unlimited">
-                <input type="radio" name="approve-duration" value="0">
-                <span>∞ Ilimitado</span>
-              </label>
-            </div>
-          </div>
-
-          <div class="form-section">
-            <h4 class="form-section-title">💳 Resumen del Pedido</h4>
-            <div id="approve-summary" class="approve-summary"></div>
-          </div>
-
-          <div class="approve-actions">
-            <button type="button" onclick="rejectClient()" class="btn btn-danger">❌ Rechazar</button>
-            <button type="submit" class="btn btn-primary">✅ Aprobar y Activar</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  </div>
 
   <!-- Edit Client Modal -->
   <div id="modal-edit-client" class="modal hidden">
