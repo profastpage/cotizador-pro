@@ -90,7 +90,6 @@ function initUI() {
   document.getElementById('quote-issue-date').value = today.toISOString().split('T')[0];
   document.getElementById('quote-due-date').value = dueDate.toISOString().split('T')[0];
 
-  setupNavigation();
   setupWizard();
   setupForms();
 }
@@ -107,31 +106,43 @@ function updatePlanProgress() {
 }
 
 // ==========================================================
-// NAVIGATION
+// NAVIGATION - Event delegation for reliability
 // ==========================================================
 
-function setupNavigation() {
-  document.querySelectorAll('.sidebar .nav-item, .bottom-nav .nav-item').forEach(btn => {
-    btn.addEventListener('click', () => navigateTo(btn.dataset.screen));
-  });
-  document.querySelectorAll('[data-close-modal]').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-    });
-  });
-}
+// Use event delegation on document for all navigation
+document.addEventListener('click', (e) => {
+  const navBtn = e.target.closest('[data-screen]');
+  if (navBtn) {
+    e.preventDefault();
+    navigateTo(navBtn.dataset.screen);
+  }
+  
+  // Close modals
+  if (e.target.hasAttribute('data-close-modal')) {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+  }
+});
 
 function navigateTo(screen) {
+  if (!screen) return;
+  
+  // Hide all screens
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  document.getElementById(`screen-${screen}`).classList.add('active');
+  const targetScreen = document.getElementById(`screen-${screen}`);
+  if (targetScreen) targetScreen.classList.add('active');
+  
+  // Update ALL nav buttons (sidebar + bottom)
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.remove('active');
     if (btn.dataset.screen === screen) btn.classList.add('active');
   });
+  
+  // Load screen data
   if (screen === 'dashboard') loadDashboard();
   if (screen === 'history') loadHistory();
   if (screen === 'new-quote') resetWizard();
   if (screen === 'settings') loadSettings();
+  
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -492,7 +503,7 @@ function setupForms() {
 // ==========================================================
 
 function getPlanQuota(plan) {
-  return { free: 5, basic: 20, business: 50, pro: -1 }[plan] || 5;
+  return { free: 5, basic: 60, business: 200, pro: -1 }[plan] || 5;
 }
 
 function getPlanName(plan) {
@@ -506,8 +517,8 @@ function getPlanPrice(plan) {
 function getPlanDesc(plan) {
   const descs = {
     free: '5 cotizaciones por mes • 10 clientes',
-    basic: '20 cotizaciones por mes • 50 clientes',
-    business: '50 cotizaciones por mes • 200 clientes',
+    basic: '60 cotizaciones por mes • 50 clientes',
+    business: '200 cotizaciones por mes • 200 clientes',
     pro: 'Cotizaciones ilimitadas • Todo incluido'
   };
   return descs[plan] || descs.free;

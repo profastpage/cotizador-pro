@@ -267,7 +267,7 @@ function getPlanName(plan) {
 }
 
 function getPlanQuota(plan) {
-  return { free: '5', basic: '20', business: '50', pro: '∞' }[plan] || '0';
+  return { free: '5', basic: '60', business: '200', pro: '∞' }[plan] || '0';
 }
 
 function getPlanPrice(plan) {
