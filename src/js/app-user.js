@@ -220,6 +220,24 @@ function setupWizard() {
   document.getElementById('btn-prev-step')?.addEventListener('click', prevStep);
   document.getElementById('btn-generate-pdf')?.addEventListener('click', generatePDF);
   document.getElementById('btn-add-item')?.addEventListener('click', addItem);
+  
+  // IGV toggle listeners
+  document.getElementById('igv-enabled')?.addEventListener('change', updateSummary);
+  document.querySelectorAll('input[name="igv-type"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const igvTypeOptions = document.getElementById('igv-type-options');
+      if (igvTypeOptions) {
+        igvTypeOptions.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
+      }
+      updateSummary();
+    });
+  });
+  
+  // Initialize IGV type options visibility
+  const igvTypeOptions = document.getElementById('igv-type-options');
+  if (igvTypeOptions && document.getElementById('igv-enabled')) {
+    igvTypeOptions.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
+  }
 }
 
 function resetWizard() {
@@ -327,12 +345,50 @@ function updateItem(id, field, value) {
 }
 
 function updateSummary() {
+  const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
+  const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
+  
   const subtotal = quoteItems.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0), 0);
-  const igv = subtotal * 0.18;
-  const total = subtotal + igv;
+  let igv = 0;
+  let total = 0;
+  
+  if (igvEnabled) {
+    if (igvType === 'included') {
+      // Price includes IGV: extract IGV from total
+      total = subtotal;
+      igv = total - (total / 1.18);
+    } else {
+      // IGV is added on top
+      igv = subtotal * 0.18;
+      total = subtotal + igv;
+    }
+  } else {
+    igv = 0;
+    total = subtotal;
+  }
+
   document.getElementById('summary-subtotal').textContent = formatCurrency(subtotal);
   document.getElementById('summary-igv').textContent = formatCurrency(igv);
   document.getElementById('summary-total').textContent = formatCurrency(total);
+  
+  // Update IGV row visibility
+  const igvRow = document.getElementById('summary-igv-row');
+  if (igvRow) igvRow.style.display = igvEnabled ? '' : 'none';
+  
+  // Update note
+  const note = document.getElementById('summary-note');
+  if (note) {
+    if (!igvEnabled) {
+      note.textContent = 'Precios sin IGV';
+      note.style.color = 'var(--color-gray-500)';
+    } else if (igvType === 'included') {
+      note.textContent = 'Precios incluyen IGV';
+      note.style.color = 'var(--color-success)';
+    } else {
+      note.textContent = 'IGV se agrega al subtotal';
+      note.style.color = 'var(--color-gray-500)';
+    }
+  }
 }
 
 function updateReview() {

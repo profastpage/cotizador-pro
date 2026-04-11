@@ -164,12 +164,34 @@
           <h3 class="form-section-title">Items</h3>
           <div id="items-container" class="items-container"></div>
           <button id="btn-add-item" class="btn btn-outline btn-block">➕ Agregar Item</button>
+          
+          <!-- IGV Options -->
+          <div class="igv-options">
+            <h4 class="form-section-title">Configuración de IGV</h4>
+            <div class="igv-toggle-row">
+              <label class="igv-toggle-label">
+                <input type="checkbox" id="igv-enabled" checked>
+                <span>Incluir IGV (18%)</span>
+              </label>
+            </div>
+            <div id="igv-type-options" class="igv-type-options">
+              <label class="igv-radio-option">
+                <input type="radio" name="igv-type" value="apart" checked>
+                <span>IGV aparte (se suma al subtotal)</span>
+              </label>
+              <label class="igv-radio-option">
+                <input type="radio" name="igv-type" value="included">
+                <span>Precio incluye IGV (se desglosa)</span>
+              </label>
+            </div>
+          </div>
+          
           <div class="quote-summary">
             <div class="summary-row">
               <span>Subtotal:</span>
               <span id="summary-subtotal">S/ 0.00</span>
             </div>
-            <div class="summary-row">
+            <div class="summary-row" id="summary-igv-row">
               <span>IGV (18%):</span>
               <span id="summary-igv">S/ 0.00</span>
             </div>
@@ -177,6 +199,7 @@
               <span>TOTAL:</span>
               <span id="summary-total">S/ 0.00</span>
             </div>
+            <div class="summary-note" id="summary-note"></div>
           </div>
         </div>
 
