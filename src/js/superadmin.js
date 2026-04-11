@@ -3,33 +3,31 @@
 import { auth, db, SUPER_ADMIN_EMAIL, PLANS, LICENSE_DURATIONS, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 let allUsers = [];
-let isLoading = true;
+let currentUser = null;
 
-// Auth check
-onAuthStateChanged(auth, async (user) => {
-  if (isLoading && !user) {
-    // Not logged in, redirect to login
-    window.location.href = 'index.html';
-    return;
-  }
+// Auth check - wait for auth to settle before any logic
+onAuthStateChanged(auth, (user) => {
+  currentUser = user;
   
-  if (!user) return;
-  
-  isLoading = false;
-
-  const userDoc = await getDoc(doc(db, 'users', user.uid));
-  if (!userDoc.exists() || userDoc.data().role !== 'superadmin') {
-    // Not a super admin, redirect to app
-    window.location.href = 'app.html';
+  if (!user) {
+    // Not logged in - show message instead of redirecting
+    document.getElementById('admin-name').textContent = 'No autorizado';
     return;
   }
 
-  document.getElementById('admin-name').textContent = userDoc.data().name;
-  const settingEmail = document.getElementById('setting-admin-email');
-  if (settingEmail) settingEmail.value = SUPER_ADMIN_EMAIL;
+  // User is logged in, check if super admin
+  getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
+    if (!userDoc.exists() || userDoc.data().role !== 'superadmin') {
+      // Not a super admin
+      window.location.replace('app.html');
+      return;
+    }
 
-  loadDashboard();
-  loadClients();
+    // Super admin - load the panel
+    document.getElementById('admin-name').textContent = userDoc.data().name;
+    loadDashboard();
+    loadClients();
+  });
 });
 
 // Tab navigation

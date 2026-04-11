@@ -6,58 +6,58 @@ let currentUser = null;
 let userData = null;
 let quoteItems = [];
 let currentWizardStep = 1;
-let isLoading = true;
 
 // ==========================================================
-// AUTH CHECK
+// AUTH CHECK - NO redirects to avoid loops
 // ==========================================================
 
-onAuthStateChanged(auth, async (user) => {
-  if (isLoading && !user) {
-    window.location.href = 'index.html';
-    return;
-  }
-  
-  if (!user) return;
-  
-  isLoading = false;
+onAuthStateChanged(auth, (user) => {
   currentUser = user;
-  const userDoc = await getDoc(doc(db, 'users', user.uid));
-  if (!userDoc.exists()) {
-    window.location.href = 'index.html';
+  
+  if (!user) {
+    // Not logged in - show message
+    document.getElementById('user-name').textContent = 'Usuario';
     return;
   }
 
-  userData = userDoc.data();
-
-  // Check if user is active
-  if (!userData.isActive) {
-    showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
-    signOut(auth);
-    return;
-  }
-
-  // Check plan expiry
-  if (userData.plan !== 'free' && userData.planEndDate) {
-    const endDate = new Date(userData.planEndDate);
-    if (endDate < new Date() && userData.licenseDuration !== 0) {
-      await updateDoc(doc(db, 'users', user.uid), {
-        plan: 'free', planStartDate: null, planEndDate: null, quotesUsedThisMonth: 0
-      });
-      userData.plan = 'free';
+  // User is logged in, load their data
+  getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
+    if (!userDoc.exists()) {
+      window.location.href = 'index.html';
+      return;
     }
-  }
 
-  // Monthly reset
-  const lastReset = new Date(userData.lastQuoteReset);
-  const now = new Date();
-  if (lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear()) {
-    await updateDoc(doc(db, 'users', user.uid), { quotesUsedThisMonth: 0, lastQuoteReset: now.toISOString() });
-    userData.quotesUsedThisMonth = 0;
-  }
+    userData = userDoc.data();
 
-  initUI();
-  loadDashboard();
+    // Check if user is active
+    if (!userData.isActive) {
+      showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
+      signOut(auth);
+      return;
+    }
+
+    // Check plan expiry
+    if (userData.plan !== 'free' && userData.planEndDate) {
+      const endDate = new Date(userData.planEndDate);
+      if (endDate < new Date() && userData.licenseDuration !== 0) {
+        updateDoc(doc(db, 'users', user.uid), {
+          plan: 'free', planStartDate: null, planEndDate: null, quotesUsedThisMonth: 0
+        });
+        userData.plan = 'free';
+      }
+    }
+
+    // Monthly reset
+    const lastReset = new Date(userData.lastQuoteReset);
+    const now = new Date();
+    if (lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear()) {
+      updateDoc(doc(db, 'users', user.uid), { quotesUsedThisMonth: 0, lastQuoteReset: now.toISOString() });
+      userData.quotesUsedThisMonth = 0;
+    }
+
+    initUI();
+    loadDashboard();
+  });
 });
 
 // ==========================================================

@@ -269,31 +269,33 @@ if (formLogin) {
 
 // ==========================================================
 // AUTH STATE LISTENER
+// Only redirects if already logged in and on landing page
 // ==========================================================
 
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const currentPath = window.location.pathname;
+let hasRedirected = false;
 
-        // Only redirect if on landing page
-        if (currentPath.includes('index.html') || currentPath === '/' || currentPath === '') {
-          if (userData.role === 'superadmin') {
-            window.location.href = 'superadmin.html';
-          } else if (!userData.isActive) {
-            showToast('Tu cuenta está desactivada.', 'error');
-            signOut(auth);
-          } else {
-            window.location.href = 'app.html';
-          }
-        }
+onAuthStateChanged(auth, async (user) => {
+  if (hasRedirected) return;
+  if (!user) return;
+
+  try {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    if (!userDoc.exists()) return;
+
+    const userData = userDoc.data();
+    const currentPath = window.location.pathname;
+
+    // Only auto-redirect from root/landing page
+    if ((currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html')) && !hasRedirected) {
+      hasRedirected = true;
+      if (userData.role === 'superadmin') {
+        window.location.replace('superadmin.html');
+      } else if (userData.isActive) {
+        window.location.replace('app.html');
       }
-    } catch (error) {
-      console.error('Error checking user:', error);
     }
+  } catch (error) {
+    console.error('Error checking user:', error);
   }
 });
 
