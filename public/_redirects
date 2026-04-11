@@ -2,9 +2,10 @@
 # SPA fallbacks - rutas amigables
 /superadmin     /superadmin.html   200
 /superadmin/*   /superadmin.html   200
-/clientes       /clientes.html     200
-/clientes/*     /clientes.html     200
-/admin          /admin.html        200
-/admin/*        /admin.html        200
+/clientes       /app.html          200
+/clientes/*     /app.html          200
+/admin          /superadmin.html   200
+/admin/*        /superadmin.html   200
 /app            /app.html          200
 /app/*          /app.html          200
+/*              /index.html        200

@@ -1,19 +1,29 @@
-// Firebase Configuration
-// Reemplaza con tus credenciales de Firebase Console
+// Firebase Configuration - SDK Modular v10+
+import { initializeApp } from "firebase/app";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from "firebase/firestore";
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "TU_API_KEY_AQUI",
-  authDomain: "tu-proyecto.firebaseapp.com",
-  projectId: "tu-proyecto",
-  storageBucket: "tu-proyecto.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "1:123456789:web:abcdef123456"
+  apiKey: "AIzaSyBE61OROA5PenPM-3wKwJaKWpxa4OiEk48",
+  authDomain: "cotizapro-34b07.firebaseapp.com",
+  projectId: "cotizapro-34b07",
+  storageBucket: "cotizapro-34b07.firebasestorage.app",
+  messagingSenderId: "886349689737",
+  appId: "1:886349689737:web:e2211a67c86ad958516758"
 };
 
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
 // Super Admin Email (SOLO ESTE EMAIL TIENE ACCESO AL PANEL ADMIN)
-const SUPER_ADMIN_EMAIL = "tu-email@gmail.com";
+export const SUPER_ADMIN_EMAIL = "tu-email@gmail.com";
 
 // Planes disponibles con límites reales
-const PLANS = {
+export const PLANS = {
   free: {
     id: 'free',
     name: 'Prueba Gratuita',
@@ -102,10 +112,14 @@ const PLANS = {
 };
 
 // Duraciones de licencia disponibles
-const LICENSE_DURATIONS = {
+export const LICENSE_DURATIONS = {
   1: { label: '1 Mes', multiplier: 1 },
   3: { label: '3 Meses (Trimestral)', multiplier: 3, discount: 0.10 },
   6: { label: '6 Meses (Semestral)', multiplier: 6, discount: 0.15 },
   12: { label: '12 Meses (Anual)', multiplier: 12, discount: 0.20 },
   0: { label: 'Ilimitado', multiplier: 0, discount: 0 }
 };
+
+// Export Firebase instances and methods
+export { auth, db, googleProvider, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue };
+export default app;
