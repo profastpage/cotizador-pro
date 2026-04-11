@@ -90,6 +90,7 @@ function initUI() {
   document.getElementById('quote-issue-date').value = today.toISOString().split('T')[0];
   document.getElementById('quote-due-date').value = dueDate.toISOString().split('T')[0];
 
+  setupNavigation();
   setupWizard();
   setupForms();
 }
@@ -106,35 +107,48 @@ function updatePlanProgress() {
 }
 
 // ==========================================================
-// NAVIGATION - Event delegation for reliability
+// NAVIGATION - Direct event binding (works with ES modules)
 // ==========================================================
 
-// Use event delegation on document for all navigation
-document.addEventListener('click', (e) => {
-  const navBtn = e.target.closest('[data-screen]');
-  if (navBtn) {
-    e.preventDefault();
-    navigateTo(navBtn.dataset.screen);
-  }
+function setupNavigation() {
+  // Sidebar and bottom nav buttons
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const screen = btn.dataset.screen;
+      if (screen) navigateTo(screen);
+    };
+  });
   
-  // Close modals
-  if (e.target.hasAttribute('data-close-modal')) {
-    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-  }
-});
+  // Modal close buttons
+  document.querySelectorAll('[data-close-modal]').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+    };
+  });
+}
 
 function navigateTo(screen) {
   if (!screen) return;
   
   // Hide all screens
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  const targetScreen = document.getElementById(`screen-${screen}`);
-  if (targetScreen) targetScreen.classList.add('active');
   
-  // Update ALL nav buttons (sidebar + bottom)
+  // Show target screen
+  const targetScreen = document.getElementById(`screen-${screen}`);
+  if (targetScreen) {
+    targetScreen.classList.add('active');
+  } else {
+    console.error(`Screen not found: screen-${screen}`);
+  }
+  
+  // Update ALL nav buttons (sidebar + bottom nav)
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.remove('active');
-    if (btn.dataset.screen === screen) btn.classList.add('active');
+    if (btn.dataset.screen === screen) {
+      btn.classList.add('active');
+    }
   });
   
   // Load screen data
@@ -143,6 +157,7 @@ function navigateTo(screen) {
   if (screen === 'new-quote') resetWizard();
   if (screen === 'settings') loadSettings();
   
+  // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -589,11 +604,19 @@ function formatDateShort(date) {
 }
 
 async function getUserQuotes() {
-  const q = query(collection(db, 'quotes'), where('userId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
-  const snapshot = await getDocs(q);
-  const quotes = [];
-  snapshot.forEach(docSnap => quotes.push({ id: docSnap.id, ...docSnap.data() }));
-  return quotes;
+  try {
+    const q = query(collection(db, 'quotes'), where('userId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const quotes = [];
+    snapshot.forEach(docSnap => quotes.push({ id: docSnap.id, ...docSnap.data() }));
+    return quotes;
+  } catch (error) {
+    console.error('Error fetching quotes:', error);
+    if (error.code === 'failed-precondition') {
+      showToast('Índice de base de datos requerido. Contacta al administrador.', 'error');
+    }
+    return [];
+  }
 }
 
 window.deleteQuote = async function(id) {
