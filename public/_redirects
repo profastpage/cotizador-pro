@@ -1,11 +1,6 @@
 # Cloudflare Pages redirects
-# SPA fallbacks - rutas amigables
-/superadmin     /superadmin.html   200
-/superadmin/*   /superadmin.html   200
-/clientes       /app.html          200
-/clientes/*     /app.html          200
-/admin          /superadmin.html   200
-/admin/*        /superadmin.html   200
-/app            /app.html          200
-/app/*          /app.html          200
-/*              /index.html        200
+/superadmin    /superadmin.html    200
+/app           /app.html           200
+/admin         /superadmin.html    200
+/clientes      /app.html           200
+/*             /index.html         200
