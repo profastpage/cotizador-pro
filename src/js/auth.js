@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, PLANS, LICENSE_DURATIONS, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, PLANS, LICENSE_DURATIONS, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -73,19 +73,28 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN
+// GOOGLE SIGN IN (Redirect flow - avoids COOP popup issues)
 // ==========================================================
 
 async function signInWithGoogle() {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const user = result.user;
+    await signInWithRedirect(auth, googleProvider);
+  } catch (error) {
+    console.error('Error Google Sign-In:', error);
+    showToast('Error al iniciar sesión con Google', 'error');
+  }
+}
 
-    // Check if user exists in Firestore
+// Handle redirect result on page load
+async function handleRedirectResult() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) return;
+
+    const user = result.user;
     const userDoc = await getDoc(doc(db, 'users', user.uid));
 
     if (!userDoc.exists()) {
-      // New user, create document
       const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 
       await setDoc(doc(db, 'users', user.uid), {
@@ -109,33 +118,29 @@ async function signInWithGoogle() {
         window.location.href = 'superadmin.html';
       } else {
         showToast('¡Cuenta creada! Redirigiendo...');
-        setTimeout(() => {
-          window.location.href = 'app.html';
-        }, 1000);
+        setTimeout(() => { window.location.href = 'app.html'; }, 1000);
       }
     } else {
       const userData = userDoc.data();
-
       if (userData.role === 'superadmin') {
         window.location.href = 'superadmin.html';
       } else if (!userData.isActive) {
-        showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
+        showToast('Tu cuenta está desactivada.', 'error');
         signOut(auth);
       } else {
         window.location.href = 'app.html';
       }
     }
   } catch (error) {
-    console.error('Error Google Sign-In:', error);
-    let message = 'Error al iniciar sesión con Google';
-    if (error.code === 'auth/popup-closed-by-user') {
-      message = 'Inicio de sesión cancelado';
-    } else if (error.code === 'auth/popup-blocked') {
-      message = 'Permite las ventanas emergentes para usar Google';
+    console.error('Error handling redirect:', error);
+    if (error.code !== 'auth/popup-closed-by-user') {
+      showToast('Error al iniciar sesión con Google', 'error');
     }
-    showToast(message, 'error');
   }
 }
+
+// Check redirect result on load
+handleRedirectResult();
 
 const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
