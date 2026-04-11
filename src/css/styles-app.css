@@ -44,19 +44,17 @@ body {
   display: block;
 }
 
-/* Plan Banner */
+/* Plan Banner - Desktop: integrated in sidebar, Mobile: thin single line */
 .plan-banner {
   background: linear-gradient(135deg, var(--color-warning) 0%, #ea580c 100%);
   color: white;
-  padding: 0.75rem 1rem;
+  padding: 0.5rem 1rem;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 200;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  display: none; /* Hidden on desktop - shown in sidebar */
 }
 .plan-banner .container {
   display: flex;
@@ -66,7 +64,65 @@ body {
   max-width: 1200px;
   margin: 0 auto;
 }
-.plan-banner .btn { background: white; color: var(--color-warning); }
+
+/* Sidebar plan upgrade (Desktop only) */
+.sidebar-plan-upgrade {
+  display: none;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-plan-upgrade .upgrade-text {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 0.5rem;
+}
+.sidebar-plan-upgrade .btn-upgrade {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--color-warning);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  /* Mobile: thin single-line banner */
+  .plan-banner {
+    display: flex;
+    padding: 0.4rem 0.75rem;
+  }
+  .plan-banner .container {
+    max-width: 100%;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+  .plan-banner span {
+    font-size: 0.7rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    line-height: 1.2;
+  }
+  .plan-banner .btn {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.65rem;
+    background: white;
+    color: var(--color-warning);
+    border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    border: none;
+    line-height: 1.2;
+  }
+  .main-content {
+    padding-top: calc(var(--topbar-height) + 34px);
+  }
+}
 
 /* Sidebar */
 .sidebar {

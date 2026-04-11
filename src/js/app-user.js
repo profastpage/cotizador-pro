@@ -414,13 +414,13 @@ function updateReview() {
 }
 
 // ==========================================================
-// GENERATE PDF - Fixed version
+// GENERATE PDF - Professional Design
 // ==========================================================
 
 async function generatePDF() {
   if (isGeneratingPDF) return;
   isGeneratingPDF = true;
-  
+
   try {
     const quota = getPlanQuota(userData.plan);
     if (quota !== -1 && userData.quotesUsedThisMonth >= quota) {
@@ -440,43 +440,43 @@ async function generatePDF() {
 
     showToast('Generando PDF...', 'info');
     const company = companySnap.data();
-    
+
     const clientName = document.getElementById('client-name').value || 'Sin nombre';
     const clientDoc = document.getElementById('client-document').value || '';
-    
+    const clientEmail = document.getElementById('client-email').value || '';
+    const clientPhone = document.getElementById('client-phone').value || '';
+    const clientAddress = document.getElementById('client-address').value || '';
+
     const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
     const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
-    
+
     let subtotal = 0;
     for (let idx = 0; idx < quoteItems.length; idx++) {
       subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
     }
-    
+
     let igvAmount = 0, grandTotal = 0;
     if (igvEnabled) {
       if (igvType === 'included') { grandTotal = subtotal; igvAmount = grandTotal - (grandTotal / 1.18); }
       else { igvAmount = subtotal * 0.18; grandTotal = subtotal + igvAmount; }
     } else { grandTotal = subtotal; }
 
+    const quoteNum = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
+    const issueDate = document.getElementById('quote-issue-date').value;
+    const dueDate = document.getElementById('quote-due-date').value;
+
     const quoteData = {
       userId: currentUser.uid,
-      client: {
-        name: clientName, document: clientDoc,
-        email: document.getElementById('client-email').value || '',
-        phone: document.getElementById('client-phone').value || '',
-        address: document.getElementById('client-address').value || ''
-      },
-      items: quoteItems,
-      issueDate: document.getElementById('quote-issue-date').value,
-      dueDate: document.getElementById('quote-due-date').value,
-      subtotal, igv: igvAmount, total: grandTotal,
-      igvEnabled, igvType,
+      client: { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress },
+      items: quoteItems, issueDate, dueDate,
+      subtotal, igv: igvAmount, total: grandTotal, igvEnabled, igvType,
       createdAt: new Date().toISOString()
     };
 
     await addDoc(collection(db, 'quotes'), quoteData);
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
+    // Load jsPDF
     if (!window.jspdf) {
       await new Promise((resolve, reject) => {
         const scriptTag = document.createElement('script');
@@ -486,94 +486,323 @@ async function generatePDF() {
         document.head.appendChild(scriptTag);
       });
     }
-    
+
+    // Generate Professional PDF
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF();
     
-    pdf.setFontSize(20); pdf.setFont(undefined, 'bold');
-    pdf.text('COTIZACIÓN', 105, 20, { align: 'center' });
+    // Colors
+    const BLUE = [30, 64, 175];
+    const LIGHT_BLUE = [240, 244, 255];
+    const GRAY_BG = [245, 247, 250];
+    const GRAY_TEXT = [100, 116, 139];
+    const DARK = [15, 23, 42];
+    const GREEN = [5, 150, 105];
+
+    // ==========================================
+    // HEADER - Company Info + Title
+    // ==========================================
     
-    pdf.setFontSize(10); pdf.setFont(undefined, 'normal');
-    pdf.text(company.name || '', 20, 35);
-    if (company.ruc) pdf.text(`RUC: ${company.ruc}`, 20, 42);
-    if (company.address) pdf.text(company.address, 20, 48);
-    if (company.phone) pdf.text(`Tel: ${company.phone}`, 20, 54);
-    
+    // Company info (left)
     pdf.setFontSize(11);
-    const quoteNum = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
-    pdf.text(`N° ${quoteNum}`, 190, 35, { align: 'right' });
-    pdf.text(`Fecha: ${quoteData.issueDate}`, 190, 42, { align: 'right' });
-    pdf.text(`Vence: ${quoteData.dueDate}`, 190, 49, { align: 'right' });
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(...DARK);
+    pdf.text(company.name || 'Mi Empresa', 20, 20);
     
-    pdf.setFillColor(240, 240, 240);
-    pdf.rect(20, 70, 170, 25, 'F');
-    pdf.setFontSize(11); pdf.setFont(undefined, 'bold');
-    pdf.text('CLIENTE', 25, 78);
-    pdf.setFont(undefined, 'normal'); pdf.setFontSize(10);
-    pdf.text(clientName, 25, 86);
-    if (clientDoc) pdf.text(`RUC/DNI: ${clientDoc}`, 25, 92);
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...GRAY_TEXT);
     
-    let tableY = 105;
-    pdf.setFillColor(30, 64, 175);
-    pdf.rect(20, tableY, 170, 8, 'F');
-    pdf.setTextColor(255, 255, 255); pdf.setFontSize(9); pdf.setFont(undefined, 'bold');
-    pdf.text('DESCRIPCIÓN', 25, tableY + 6);
-    pdf.text('CANT', 115, tableY + 6);
-    pdf.text('P.UNIT', 140, tableY + 6);
-    pdf.text('TOTAL', 188, tableY + 6, { align: 'right' });
+    let companyY = 27;
+    if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
+    if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
+    if (company.phone) { pdf.text(company.phone, 20, companyY); companyY += 5; }
     
-    pdf.setTextColor(0, 0, 0); pdf.setFont(undefined, 'normal');
+    // COTIZACIÓN title (right)
+    pdf.setFontSize(22);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(...BLUE);
+    pdf.text('COTIZACIÓN', 190, 20, { align: 'right' });
+    
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
+    if (company.phone) pdf.text(`Tel: ${company.phone}`, 190, 32, { align: 'right' });
+    if (company.email) pdf.text(company.email, 190, 37, { align: 'right' });
+    
+    // Blue divider line
+    pdf.setDrawColor(...BLUE);
+    pdf.setLineWidth(1);
+    pdf.line(20, 42, 190, 42);
+
+    // ==========================================
+    // QUOTE INFO BAR
+    // ==========================================
+    
+    const barY = 47;
+    pdf.setFillColor(...LIGHT_BLUE);
+    pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
+    
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(...GRAY_TEXT);
+    
+    // Número
+    pdf.text('NÚMERO:', 25, barY + 5);
+    pdf.setFontSize(9);
+    pdf.setTextColor(...DARK);
+    pdf.text(`#${quoteNum}`, 25, barY + 10);
+    
+    // Fecha Emisión
+    pdf.setFontSize(8);
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('FECHA EMISIÓN:', 65, barY + 5);
+    pdf.setFontSize(9);
+    pdf.setTextColor(...DARK);
+    pdf.text(issueDate || '-', 65, barY + 10);
+    
+    // Fecha Vencimiento
+    pdf.setFontSize(8);
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
+    pdf.setFontSize(9);
+    pdf.setTextColor(...DARK);
+    pdf.text(dueDate || '-', 105, barY + 10);
+    
+    // Moneda
+    pdf.setFontSize(8);
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('MONEDA:', 155, barY + 5);
+    pdf.setFontSize(9);
+    pdf.setTextColor(...DARK);
+    pdf.text('PEN (Soles)', 155, barY + 10);
+
+    // ==========================================
+    // CLIENT DATA SECTION
+    // ==========================================
+    
+    const clientY = 68;
+    
+    // Blue header bar
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
+    
+    // Gray info box
+    const boxY = clientY + 11;
+    pdf.setFillColor(...GRAY_BG);
+    pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
+    
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...DARK);
+    
+    // Left column
+    pdf.setFont(undefined, 'bold');
+    pdf.text('RUC/DNI:', 25, boxY + 7);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(clientDoc || '-', 55, boxY + 7);
+    
+    pdf.setFont(undefined, 'bold');
+    pdf.text('EMAIL:', 25, boxY + 14);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(clientEmail || '-', 55, boxY + 14);
+    
+    pdf.setFont(undefined, 'bold');
+    pdf.text('DIRECCIÓN:', 25, boxY + 21);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(clientAddress || '-', 58, boxY + 21);
+    
+    // Right column
+    pdf.setFont(undefined, 'bold');
+    pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(clientName, 145, boxY + 7);
+    
+    pdf.setFont(undefined, 'bold');
+    pdf.text('TELÉFONO:', 110, boxY + 14);
+    pdf.setFont(undefined, 'normal');
+    pdf.text(clientPhone || '-', 135, boxY + 14);
+
+    // ==========================================
+    // ITEMS TABLE
+    // ==========================================
+    
+    let tableY = boxY + 35;
+    
+    // Table header
+    pdf.setFillColor(...BLUE);
+    pdf.rect(20, tableY, 170, 9, 'F');
+    
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('CANT.', 25, tableY + 6);
+    pdf.text('DESCRIPCIÓN', 45, tableY + 6);
+    pdf.text('P. UNIT.', 130, tableY + 6);
+    pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+    
+    // Table rows
+    pdf.setFont(undefined, 'normal');
+    pdf.setFontSize(8);
+    tableY += 9;
+    
     for (let rowIdx = 0; rowIdx < quoteItems.length; rowIdx++) {
-      const qty = quoteItems[rowIdx].quantity || 0;
-      const price = quoteItems[rowIdx].unitPrice || 0;
+      const item = quoteItems[rowIdx];
+      const qty = item.quantity || 0;
+      const price = item.unitPrice || 0;
       const lineTotal = qty * price;
+      
+      // Alternate row colors
+      if (rowIdx % 2 === 0) {
+        pdf.setFillColor(249, 250, 251);
+        pdf.rect(20, tableY, 170, 8, 'F');
+      }
+      
+      pdf.setTextColor(...DARK);
+      pdf.text(String(qty), 25, tableY + 5.5);
+      
+      // Description (with word wrap)
+      const desc = item.description || '';
+      const splitDesc = pdf.splitTextToSize(desc, 80);
+      pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
+      
+      pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
+      pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+      
       tableY += 8;
-      pdf.setFontSize(9);
-      pdf.text(`${rowIdx + 1}. ${quoteItems[rowIdx].description || ''}`, 25, tableY);
-      pdf.text(String(qty), 117, tableY);
-      pdf.text(`S/${price.toFixed(2)}`, 140, tableY);
-      pdf.text(`S/${lineTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
     }
     
-    tableY += 12;
-    pdf.setDrawColor(200, 200, 200);
-    pdf.line(120, tableY, 190, tableY);
-    tableY += 6;
+    // Thick blue line before totals
+    pdf.setDrawColor(...BLUE);
+    pdf.setLineWidth(1.5);
+    pdf.line(20, tableY + 2, 190, tableY + 2);
     
-    pdf.setFontSize(10);
-    pdf.text('Subtotal:', 120, tableY);
-    pdf.text(`S/${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+    // Totals
+    tableY += 8;
+    pdf.setLineWidth(0.2);
+    pdf.setDrawColor(200, 200, 200);
+    
+    pdf.setFontSize(9);
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('SUBTOTAL:', 120, tableY);
+    pdf.setTextColor(...DARK);
+    pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
     tableY += 6;
     
     if (igvEnabled) {
+      pdf.setTextColor(...GRAY_TEXT);
       pdf.text('IGV (18%):', 120, tableY);
-      pdf.text(`S/${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
+      pdf.setTextColor(...DARK);
+      pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
       tableY += 4;
       if (igvType === 'included') {
-        pdf.setFontSize(8); pdf.setTextColor(5, 150, 105);
+        pdf.setFontSize(7);
+        pdf.setTextColor(...GREEN);
         pdf.text('(Incluido en el precio)', 120, tableY);
-        pdf.setTextColor(0, 0, 0);
+        pdf.setTextColor(...DARK);
+        pdf.setFontSize(9);
         tableY += 5;
-      } else { tableY += 2; }
+      } else {
+        tableY += 2;
+      }
     }
     
     tableY += 2;
     pdf.line(120, tableY, 190, tableY);
-    tableY += 7;
-    pdf.setFontSize(12); pdf.setFont(undefined, 'bold');
-    pdf.text('TOTAL:', 120, tableY);
-    pdf.text(`S/${grandTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+    tableY += 8;
     
-    pdf.setFont(undefined, 'normal'); pdf.setFontSize(8); pdf.setTextColor(120, 120, 120);
-    if (company.email) pdf.text(company.email, 105, 285, { align: 'center' });
+    // Grand Total - Large and bold
+    pdf.setFontSize(14);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(...BLUE);
+    pdf.text('TOTAL:', 120, tableY);
+    pdf.text(`S/ ${grandTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
 
-    pdf.save(`Cotizacion-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
+    // ==========================================
+    // PAYMENT CONDITIONS
+    // ==========================================
+    
+    tableY += 15;
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, tableY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('CONDICIONES DE PAGO', 25, tableY + 5.5);
+    
+    tableY += 12;
+    pdf.setFontSize(8);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...DARK);
+    pdf.text('Contado', 25, tableY);
+
+    // ==========================================
+    // TERMS AND CONDITIONS
+    // ==========================================
+    
+    tableY += 12;
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, tableY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(255, 255, 255);
+    pdf.text('TÉRMINOS Y CONDICIONES', 25, tableY + 5.5);
+    
+    tableY += 11;
+    pdf.setFillColor(...GRAY_BG);
+    pdf.roundedRect(20, tableY, 170, 32, 2, 2, 'F');
+    
+    pdf.setFontSize(7);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...GRAY_TEXT);
+    
+    const terms = [
+      'Esta cotización tiene una validez de 30 días calendario.',
+      'Los precios están expresados en Soles (PEN) e incluyen IGV.' + (igvEnabled ? '' : ' (No incluye IGV)'),
+      'La forma de pago y plazos están detallados en la sección de condiciones de pago.',
+      'Esta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.',
+      'Para consultas, comuníquese a los datos de contacto indicados en el encabezado.'
+    ];
+    
+    let termY = tableY + 6;
+    terms.forEach(term => {
+      pdf.text('• ' + term, 25, termY);
+      termY += 5;
+    });
+
+    // ==========================================
+    // FOOTER
+    // ==========================================
+    
+    pdf.setDrawColor(...BLUE);
+    pdf.setLineWidth(1);
+    pdf.line(20, 278, 190, 278);
+    
+    pdf.setFontSize(10);
+    pdf.setFont(undefined, 'bold');
+    pdf.setTextColor(...BLUE);
+    pdf.text('¡GRACIAS POR SU PREFERENCIA!', 105, 285, { align: 'center' });
+    
+    pdf.setFontSize(7);
+    pdf.setFont(undefined, 'normal');
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 290, { align: 'center' });
+
+    // Save PDF
+    const fileName = `Cotizacion-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}-${quoteNum}.pdf`;
+    pdf.save(fileName);
+
     showToast('¡PDF generado exitosamente!');
     resetWizard();
     navigateTo('dashboard');
     userData.quotesUsedThisMonth++;
     updatePlanProgress();
-    
+
   } catch (error) {
     console.error('PDF Error:', error);
     showToast('Error: ' + error.message, 'error');

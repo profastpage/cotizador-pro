@@ -78,11 +78,12 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN (Redirect flow - avoids COOP popup issues)
+// GOOGLE SIGN IN (Redirect flow)
 // ==========================================================
 
 async function signInWithGoogle() {
   try {
+    document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
     await signInWithRedirect(auth, googleProvider);
   } catch (error) {
     console.error('Error Google Sign-In:', error);
@@ -90,66 +91,11 @@ async function signInWithGoogle() {
   }
 }
 
-// Handle redirect result on page load
-async function handleRedirectResult() {
-  try {
-    const result = await getRedirectResult(auth);
-    if (!result) return null;
-
-    const user = result.user;
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-
-    if (!userDoc.exists()) {
-      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-
-      await setDoc(doc(db, 'users', user.uid), {
-        name: user.displayName || user.email.split('@')[0],
-        email: user.email.toLowerCase(),
-        company: '',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free',
-        planStartDate: null,
-        planEndDate: null,
-        quotesUsedThisMonth: 0,
-        lastQuoteReset: new Date().toISOString(),
-        isActive: true,
-        approved: true,
-        providerId: 'google.com',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-
-      showToast('¡Bienvenido! Redirigiendo...');
-      setTimeout(() => {
-        window.location.href = isSuperAdmin ? 'superadmin.html' : 'app.html';
-      }, 500);
-    } else {
-      const userData = userDoc.data();
-      if (userData.role === 'superadmin') {
-        window.location.href = 'superadmin.html';
-      } else if (!userData.isActive) {
-        showToast('Tu cuenta está desactivada.', 'error');
-        signOut(auth);
-      } else {
-        window.location.href = 'app.html';
-      }
-    }
-    return result;
-  } catch (error) {
-    console.error('Error handling redirect:', error);
-    if (error.code === 'auth/popup-closed-by-user') {
-      return null;
-    }
-    showToast('Error al iniciar sesión con Google', 'error');
-    return null;
-  }
-}
-
-// Check redirect result on load
-handleRedirectResult().catch(console.error);
-
+// Google button listeners
 const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
+if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
+if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
 if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
 if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
 
