@@ -3,18 +3,24 @@
 import { auth, db, SUPER_ADMIN_EMAIL, PLANS, LICENSE_DURATIONS, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 let allUsers = [];
-let pendingUsers = [];
+let isLoading = true;
 
 // Auth check
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
+  if (isLoading && !user) {
+    // Not logged in, redirect to login
     window.location.href = 'index.html';
     return;
   }
+  
+  if (!user) return;
+  
+  isLoading = false;
 
   const userDoc = await getDoc(doc(db, 'users', user.uid));
   if (!userDoc.exists() || userDoc.data().role !== 'superadmin') {
-    window.location.href = 'index.html';
+    // Not a super admin, redirect to app
+    window.location.href = 'app.html';
     return;
   }
 

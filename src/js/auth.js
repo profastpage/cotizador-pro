@@ -279,6 +279,7 @@ onAuthStateChanged(auth, async (user) => {
         const userData = userDoc.data();
         const currentPath = window.location.pathname;
 
+        // Only redirect if on landing page
         if (currentPath.includes('index.html') || currentPath === '/' || currentPath === '') {
           if (userData.role === 'superadmin') {
             window.location.href = 'superadmin.html';

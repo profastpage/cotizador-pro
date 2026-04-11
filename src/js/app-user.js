@@ -6,17 +6,21 @@ let currentUser = null;
 let userData = null;
 let quoteItems = [];
 let currentWizardStep = 1;
+let isLoading = true;
 
 // ==========================================================
 // AUTH CHECK
 // ==========================================================
 
 onAuthStateChanged(auth, async (user) => {
-  if (!user) {
+  if (isLoading && !user) {
     window.location.href = 'index.html';
     return;
   }
-
+  
+  if (!user) return;
+  
+  isLoading = false;
   currentUser = user;
   const userDoc = await getDoc(doc(db, 'users', user.uid));
   if (!userDoc.exists()) {
