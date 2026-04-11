@@ -102,8 +102,7 @@ async function loadDashboard() {
         if (user.plan === 'free') freeUsers++;
         else {
           paidUsers++;
-          const prices = { basic: 20, business: 40, pro: 60 };
-          monthlyRevenue += prices[user.plan] || 0;
+          monthlyRevenue += getPlanPrice(user.plan);
         }
       }
     });
@@ -269,6 +268,10 @@ function getPlanName(plan) {
 
 function getPlanQuota(plan) {
   return { free: '5', basic: '20', business: '50', pro: '∞' }[plan] || '0';
+}
+
+function getPlanPrice(plan) {
+  return { free: 0, basic: 35, business: 59, pro: 99 }[plan] || 0;
 }
 
 function formatDate(dateStr) {

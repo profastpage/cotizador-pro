@@ -460,10 +460,8 @@ function loadSettings() {
   });
 
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
-  const prices = { free: 'S/ 0', basic: 'S/ 20', business: 'S/ 40', pro: 'S/ 60' };
-  document.getElementById('current-plan-price').textContent = prices[userData.plan] || 'S/ 0';
-  const descs = { free: '5 cotizaciones por mes', basic: '20 cotizaciones por mes', business: '50 cotizaciones por mes', pro: 'Cotizaciones ilimitadas' };
-  document.getElementById('current-plan-desc').textContent = descs[userData.plan];
+  document.getElementById('current-plan-price').textContent = getPlanPrice(userData.plan);
+  document.getElementById('current-plan-desc').textContent = getPlanDesc(userData.plan);
 }
 
 function setupForms() {
@@ -499,6 +497,20 @@ function getPlanQuota(plan) {
 
 function getPlanName(plan) {
   return { free: 'Gratis', basic: 'Básico', business: 'Business', pro: 'Pro' }[plan] || 'Gratis';
+}
+
+function getPlanPrice(plan) {
+  return { free: 'S/ 0', basic: 'S/ 35', business: 'S/ 59', pro: 'S/ 99' }[plan] || 'S/ 0';
+}
+
+function getPlanDesc(plan) {
+  const descs = {
+    free: '5 cotizaciones por mes • 10 clientes',
+    basic: '20 cotizaciones por mes • 50 clientes',
+    business: '50 cotizaciones por mes • 200 clientes',
+    pro: 'Cotizaciones ilimitadas • Todo incluido'
+  };
+  return descs[plan] || descs.free;
 }
 
 function formatCurrency(amount) {
