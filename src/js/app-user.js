@@ -1,4 +1,4 @@
-/* App User Logic - SDK Modular v10+ */
+// App User Logic - SDK Modular v10+
 
 import { auth, db, PLANS, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
@@ -6,6 +6,7 @@ let currentUser = null;
 let userData = null;
 let quoteItems = [];
 let currentWizardStep = 1;
+let isGeneratingPDF = false;
 
 // ==========================================================
 // AUTH CHECK - NO redirects to avoid loops
@@ -15,12 +16,10 @@ onAuthStateChanged(auth, (user) => {
   currentUser = user;
   
   if (!user) {
-    // Not logged in - show message
     document.getElementById('user-name').textContent = 'Usuario';
     return;
   }
 
-  // User is logged in, load their data
   getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
     if (!userDoc.exists()) {
       window.location.href = 'index.html';
@@ -29,14 +28,12 @@ onAuthStateChanged(auth, (user) => {
 
     userData = userDoc.data();
 
-    // Check if user is active
     if (!userData.isActive) {
       showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
       signOut(auth);
       return;
     }
 
-    // Check plan expiry
     if (userData.plan !== 'free' && userData.planEndDate) {
       const endDate = new Date(userData.planEndDate);
       if (endDate < new Date() && userData.licenseDuration !== 0) {
@@ -47,7 +44,6 @@ onAuthStateChanged(auth, (user) => {
       }
     }
 
-    // Monthly reset
     const lastReset = new Date(userData.lastQuoteReset);
     const now = new Date();
     if (lastReset.getMonth() !== now.getMonth() || lastReset.getFullYear() !== now.getFullYear()) {
@@ -81,7 +77,7 @@ function initUI() {
 
   if (userData.plan === 'free') {
     document.getElementById('plan-banner').classList.remove('hidden');
-    document.getElementById('plan-banner-text').textContent = '¡Tienes 5 cotizaciones gratis este mes!';
+    document.getElementById('plan-banner-text').textContent = `¡Tienes ${getPlanQuota(userData.plan)} cotizaciones gratis este mes!`;
   }
 
   const today = new Date();
@@ -107,11 +103,10 @@ function updatePlanProgress() {
 }
 
 // ==========================================================
-// NAVIGATION - Direct event binding (works with ES modules)
+// NAVIGATION
 // ==========================================================
 
 function setupNavigation() {
-  // Sidebar and bottom nav buttons
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.onclick = (e) => {
       e.preventDefault();
@@ -121,7 +116,6 @@ function setupNavigation() {
     };
   });
   
-  // Modal close buttons
   document.querySelectorAll('[data-close-modal]').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
@@ -131,33 +125,17 @@ function setupNavigation() {
 
 function navigateTo(screen) {
   if (!screen) return;
-  
-  // Hide all screens
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-  
-  // Show target screen
   const targetScreen = document.getElementById(`screen-${screen}`);
-  if (targetScreen) {
-    targetScreen.classList.add('active');
-  } else {
-    console.error(`Screen not found: screen-${screen}`);
-  }
-  
-  // Update ALL nav buttons (sidebar + bottom nav)
+  if (targetScreen) targetScreen.classList.add('active');
   document.querySelectorAll('.nav-item').forEach(btn => {
     btn.classList.remove('active');
-    if (btn.dataset.screen === screen) {
-      btn.classList.add('active');
-    }
+    if (btn.dataset.screen === screen) btn.classList.add('active');
   });
-  
-  // Load screen data
   if (screen === 'dashboard') loadDashboard();
   if (screen === 'history') loadHistory();
   if (screen === 'new-quote') resetWizard();
   if (screen === 'settings') loadSettings();
-  
-  // Scroll to top
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -213,14 +191,13 @@ function createQuoteCard(quote, showActions = false) {
   `;
 }
 
-// Search
 document.addEventListener('DOMContentLoaded', () => {
   const searchInput = document.getElementById('search-quotes');
   if (searchInput) {
     searchInput.addEventListener('input', async (e) => {
-      const query = e.target.value.toLowerCase();
+      const queryStr = e.target.value.toLowerCase();
       const quotes = await getUserQuotes();
-      const filtered = quotes.filter(q => (q.client?.name || '').toLowerCase().includes(query) || (q.number || '').toLowerCase().includes(query));
+      const filtered = quotes.filter(q => (q.client?.name || '').toLowerCase().includes(queryStr) || (q.number || '').toLowerCase().includes(queryStr));
       document.getElementById('history-quotes-list').innerHTML = filtered.map(q => createQuoteCard(q, true)).join('');
     });
   }
@@ -236,22 +213,21 @@ function setupWizard() {
   document.getElementById('btn-generate-pdf')?.addEventListener('click', generatePDF);
   document.getElementById('btn-add-item')?.addEventListener('click', addItem);
   
-  // IGV toggle listeners
-  document.getElementById('igv-enabled')?.addEventListener('change', updateSummary);
+  const igvCheckbox = document.getElementById('igv-enabled');
+  if (igvCheckbox) {
+    igvCheckbox.addEventListener('change', updateSummary);
+  }
   document.querySelectorAll('input[name="igv-type"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      const igvTypeOptions = document.getElementById('igv-type-options');
-      if (igvTypeOptions) {
-        igvTypeOptions.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
-      }
+      const opts = document.getElementById('igv-type-options');
+      if (opts) opts.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
       updateSummary();
     });
   });
   
-  // Initialize IGV type options visibility
-  const igvTypeOptions = document.getElementById('igv-type-options');
-  if (igvTypeOptions && document.getElementById('igv-enabled')) {
-    igvTypeOptions.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
+  const igvTypeOpts = document.getElementById('igv-type-options');
+  if (igvTypeOpts && document.getElementById('igv-enabled')) {
+    igvTypeOpts.style.display = document.getElementById('igv-enabled').checked ? '' : 'none';
   }
 }
 
@@ -265,13 +241,13 @@ function resetWizard() {
 }
 
 function updateWizardUI() {
-  document.querySelectorAll('.wizard-step').forEach((step, i) => {
+  document.querySelectorAll('.wizard-step').forEach((step, idx) => {
     step.classList.remove('active', 'completed');
-    if (i + 1 === currentWizardStep) step.classList.add('active');
-    else if (i + 1 < currentWizardStep) step.classList.add('completed');
+    if (idx + 1 === currentWizardStep) step.classList.add('active');
+    else if (idx + 1 < currentWizardStep) step.classList.add('completed');
   });
-  document.querySelectorAll('.wizard-step-content').forEach((c, i) => {
-    c.classList.toggle('active', i + 1 === currentWizardStep);
+  document.querySelectorAll('.wizard-step-content').forEach((c, idx) => {
+    c.classList.toggle('active', idx + 1 === currentWizardStep);
   });
   document.getElementById('wizard-bar-progress').style.width = `${(currentWizardStep / 3) * 100}%`;
   document.getElementById('btn-prev-step')?.classList.toggle('hidden', currentWizardStep === 1);
@@ -301,14 +277,14 @@ function prevStep() {
 // ==========================================================
 
 function addItem() {
-  const id = Date.now().toString();
-  quoteItems.push({ id, quantity: 1, unitPrice: 0, description: '' });
+  const itemId = Date.now().toString();
+  quoteItems.push({ id: itemId, quantity: 1, unitPrice: 0, description: '' });
   const container = document.getElementById('items-container');
   const html = `
-    <div class="item-card" data-item-id="${id}">
+    <div class="item-card" data-item-id="${itemId}">
       <div class="item-header">
         <span class="item-number">Item ${quoteItems.length}</span>
-        <button class="btn-remove-item" onclick="window.removeItem('${id}')">✕</button>
+        <button class="btn-remove-item" onclick="window.removeItem('${itemId}')">✕</button>
       </div>
       <div class="item-fields">
         <div class="form-row">
@@ -331,14 +307,14 @@ function addItem() {
   `;
   container.insertAdjacentHTML('beforeend', html);
 
-  const card = container.querySelector(`[data-item-id="${id}"]`);
-  card.querySelector('.item-qty').addEventListener('input', (e) => updateItem(id, 'quantity', parseFloat(e.target.value) || 0));
-  card.querySelector('.item-price').addEventListener('input', (e) => updateItem(id, 'unitPrice', parseFloat(e.target.value) || 0));
-  card.querySelector('.item-desc').addEventListener('input', (e) => updateItem(id, 'description', e.target.value));
+  const card = container.querySelector(`[data-item-id="${itemId}"]`);
+  card.querySelector('.item-qty').addEventListener('input', (e) => updateItem(itemId, 'quantity', parseFloat(e.target.value) || 0));
+  card.querySelector('.item-price').addEventListener('input', (e) => updateItem(itemId, 'unitPrice', parseFloat(e.target.value) || 0));
+  card.querySelector('.item-desc').addEventListener('input', (e) => updateItem(itemId, 'description', e.target.value));
 }
 
 function removeItem(id) {
-  quoteItems = quoteItems.filter(i => i.id !== id);
+  quoteItems = quoteItems.filter(item => item.id !== id);
   document.querySelector(`[data-item-id="${id}"]`)?.remove();
   renumberItems();
   updateSummary();
@@ -346,7 +322,7 @@ function removeItem(id) {
 window.removeItem = removeItem;
 
 function renumberItems() {
-  document.querySelectorAll('.item-number').forEach((el, i) => el.textContent = `Item ${i + 1}`);
+  document.querySelectorAll('.item-number').forEach((el, idx) => el.textContent = `Item ${idx + 1}`);
 }
 
 function updateItem(id, field, value) {
@@ -363,22 +339,23 @@ function updateSummary() {
   const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
   const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
   
-  const subtotal = quoteItems.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0), 0);
+  let subtotal = 0;
+  for (let idx = 0; idx < quoteItems.length; idx++) {
+    subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
+  }
+  
   let igv = 0;
   let total = 0;
   
   if (igvEnabled) {
     if (igvType === 'included') {
-      // Price includes IGV: extract IGV from total
       total = subtotal;
       igv = total - (total / 1.18);
     } else {
-      // IGV is added on top
       igv = subtotal * 0.18;
       total = subtotal + igv;
     }
   } else {
-    igv = 0;
     total = subtotal;
   }
 
@@ -386,11 +363,9 @@ function updateSummary() {
   document.getElementById('summary-igv').textContent = formatCurrency(igv);
   document.getElementById('summary-total').textContent = formatCurrency(total);
   
-  // Update IGV row visibility
   const igvRow = document.getElementById('summary-igv-row');
   if (igvRow) igvRow.style.display = igvEnabled ? '' : 'none';
   
-  // Update note
   const note = document.getElementById('summary-note');
   if (note) {
     if (!igvEnabled) {
@@ -407,23 +382,28 @@ function updateSummary() {
 }
 
 function updateReview() {
-  const client = {
-    name: document.getElementById('client-name').value,
-    document: document.getElementById('client-document').value,
-    email: document.getElementById('client-email').value,
-    phone: document.getElementById('client-phone').value,
-    address: document.getElementById('client-address').value
-  };
-  const subtotal = quoteItems.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0), 0);
-  const igv = subtotal * 0.18;
-  const total = subtotal + igv;
+  const clientName = document.getElementById('client-name').value;
+  const clientDoc = document.getElementById('client-document').value;
+  
+  let subtotal = 0;
+  for (let idx = 0; idx < quoteItems.length; idx++) {
+    subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
+  }
+  
+  const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
+  const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
+  let igv = 0, total = 0;
+  if (igvEnabled) {
+    if (igvType === 'included') { total = subtotal; igv = total - (total / 1.18); }
+    else { igv = subtotal * 0.18; total = subtotal + igv; }
+  } else { total = subtotal; }
 
   document.getElementById('quote-review').innerHTML = `
     <div class="review-section"><div class="review-section-title">Cliente</div>
-      <p><strong>${client.name}</strong></p>${client.document ? `<p>RUC/DNI: ${client.document}</p>` : ''}
+      <p><strong>${clientName}</strong></p>${clientDoc ? `<p>RUC/DNI: ${clientDoc}</p>` : ''}
     </div>
     <div class="review-section"><div class="review-section-title">Items</div>
-      ${quoteItems.map(i => `<div class="review-item"><span>${i.quantity}x ${i.description}</span><span>${formatCurrency((i.quantity || 0) * (i.unitPrice || 0))}</span></div>`).join('')}
+      ${quoteItems.map(item => `<div class="review-item"><span>${item.quantity}x ${item.description}</span><span>${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</span></div>`).join('')}
     </div>
     <div class="quote-summary">
       <div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
@@ -434,94 +414,171 @@ function updateReview() {
 }
 
 // ==========================================================
-// GENERATE PDF
+// GENERATE PDF - Fixed version
 // ==========================================================
 
 async function generatePDF() {
-  const quota = getPlanQuota(userData.plan);
-  if (quota !== -1 && userData.quotesUsedThisMonth >= quota) {
-    showToast('¡Límite alcanzado! Mejora tu plan.', 'error');
-    showUpgradeModal();
-    return;
-  }
-
-  const companyData = await getDoc(doc(db, 'companies', currentUser.uid));
-  if (!companyData.exists() || !companyData.data().ruc) {
-    showToast('Configura los datos de tu empresa primero', 'error');
-    navigateTo('settings');
-    return;
-  }
-
+  if (isGeneratingPDF) return;
+  isGeneratingPDF = true;
+  
   try {
-    showToast('Generando PDF...', 'info');
-    const company = companyData.data();
-    const client = {
-      name: document.getElementById('client-name').value,
-      document: document.getElementById('client-document').value,
-      email: document.getElementById('client-email').value,
-      phone: document.getElementById('client-phone').value,
-      address: document.getElementById('client-address').value
-    };
-    const subtotal = quoteItems.reduce((s, i) => s + (i.quantity || 0) * (i.unitPrice || 0), 0);
-    const igv = subtotal * 0.18;
-    const total = subtotal + igv;
+    const quota = getPlanQuota(userData.plan);
+    if (quota !== -1 && userData.quotesUsedThisMonth >= quota) {
+      showToast('¡Límite alcanzado! Mejora tu plan.', 'error');
+      showUpgradeModal();
+      isGeneratingPDF = false;
+      return;
+    }
 
-    const quote = {
-      userId: currentUser.uid, client, items: quoteItems,
+    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+    if (!companySnap.exists() || !companySnap.data().ruc) {
+      showToast('Configura los datos de tu empresa primero', 'error');
+      navigateTo('settings');
+      isGeneratingPDF = false;
+      return;
+    }
+
+    showToast('Generando PDF...', 'info');
+    const company = companySnap.data();
+    
+    const clientName = document.getElementById('client-name').value || 'Sin nombre';
+    const clientDoc = document.getElementById('client-document').value || '';
+    
+    const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
+    const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
+    
+    let subtotal = 0;
+    for (let idx = 0; idx < quoteItems.length; idx++) {
+      subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
+    }
+    
+    let igvAmount = 0, grandTotal = 0;
+    if (igvEnabled) {
+      if (igvType === 'included') { grandTotal = subtotal; igvAmount = grandTotal - (grandTotal / 1.18); }
+      else { igvAmount = subtotal * 0.18; grandTotal = subtotal + igvAmount; }
+    } else { grandTotal = subtotal; }
+
+    const quoteData = {
+      userId: currentUser.uid,
+      client: {
+        name: clientName, document: clientDoc,
+        email: document.getElementById('client-email').value || '',
+        phone: document.getElementById('client-phone').value || '',
+        address: document.getElementById('client-address').value || ''
+      },
+      items: quoteItems,
       issueDate: document.getElementById('quote-issue-date').value,
       dueDate: document.getElementById('quote-due-date').value,
-      subtotal, igv, total, createdAt: new Date().toISOString()
+      subtotal, igv: igvAmount, total: grandTotal,
+      igvEnabled, igvType,
+      createdAt: new Date().toISOString()
     };
 
-    await addDoc(collection(db, 'quotes'), quote);
+    await addDoc(collection(db, 'quotes'), quoteData);
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
-    // Load jsPDF dynamically
     if (!window.jspdf) {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      await new Promise(resolve => { script.onload = resolve; document.head.appendChild(script); });
+      await new Promise((resolve, reject) => {
+        const scriptTag = document.createElement('script');
+        scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        scriptTag.onload = resolve;
+        scriptTag.onerror = reject;
+        document.head.appendChild(scriptTag);
+      });
     }
+    
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('COTIZACIÓN', 105, 20, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(`N° ${String(Math.floor(Math.random() * 999999)).padStart(6, '0')}`, 20, 40);
-    doc.text(`Fecha: ${quote.issueDate}`, 20, 50);
-    doc.text('CLIENTE:', 20, 70);
-    doc.setFontSize(10);
-    doc.text(client.name, 20, 80);
-    if (client.document) doc.text(`RUC/DNI: ${client.document}`, 20, 88);
-    doc.setFontSize(12);
-    doc.text('ITEMS:', 20, 110);
+    const pdf = new jsPDF();
+    
+    pdf.setFontSize(20); pdf.setFont(undefined, 'bold');
+    pdf.text('COTIZACIÓN', 105, 20, { align: 'center' });
+    
+    pdf.setFontSize(10); pdf.setFont(undefined, 'normal');
+    pdf.text(company.name || '', 20, 35);
+    if (company.ruc) pdf.text(`RUC: ${company.ruc}`, 20, 42);
+    if (company.address) pdf.text(company.address, 20, 48);
+    if (company.phone) pdf.text(`Tel: ${company.phone}`, 20, 54);
+    
+    pdf.setFontSize(11);
+    const quoteNum = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
+    pdf.text(`N° ${quoteNum}`, 190, 35, { align: 'right' });
+    pdf.text(`Fecha: ${quoteData.issueDate}`, 190, 42, { align: 'right' });
+    pdf.text(`Vence: ${quoteData.dueDate}`, 190, 49, { align: 'right' });
+    
+    pdf.setFillColor(240, 240, 240);
+    pdf.rect(20, 70, 170, 25, 'F');
+    pdf.setFontSize(11); pdf.setFont(undefined, 'bold');
+    pdf.text('CLIENTE', 25, 78);
+    pdf.setFont(undefined, 'normal'); pdf.setFontSize(10);
+    pdf.text(clientName, 25, 86);
+    if (clientDoc) pdf.text(`RUC/DNI: ${clientDoc}`, 25, 92);
+    
+    let tableY = 105;
+    pdf.setFillColor(30, 64, 175);
+    pdf.rect(20, tableY, 170, 8, 'F');
+    pdf.setTextColor(255, 255, 255); pdf.setFontSize(9); pdf.setFont(undefined, 'bold');
+    pdf.text('DESCRIPCIÓN', 25, tableY + 6);
+    pdf.text('CANT', 115, tableY + 6);
+    pdf.text('P.UNIT', 140, tableY + 6);
+    pdf.text('TOTAL', 188, tableY + 6, { align: 'right' });
+    
+    pdf.setTextColor(0, 0, 0); pdf.setFont(undefined, 'normal');
+    for (let rowIdx = 0; rowIdx < quoteItems.length; rowIdx++) {
+      const qty = quoteItems[rowIdx].quantity || 0;
+      const price = quoteItems[rowIdx].unitPrice || 0;
+      const lineTotal = qty * price;
+      tableY += 8;
+      pdf.setFontSize(9);
+      pdf.text(`${rowIdx + 1}. ${quoteItems[rowIdx].description || ''}`, 25, tableY);
+      pdf.text(String(qty), 117, tableY);
+      pdf.text(`S/${price.toFixed(2)}`, 140, tableY);
+      pdf.text(`S/${lineTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+    }
+    
+    tableY += 12;
+    pdf.setDrawColor(200, 200, 200);
+    pdf.line(120, tableY, 190, tableY);
+    tableY += 6;
+    
+    pdf.setFontSize(10);
+    pdf.text('Subtotal:', 120, tableY);
+    pdf.text(`S/${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+    tableY += 6;
+    
+    if (igvEnabled) {
+      pdf.text('IGV (18%):', 120, tableY);
+      pdf.text(`S/${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
+      tableY += 4;
+      if (igvType === 'included') {
+        pdf.setFontSize(8); pdf.setTextColor(5, 150, 105);
+        pdf.text('(Incluido en el precio)', 120, tableY);
+        pdf.setTextColor(0, 0, 0);
+        tableY += 5;
+      } else { tableY += 2; }
+    }
+    
+    tableY += 2;
+    pdf.line(120, tableY, 190, tableY);
+    tableY += 7;
+    pdf.setFontSize(12); pdf.setFont(undefined, 'bold');
+    pdf.text('TOTAL:', 120, tableY);
+    pdf.text(`S/${grandTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+    
+    pdf.setFont(undefined, 'normal'); pdf.setFontSize(8); pdf.setTextColor(120, 120, 120);
+    if (company.email) pdf.text(company.email, 105, 285, { align: 'center' });
 
-    let y = 120;
-    quoteItems.forEach((item, i) => {
-      const itemTotal = (item.quantity || 0) * (item.unitPrice || 0);
-      doc.setFontSize(10);
-      doc.text(`${i + 1}. ${item.description}`, 20, y);
-      doc.text(`${item.quantity} x S/${item.unitPrice.toFixed(2)} = S/${itemTotal.toFixed(2)}`, 150, y);
-      y += 10;
-    });
-
-    y += 10;
-    doc.setFontSize(12);
-    doc.text(`Subtotal: S/${subtotal.toFixed(2)}`, 150, y); y += 8;
-    doc.text(`IGV (18%): S/${igv.toFixed(2)}`, 150, y); y += 8;
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text(`TOTAL: S/${total.toFixed(2)}`, 150, y);
-
-    doc.save(`Cotizacion-${client.name.replace(/\s+/g, '-')}.pdf`);
+    pdf.save(`Cotizacion-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
     showToast('¡PDF generado exitosamente!');
     resetWizard();
     navigateTo('dashboard');
     userData.quotesUsedThisMonth++;
     updatePlanProgress();
+    
   } catch (error) {
-    console.error('Error:', error);
-    showToast('Error al generar PDF', 'error');
+    console.error('PDF Error:', error);
+    showToast('Error: ' + error.message, 'error');
+  } finally {
+    isGeneratingPDF = false;
   }
 }
 
@@ -540,7 +597,6 @@ function loadSettings() {
       document.getElementById('company-email').value = data.email || '';
     }
   });
-
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
   document.getElementById('current-plan-price').textContent = getPlanPrice(userData.plan);
   document.getElementById('current-plan-desc').textContent = getPlanDesc(userData.plan);
@@ -574,7 +630,7 @@ function setupForms() {
 // ==========================================================
 
 function getPlanQuota(plan) {
-  return { free: 5, basic: 60, business: 200, pro: -1 }[plan] || 5;
+  return { free: 3, basic: 60, business: 200, pro: -1 }[plan] || 3;
 }
 
 function getPlanName(plan) {
@@ -587,10 +643,10 @@ function getPlanPrice(plan) {
 
 function getPlanDesc(plan) {
   const descs = {
-    free: '5 cotizaciones por mes • 10 clientes',
-    basic: '60 cotizaciones por mes • 50 clientes',
-    business: '200 cotizaciones por mes • 200 clientes',
-    pro: 'Cotizaciones ilimitadas • Todo incluido'
+    free: '3 cotizaciones de prueba/mes • 1 empresa',
+    basic: '60 cotizaciones por mes • 1 empresa',
+    business: '200 cotizaciones por mes • 3 empresas',
+    pro: 'Cotizaciones ilimitadas • 5 empresas'
   };
   return descs[plan] || descs.free;
 }
@@ -613,7 +669,7 @@ async function getUserQuotes() {
   } catch (error) {
     console.error('Error fetching quotes:', error);
     if (error.code === 'failed-precondition') {
-      showToast('Índice de base de datos requerido. Contacta al administrador.', 'error');
+      showToast('Crea el índice en Firebase Console (userId + createdAt)', 'error');
     }
     return [];
   }
@@ -636,7 +692,7 @@ window.showUpgradeModal = function() {
 };
 
 window.selectPlan = function(plan) {
-  showToast(`Plan ${getPlanName(plan)} seleccionado. Contacta al admin para activar.`, 'success');
+  showToast(`Plan ${getPlanName(plan)} seleccionado. Contacta al admin.`, 'success');
   document.getElementById('modal-upgrade').classList.add('hidden');
 };
 
@@ -647,7 +703,7 @@ function showToast(message, type = 'success') {
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 2000);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
 window.logout = function() {
