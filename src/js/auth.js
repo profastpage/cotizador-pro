@@ -174,27 +174,27 @@ if (formLogin) {
 
 let authProcessed = false;
 
-onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, (user) => {
+  // Prevent multiple calls
   if (authProcessed) return;
   
   if (!user) {
-    // No user - do nothing on landing page
+    // No user logged in - stay on landing page
     return;
   }
 
-  // User is authenticated (email, password, OR Google redirect)
+  // User IS logged in (email, password, OR Google)
   authProcessed = true;
-  console.log('Auth state changed:', user.email, 'provider:', user.providerData[0]?.providerId);
+  console.log('✓ User authenticated:', user.email);
 
-  try {
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-
+  // Process user immediately (sync redirect)
+  getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
     if (!userDoc.exists()) {
-      // New user (likely from Google Sign-In)
+      // NEW user from Google Sign-In - create account
       const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
       const providerId = user.providerData[0]?.providerId || 'email';
       
-      await setDoc(doc(db, 'users', user.uid), {
+      setDoc(doc(db, 'users', user.uid), {
         name: user.displayName || user.email.split('@')[0],
         email: user.email.toLowerCase(),
         company: '',
@@ -208,33 +208,29 @@ onAuthStateChanged(auth, async (user) => {
         providerId: providerId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      }).then(() => {
+        showToast('¡Bienvenido!');
+        setTimeout(() => {
+          window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+        }, 500);
       });
-
-      showToast('¡Bienvenido!');
-      setTimeout(() => {
-        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
-      }, 500);
     } else {
-      // Existing user - check role and redirect
+      // EXISTING user - redirect based on role
       const userData = userDoc.data();
-      const currentPath = window.location.pathname;
-
-      // Only auto-redirect from landing page
-      if (currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html') || currentPath.includes('index')) {
-        if (userData.role === 'superadmin') {
-          window.location.replace('superadmin.html');
-        } else if (!userData.isActive) {
-          showToast('Tu cuenta está desactivada.', 'error');
-          signOut(auth);
-        } else {
-          window.location.replace('app.html');
-        }
+      
+      if (userData.role === 'superadmin') {
+        window.location.replace('superadmin.html');
+      } else if (!userData.isActive) {
+        showToast('Tu cuenta está desactivada.', 'error');
+        signOut(auth);
+      } else {
+        window.location.replace('app.html');
       }
     }
-  } catch (error) {
-    console.error('Auth State Error:', error);
+  }).catch((error) => {
+    console.error('Firestore Error:', error);
     authProcessed = false;
-  }
+  });
 });
 
 window.logout = function() {
