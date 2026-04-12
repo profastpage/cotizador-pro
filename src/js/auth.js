@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, PLANS, LICENSE_DURATIONS, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -18,14 +18,10 @@ function showRegister() {
 }
 window.showRegister = showRegister;
 
-function switchToLogin() {
-  showLogin();
-}
+function switchToLogin() { showLogin(); }
 window.switchToLogin = switchToLogin;
 
-function switchToRegister() {
-  showRegister();
-}
+function switchToRegister() { showRegister(); }
 window.switchToRegister = switchToRegister;
 
 function scrollToPlans() {
@@ -38,25 +34,17 @@ function showToast(message, type = 'success') {
   if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `
-    <span>${type === 'success' ? '✅' : '❌'}</span>
-    <span>${message}</span>
-  `;
+  toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    setTimeout(() => toast.remove(), 300);
-  }, 3000);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
-// Close modals
 document.querySelectorAll('[data-close-modal]').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
   });
 });
 
-// Password toggle
 document.querySelectorAll('.password-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
     const inputId = btn.dataset.toggle;
@@ -71,14 +59,13 @@ document.querySelectorAll('.password-toggle').forEach(btn => {
   });
 });
 
-// Nav buttons
 const btnLoginNav = document.getElementById('btn-login-nav');
 const btnRegisterNav = document.getElementById('btn-register-nav');
 if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN (Redirect flow)
+// GOOGLE SIGN IN - Complete working flow
 // ==========================================================
 
 async function signInWithGoogle() {
@@ -86,28 +73,80 @@ async function signInWithGoogle() {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
     await signInWithRedirect(auth, googleProvider);
   } catch (error) {
-    console.error('Error Google Sign-In:', error);
-    showToast('Error al iniciar sesión con Google', 'error');
+    console.error('Google Sign-In Error:', error);
+    showToast('Error al conectar con Google', 'error');
   }
 }
 
-// Google button listeners
+// Attach to Google buttons
 const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
 if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
 if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
-if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
-if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
+
+// Handle Google redirect result when user returns
+async function handleGoogleRedirect() {
+  try {
+    const result = await getRedirectResult(auth);
+    if (!result) return false;
+
+    const user = result.user;
+    if (!user) return false;
+
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+
+    if (!userDoc.exists()) {
+      // New Google user - create account
+      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+      await setDoc(doc(db, 'users', user.uid), {
+        name: user.displayName || user.email.split('@')[0],
+        email: user.email.toLowerCase(),
+        company: '',
+        role: isSuperAdmin ? 'superadmin' : 'user',
+        plan: 'free',
+        planStartDate: null,
+        planEndDate: null,
+        quotesUsedThisMonth: 0,
+        lastQuoteReset: new Date().toISOString(),
+        isActive: true,
+        providerId: 'google.com',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      showToast('¡Bienvenido!');
+      setTimeout(() => {
+        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+      }, 500);
+    } else {
+      // Existing Google user - login
+      const userData = userDoc.data();
+      if (userData.role === 'superadmin') {
+        window.location.replace('superadmin.html');
+      } else if (!userData.isActive) {
+        showToast('Tu cuenta está desactivada.', 'error');
+        signOut(auth);
+      } else {
+        window.location.replace('app.html');
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error('Google Redirect Error:', error);
+    return false;
+  }
+}
+
+// Run redirect handler on page load
+handleGoogleRedirect();
 
 // ==========================================================
-// AUTH: REGISTER
+// EMAIL/PASSWORD REGISTER
 // ==========================================================
 
 const formRegister = document.getElementById('form-register');
 if (formRegister) {
   formRegister.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const name = document.getElementById('register-name').value.trim();
     const email = document.getElementById('register-email').value.trim();
     const password = document.getElementById('register-password').value;
@@ -118,12 +157,10 @@ if (formRegister) {
       showToast('Completa todos los campos obligatorios', 'error');
       return;
     }
-
     if (password.length < 6) {
       showToast('La contraseña debe tener al menos 6 caracteres', 'error');
       return;
     }
-
     if (password !== passwordConfirm) {
       showToast('Las contraseñas no coinciden', 'error');
       return;
@@ -132,82 +169,52 @@ if (formRegister) {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-
       const isSuperAdmin = email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
 
       await setDoc(doc(db, 'users', user.uid), {
-        name,
-        email: email.toLowerCase(),
-        company: company || '',
+        name, email: email.toLowerCase(), company: company || '',
         role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free',
-        planStartDate: null,
-        planEndDate: null,
-        quotesUsedThisMonth: 0,
-        lastQuoteReset: new Date().toISOString(),
-        isActive: true,
-        approved: true,
-        providerId: 'email',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        plan: 'free', planStartDate: null, planEndDate: null,
+        quotesUsedThisMonth: 0, lastQuoteReset: new Date().toISOString(),
+        isActive: true, providerId: 'email',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
 
-      if (isSuperAdmin) {
-        showToast('¡Cuenta de administrador creada! Redirigiendo...');
-        setTimeout(() => {
-          window.location.href = 'superadmin.html';
-        }, 1000);
-      } else {
-        showToast('¡Cuenta creada! Redirigiendo...');
-        setTimeout(() => {
-          window.location.href = 'app.html';
-        }, 1000);
-      }
-
+      showToast('¡Cuenta creada!');
+      setTimeout(() => {
+        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+      }, 1000);
     } catch (error) {
-      console.error('Error registering:', error);
+      console.error('Register Error:', error);
       let message = 'Error al crear la cuenta';
-      if (error.code === 'auth/email-already-in-use') {
-        message = 'Este email ya está registrado';
-      } else if (error.code === 'auth/weak-password') {
-        message = 'La contraseña es muy débil';
-      }
+      if (error.code === 'auth/email-already-in-use') message = 'Este email ya está registrado';
+      else if (error.code === 'auth/weak-password') message = 'La contraseña es muy débil';
       showToast(message, 'error');
     }
   });
 }
 
 // ==========================================================
-// AUTH: LOGIN
+// EMAIL/PASSWORD LOGIN
 // ==========================================================
 
 const formLogin = document.getElementById('form-login');
 if (formLogin) {
   formLogin.addEventListener('submit', async (e) => {
     e.preventDefault();
-
     const email = document.getElementById('login-email').value.trim();
     const password = document.getElementById('login-password').value;
-
-    if (!email || !password) {
-      showToast('Completa todos los campos', 'error');
-      return;
-    }
+    if (!email || !password) { showToast('Completa todos los campos', 'error'); return; }
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
-      console.error('Error logging in:', error);
+      console.error('Login Error:', error);
       let message = 'Error al iniciar sesión';
-      if (error.code === 'auth/user-not-found') {
-        message = 'No existe una cuenta con este email';
-      } else if (error.code === 'auth/wrong-password') {
-        message = 'Contraseña incorrecta';
-      } else if (error.code === 'auth/invalid-email') {
-        message = 'Email inválido';
-      } else if (error.code === 'auth/too-many-requests') {
-        message = 'Demasiados intentos. Intenta más tarde.';
-      }
+      if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
+      else if (error.code === 'auth/wrong-password') message = 'Contraseña incorrecta';
+      else if (error.code === 'auth/invalid-email') message = 'Email inválido';
+      else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
       showToast(message, 'error');
     }
   });
@@ -215,42 +222,27 @@ if (formLogin) {
 
 // ==========================================================
 // AUTH STATE LISTENER
-// Only redirects if already logged in and on landing page
 // ==========================================================
 
 let hasRedirected = false;
-
 onAuthStateChanged(auth, async (user) => {
-  if (hasRedirected) return;
-  if (!user) return;
-
+  if (hasRedirected || !user) return;
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) return;
-
     const userData = userDoc.data();
     const currentPath = window.location.pathname;
 
-    // Only auto-redirect from root/landing page
     if ((currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html')) && !hasRedirected) {
       hasRedirected = true;
-      if (userData.role === 'superadmin') {
-        window.location.replace('superadmin.html');
-      } else if (userData.isActive) {
-        window.location.replace('app.html');
-      }
+      if (userData.role === 'superadmin') window.location.replace('superadmin.html');
+      else if (userData.isActive) window.location.replace('app.html');
     }
   } catch (error) {
-    console.error('Error checking user:', error);
+    console.error('Auth State Error:', error);
   }
 });
 
-// ==========================================================
-// EXPORT
-// ==========================================================
-
 window.logout = function() {
-  signOut(auth).then(() => {
-    window.location.href = 'index.html';
-  });
+  signOut(auth).then(() => { window.location.href = 'index.html'; });
 };
