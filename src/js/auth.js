@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -65,90 +65,27 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN - Complete working flow with proper timing
+// GOOGLE SIGN IN - Using onAuthStateChanged for reliability
 // ==========================================================
 
-let googleRedirectProcessed = false;
+let googleUserJustSignedIn = false;
 
 async function signInWithGoogle() {
   try {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+    googleUserJustSignedIn = true;
     await signInWithRedirect(auth, googleProvider);
   } catch (error) {
     console.error('Google Sign-In Error:', error);
     showToast('Error al conectar con Google', 'error');
+    googleUserJustSignedIn = false;
   }
 }
 
-// Process Google redirect result
-async function processGoogleRedirect() {
-  if (googleRedirectProcessed) return false;
-  googleRedirectProcessed = true;
-  
-  try {
-    // Wait a bit for Firebase to initialize
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    const result = await getRedirectResult(auth);
-    if (!result || !result.user) {
-      console.log('No Google redirect result');
-      return false;
-    }
-
-    const user = result.user;
-    console.log('Google user detected:', user.email);
-
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-
-    if (!userDoc.exists()) {
-      // New Google user
-      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-      await setDoc(doc(db, 'users', user.uid), {
-        name: user.displayName || user.email.split('@')[0],
-        email: user.email.toLowerCase(),
-        company: '',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free',
-        planStartDate: null,
-        planEndDate: null,
-        quotesUsedThisMonth: 0,
-        lastQuoteReset: new Date().toISOString(),
-        isActive: true,
-        providerId: 'google.com',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      showToast('¡Bienvenido!');
-      setTimeout(() => {
-        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
-      }, 500);
-    } else {
-      // Existing Google user
-      const userData = userDoc.data();
-      if (userData.role === 'superadmin') {
-        window.location.replace('superadmin.html');
-      } else if (!userData.isActive) {
-        showToast('Tu cuenta está desactivada.', 'error');
-        signOut(auth);
-      } else {
-        window.location.replace('app.html');
-      }
-    }
-    return true;
-  } catch (error) {
-    console.error('Google Redirect Error:', error);
-    return false;
-  }
-}
-
-// Attach Google button listeners
 const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
 if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
 if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
-
-// Start processing Google redirect immediately
-processGoogleRedirect();
 
 // ==========================================================
 // EMAIL/PASSWORD REGISTER
@@ -232,28 +169,71 @@ if (formLogin) {
 }
 
 // ==========================================================
-// AUTH STATE LISTENER
+// AUTH STATE LISTENER - Handles ALL auth including Google
 // ==========================================================
 
-let hasRedirected = false;
+let authProcessed = false;
+
 onAuthStateChanged(auth, async (user) => {
-  if (googleRedirectProcessed || hasRedirected || !user) return;
+  if (authProcessed) return;
   
+  if (!user) {
+    // No user - do nothing on landing page
+    return;
+  }
+
+  // User is authenticated (email, password, OR Google redirect)
+  authProcessed = true;
+  console.log('Auth state changed:', user.email, 'provider:', user.providerData[0]?.providerId);
+
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    if (!userDoc.exists()) return;
-    
-    const userData = userDoc.data();
-    const currentPath = window.location.pathname;
 
-    // Only auto-redirect from root/landing page
-    if ((currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html')) && !hasRedirected) {
-      hasRedirected = true;
-      if (userData.role === 'superadmin') window.location.replace('superadmin.html');
-      else if (userData.isActive) window.location.replace('app.html');
+    if (!userDoc.exists()) {
+      // New user (likely from Google Sign-In)
+      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+      const providerId = user.providerData[0]?.providerId || 'email';
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        name: user.displayName || user.email.split('@')[0],
+        email: user.email.toLowerCase(),
+        company: '',
+        role: isSuperAdmin ? 'superadmin' : 'user',
+        plan: 'free',
+        planStartDate: null,
+        planEndDate: null,
+        quotesUsedThisMonth: 0,
+        lastQuoteReset: new Date().toISOString(),
+        isActive: true,
+        providerId: providerId,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+
+      showToast('¡Bienvenido!');
+      setTimeout(() => {
+        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+      }, 500);
+    } else {
+      // Existing user - check role and redirect
+      const userData = userDoc.data();
+      const currentPath = window.location.pathname;
+
+      // Only auto-redirect from landing page
+      if (currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html') || currentPath.includes('index')) {
+        if (userData.role === 'superadmin') {
+          window.location.replace('superadmin.html');
+        } else if (!userData.isActive) {
+          showToast('Tu cuenta está desactivada.', 'error');
+          signOut(auth);
+        } else {
+          window.location.replace('app.html');
+        }
+      }
     }
   } catch (error) {
     console.error('Auth State Error:', error);
+    authProcessed = false;
   }
 });
 
