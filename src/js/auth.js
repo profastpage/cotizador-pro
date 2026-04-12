@@ -175,62 +175,81 @@ if (formLogin) {
 let authProcessed = false;
 
 onAuthStateChanged(auth, (user) => {
-  // Prevent multiple calls
-  if (authProcessed) return;
+  console.log('🔔 onAuthStateChanged fired:', user ? user.email : 'no user');
+  
+  if (authProcessed) {
+    console.log('⏭️ Already processed, skipping');
+    return;
+  }
   
   if (!user) {
-    // No user logged in - stay on landing page
+    console.log('👤 No user - staying on landing');
     return;
   }
 
-  // User IS logged in (email, password, OR Google)
+  // User IS logged in
   authProcessed = true;
-  console.log('✓ User authenticated:', user.email);
+  console.log('✅ User authenticated:', user.email);
 
-  // Process user immediately (sync redirect)
-  getDoc(doc(db, 'users', user.uid)).then((userDoc) => {
-    if (!userDoc.exists()) {
-      // NEW user from Google Sign-In - create account
-      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-      const providerId = user.providerData[0]?.providerId || 'email';
+  // Check if user exists in Firestore
+  getDoc(doc(db, 'users', user.uid))
+    .then((userDoc) => {
+      console.log('📄 User doc exists:', userDoc.exists());
       
-      setDoc(doc(db, 'users', user.uid), {
-        name: user.displayName || user.email.split('@')[0],
-        email: user.email.toLowerCase(),
-        company: '',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free',
-        planStartDate: null,
-        planEndDate: null,
-        quotesUsedThisMonth: 0,
-        lastQuoteReset: new Date().toISOString(),
-        isActive: true,
-        providerId: providerId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      }).then(() => {
-        showToast('¡Bienvenido!');
-        setTimeout(() => {
-          window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
-        }, 500);
-      });
-    } else {
-      // EXISTING user - redirect based on role
-      const userData = userDoc.data();
-      
-      if (userData.role === 'superadmin') {
-        window.location.replace('superadmin.html');
-      } else if (!userData.isActive) {
-        showToast('Tu cuenta está desactivada.', 'error');
-        signOut(auth);
+      if (!userDoc.exists()) {
+        // NEW user from Google - create account
+        const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+        console.log('🆕 New user, superadmin:', isSuperAdmin);
+        
+        setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email.toLowerCase(),
+          company: '',
+          role: isSuperAdmin ? 'superadmin' : 'user',
+          plan: 'free',
+          planStartDate: null,
+          planEndDate: null,
+          quotesUsedThisMonth: 0,
+          lastQuoteReset: new Date().toISOString(),
+          isActive: true,
+          providerId: user.providerData[0]?.providerId || 'email',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }).then(() => {
+          console.log('✅ User created, redirecting...');
+          showToast('¡Bienvenido!');
+          setTimeout(() => {
+            window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+          }, 500);
+        }).catch((err) => {
+          console.error('❌ Failed to create user:', err);
+          showToast('Error al crear cuenta: ' + err.message, 'error');
+        });
       } else {
-        window.location.replace('app.html');
+        // EXISTING user - redirect based on role
+        const userData = userDoc.data();
+        console.log('🔄 Existing user, role:', userData.role);
+        
+        if (userData.role === 'superadmin') {
+          console.log('👑 Redirecting to superadmin');
+          window.location.replace('superadmin.html');
+        } else if (!userData.isActive) {
+          console.log('⛔ Account inactive');
+          showToast('Tu cuenta está desactivada.', 'error');
+          signOut(auth);
+        } else {
+          console.log('🚀 Redirecting to app');
+          window.location.replace('app.html');
+        }
       }
-    }
-  }).catch((error) => {
-    console.error('Firestore Error:', error);
-    authProcessed = false;
-  });
+    })
+    .catch((error) => {
+      console.error('❌ Firestore error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      authProcessed = false;
+      showToast('Error de base de datos: ' + error.message, 'error');
+    });
 });
 
 window.logout = function() {
