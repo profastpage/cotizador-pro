@@ -177,18 +177,18 @@ let authProcessed = false;
 onAuthStateChanged(auth, (user) => {
   console.log('🔔 onAuthStateChanged fired:', user ? user.email : 'no user');
   
+  if (!user) {
+    console.log('👤 No user - staying on landing');
+    return;  // Don't set authProcessed here!
+  }
+
+  // User IS logged in - prevent duplicate processing
   if (authProcessed) {
     console.log('⏭️ Already processed, skipping');
     return;
   }
-  
-  if (!user) {
-    console.log('👤 No user - staying on landing');
-    return;
-  }
-
-  // User IS logged in
   authProcessed = true;
+  
   console.log('✅ User authenticated:', user.email);
 
   // Check if user exists in Firestore
