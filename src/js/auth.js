@@ -65,8 +65,10 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN - Complete working flow
+// GOOGLE SIGN IN - Complete working flow with proper timing
 // ==========================================================
+
+let googleRedirectProcessed = false;
 
 async function signInWithGoogle() {
   try {
@@ -78,25 +80,28 @@ async function signInWithGoogle() {
   }
 }
 
-// Attach to Google buttons
-const btnGoogleLogin = document.getElementById('btn-google-login');
-const btnGoogleRegister = document.getElementById('btn-google-register');
-if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
-if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
-
-// Handle Google redirect result when user returns
-async function handleGoogleRedirect() {
+// Process Google redirect result
+async function processGoogleRedirect() {
+  if (googleRedirectProcessed) return false;
+  googleRedirectProcessed = true;
+  
   try {
+    // Wait a bit for Firebase to initialize
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     const result = await getRedirectResult(auth);
-    if (!result) return false;
+    if (!result || !result.user) {
+      console.log('No Google redirect result');
+      return false;
+    }
 
     const user = result.user;
-    if (!user) return false;
+    console.log('Google user detected:', user.email);
 
     const userDoc = await getDoc(doc(db, 'users', user.uid));
 
     if (!userDoc.exists()) {
-      // New Google user - create account
+      // New Google user
       const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
       await setDoc(doc(db, 'users', user.uid), {
         name: user.displayName || user.email.split('@')[0],
@@ -118,7 +123,7 @@ async function handleGoogleRedirect() {
         window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
       }, 500);
     } else {
-      // Existing Google user - login
+      // Existing Google user
       const userData = userDoc.data();
       if (userData.role === 'superadmin') {
         window.location.replace('superadmin.html');
@@ -136,8 +141,14 @@ async function handleGoogleRedirect() {
   }
 }
 
-// Run redirect handler on page load
-handleGoogleRedirect();
+// Attach Google button listeners
+const btnGoogleLogin = document.getElementById('btn-google-login');
+const btnGoogleRegister = document.getElementById('btn-google-register');
+if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
+if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
+
+// Start processing Google redirect immediately
+processGoogleRedirect();
 
 // ==========================================================
 // EMAIL/PASSWORD REGISTER
@@ -226,13 +237,16 @@ if (formLogin) {
 
 let hasRedirected = false;
 onAuthStateChanged(auth, async (user) => {
-  if (hasRedirected || !user) return;
+  if (googleRedirectProcessed || hasRedirected || !user) return;
+  
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     if (!userDoc.exists()) return;
+    
     const userData = userDoc.data();
     const currentPath = window.location.pathname;
 
+    // Only auto-redirect from root/landing page
     if ((currentPath === '/' || currentPath === '' || currentPath.endsWith('/index.html')) && !hasRedirected) {
       hasRedirected = true;
       if (userData.role === 'superadmin') window.location.replace('superadmin.html');
