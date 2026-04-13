@@ -1,6 +1,6 @@
 // App User Logic - SDK Modular v10+
 
-import { auth, db, PLANS, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, PLANS, DOCUMENT_TYPES, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 let currentUser = null;
 let userData = null;
@@ -89,6 +89,70 @@ function initUI() {
   setupNavigation();
   setupWizard();
   setupForms();
+  
+  // Check and create demo quote if needed
+  checkAndCreateDemoQuote();
+}
+
+// Check if user needs demo quote and create it
+async function checkAndCreateDemoQuote() {
+  try {
+    const quotesRef = collection(db, 'quotes');
+    const q = query(quotesRef, where('userId', '==', currentUser.uid));
+    const snapshot = await getDocs(q);
+    
+    // Only create demo if user has 0-2 quotes
+    if (snapshot.size <= 2) {
+      const hasDemo = snapshot.docs.some(doc => doc.data().isDemo);
+      if (!hasDemo) {
+        await createDemoQuote();
+      }
+    }
+  } catch (error) {
+    console.error('Error checking demo quote:', error);
+  }
+}
+
+// Create a demo quote for the user
+async function createDemoQuote() {
+  try {
+    const quoteNumber = await getNextQuoteNumber();
+    const today = new Date();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 15);
+    
+    const demoQuote = {
+      userId: currentUser.uid,
+      number: quoteNumber,
+      isDemo: true,
+      documentType: 'cotizacion',
+      client: {
+        name: 'Empresa Demo SAC',
+        document: '20123456789',
+        email: 'demo@empresa.com',
+        phone: '987654321',
+        address: 'Av. Demo 123, Lima'
+      },
+      items: [
+        { id: '1', quantity: 2, unitPrice: 500, description: 'Servicio de consultoría' },
+        { id: '2', quantity: 1, unitPrice: 1200, description: 'Implementación de sistema' },
+        { id: '3', quantity: 5, unitPrice: 150, description: 'Licencias de software' }
+      ],
+      issueDate: today.toISOString().split('T')[0],
+      dueDate: dueDate.toISOString().split('T')[0],
+      subtotal: 2450,
+      igv: 441,
+      total: 2891,
+      igvEnabled: true,
+      igvType: 'apart',
+      createdAt: today.toISOString()
+    };
+    
+    await addDoc(collection(db, 'quotes'), demoQuote);
+    console.log('✅ Demo quote created');
+  } catch (error) {
+    console.error('Error creating demo quote:', error);
+  }
 }
 
 function updatePlanProgress() {
@@ -179,10 +243,19 @@ function createQuoteCard(quote, showActions = false, position = null) {
   const quoteNum = quote.number || position || 'N/A';
   const displayNum = typeof quoteNum === 'number' ? String(quoteNum).padStart(3, '0') : quoteNum;
   
+  // Get document type info
+  const docType = DOCUMENT_TYPES[quote.documentType] || DOCUMENT_TYPES.cotizacion;
+  
+  // DEMO badge
+  const demoBadge = quote.isDemo ? '<span class="badge badge-demo" style="background:#fef3c7;color:#d97706;font-size:0.65rem;margin-left:0.5rem;">DEMO</span>' : '';
+  
+  // Document type icon
+  const typeIcon = `<span style="margin-right:0.25rem;">${docType.icon}</span>`;
+
   return `
     <div class="quote-card">
       <div class="quote-card-header">
-        <span class="quote-number">#${displayNum}</span>
+        <span class="quote-number">${typeIcon}#${displayNum}${demoBadge}</span>
         <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
       </div>
       <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
@@ -242,9 +315,33 @@ function resetWizard() {
   document.getElementById('items-container').innerHTML = '';
   updateWizardUI();
   updateSummary();
-  
+
   // Load and populate client selector
   loadClientSelector();
+  
+  // Load and populate document type selector
+  loadDocumentTypeSelector();
+}
+
+// Load document types based on user plan
+function loadDocumentTypeSelector() {
+  const selector = document.getElementById('document-type-selector');
+  if (!selector) return;
+  
+  const plan = PLANS[userData.plan];
+  const allowedTypes = plan.documentTypes || ['cotizacion'];
+  
+  selector.innerHTML = '';
+  
+  allowedTypes.forEach(typeId => {
+    const docType = DOCUMENT_TYPES[typeId];
+    if (docType) {
+      const option = document.createElement('option');
+      option.value = typeId;
+      option.textContent = `${docType.icon} ${docType.name}`;
+      selector.appendChild(option);
+    }
+  });
 }
 
 // Load clients into selector dropdown
@@ -579,10 +676,16 @@ async function generatePDF() {
     const quoteNumber = await getNextQuoteNumber();
     const issueDate = document.getElementById('quote-issue-date').value;
     const dueDate = document.getElementById('quote-due-date').value;
+    
+    // Get selected document type
+    const docTypeSelector = document.getElementById('document-type-selector');
+    const documentType = docTypeSelector?.value || 'cotizacion';
+    const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
 
     const quoteData = {
       userId: currentUser.uid,
       number: quoteNumber,
+      documentType: documentType,
       client: { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress },
       items: quoteItems, issueDate, dueDate,
       subtotal, igv: igvAmount, total: grandTotal, igvEnabled, igvType,
@@ -913,8 +1016,8 @@ async function generatePDF() {
     pdf.setFontSize(10);
     pdf.setFont(undefined, 'bold');
     pdf.setTextColor(...BLUE);
-    pdf.text('¡GRACIAS POR SU PREFERENCIA!', 105, 285, { align: 'center' });
-    
+    pdf.text(docTypeInfo.footerText, 105, 285, { align: 'center' });
+
     pdf.setFontSize(7);
     pdf.setFont(undefined, 'normal');
     pdf.setTextColor(...GRAY_TEXT);
@@ -1085,7 +1188,7 @@ window.downloadQuote = async function(id) {
     if (company.phone) { pdf.text(company.phone, 20, companyY); }
     
     pdf.setFontSize(22); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-    pdf.text('COTIZACIÓN', 190, 20, { align: 'right' });
+    pdf.text(docTypeInfo.headerTitle, 190, 20, { align: 'right' });
     pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
     pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
     

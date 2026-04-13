@@ -22,6 +22,90 @@ const googleProvider = new GoogleAuthProvider();
 // Super Admin Email (SOLO ESTE EMAIL TIENE ACCESO AL PANEL ADMIN)
 export const SUPER_ADMIN_EMAIL = "admin@cotizadorpro.com";
 
+// Tipos de documentos disponibles
+export const DOCUMENT_TYPES = {
+  cotizacion: {
+    id: 'cotizacion',
+    name: 'Cotización',
+    icon: '📋',
+    description: 'Cotización de productos o servicios',
+    headerTitle: 'COTIZACIÓN',
+    footerText: '¡GRACIAS POR SU PREFERENCIA!'
+  },
+  propuesta: {
+    id: 'propuesta',
+    name: 'Propuesta Comercial',
+    icon: '💼',
+    description: 'Propuesta comercial detallada',
+    headerTitle: 'PROPUESTA COMERCIAL',
+    footerText: '¡ESPERAMOS SU PRONTA RESPUESTA!'
+  },
+  nota_venta: {
+    id: 'nota_venta',
+    name: 'Nota de Venta',
+    icon: '🧾',
+    description: 'Nota de venta o comprobante',
+    headerTitle: 'NOTA DE VENTA',
+    footerText: '¡GRACIAS POR SU COMPRA!'
+  },
+  orden_servicio: {
+    id: 'orden_servicio',
+    name: 'Orden de Servicio',
+    icon: '🔧',
+    description: 'Orden de servicio o trabajo',
+    headerTitle: 'ORDEN DE SERVICIO',
+    footerText: '¡SERVICIO GARANTIZADO!'
+  },
+  factura: {
+    id: 'factura',
+    name: 'Factura',
+    icon: '📄',
+    description: 'Factura electrónica',
+    headerTitle: 'FACTURA',
+    footerText: 'DOCUMENTO VÁLIDO PARA TRIBUTACIÓN'
+  },
+  boleta: {
+    id: 'boleta',
+    name: 'Boleta de Venta',
+    icon: '🎫',
+    description: 'Boleta de venta',
+    headerTitle: 'BOLETA DE VENTA',
+    footerText: 'GRACIAS POR SU PREFERENCIA'
+  },
+  recibo: {
+    id: 'recibo',
+    name: 'Recibo',
+    icon: '💵',
+    description: 'Recibo de pago',
+    headerTitle: 'RECIBO',
+    footerText: 'PAGO REGISTRADO'
+  },
+  contrato: {
+    id: 'contrato',
+    name: 'Contrato',
+    icon: '📝',
+    description: 'Contrato de servicios',
+    headerTitle: 'CONTRATO',
+    footerText: 'DOCUMENTO LEGAL VÁLIDO'
+  },
+  garantia: {
+    id: 'garantia',
+    name: 'Certificado de Garantía',
+    icon: '✅',
+    description: 'Certificado de garantía',
+    headerTitle: 'CERTIFICADO DE GARANTÍA',
+    footerText: 'GARANTÍA VIGENTE'
+  },
+  personalizado: {
+    id: 'personalizado',
+    name: 'Documento Personalizado',
+    icon: '✨',
+    description: 'Documento con formato personalizado',
+    headerTitle: 'DOCUMENTO',
+    footerText: 'DOCUMENTO GENERADO POR CotizaPro'
+  }
+};
+
 // Planes con precios y características reales diferenciadas
 export const PLANS = {
   free: {
@@ -34,6 +118,7 @@ export const PLANS = {
     maxClients: 10,
     maxBankAccounts: 1,
     maxTemplates: 1,
+    documentTypes: ['cotizacion'],
     duplicateQuotes: false,
     exportImport: false,
     watermark: false,
@@ -47,13 +132,14 @@ export const PLANS = {
       '3 cotizaciones de prueba/mes',
       '1 empresa',
       '10 clientes máximo',
-      '1 plantilla básica',
+      '1 tipo: Cotización',
       'PDF estándar',
       'Historial 30 días',
       '1 cuenta bancaria'
     ],
     limitations: [
-      'Sin duplicar cotizaciones',
+      'Solo Cotización básica',
+      'Sin duplicar documentos',
       'Sin exportar/importar',
       'Sin marca personalizada',
       'Soporte básico por email'
@@ -65,9 +151,11 @@ export const PLANS = {
     price: 35,
     priceLabel: 'S/ 35/mes',
     quotesPerMonth: 60,
+    maxCompanies: 1,
     maxClients: 50,
     maxBankAccounts: 3,
-    maxTemplates: 2,
+    maxTemplates: 1,
+    documentTypes: ['cotizacion'],
     duplicateQuotes: false,
     exportImport: false,
     watermark: false,
@@ -81,14 +169,15 @@ export const PLANS = {
       '60 cotizaciones al mes',
       '1 empresa',
       '50 clientes',
-      '2 plantillas profesionales',
+      '1 tipo: Cotización profesional',
       'PDF profesional con logo',
       'Historial ilimitado',
       '3 cuentas bancarias',
       'Soporte prioritario'
     ],
     limitations: [
-      'Sin duplicar cotizaciones',
+      'Solo Cotización',
+      'Sin duplicar documentos',
       'Sin exportar/importar',
       'Sin API access'
     ]
@@ -102,7 +191,8 @@ export const PLANS = {
     maxCompanies: 3,
     maxClients: 200,
     maxBankAccounts: 10,
-    maxTemplates: 5,
+    maxTemplates: 4,
+    documentTypes: ['cotizacion', 'propuesta', 'nota_venta', 'orden_servicio'],
     duplicateQuotes: true,
     exportImport: true,
     watermark: false,
@@ -113,14 +203,14 @@ export const PLANS = {
     historyDays: -1,
     pdfQuality: 'premium',
     features: [
-      '200 cotizaciones al mes',
+      '200 documentos al mes',
       '3 empresas',
       '200 clientes',
-      '5 plantillas premium',
+      '4 tipos: Cotización, Propuesta, Nota de Venta, Orden de Servicio',
       'PDF premium con branding',
       'Historial ilimitado',
       '10 cuentas bancarias',
-      'Duplicar cotizaciones',
+      'Duplicar documentos',
       'Exportar/Importar Excel',
       'Marca personalizada',
       'Soporte prioritario 24/7'
@@ -139,7 +229,8 @@ export const PLANS = {
     maxCompanies: 5,
     maxClients: -1,
     maxBankAccounts: -1,
-    maxTemplates: -1,
+    maxTemplates: 10,
+    documentTypes: ['cotizacion', 'propuesta', 'nota_venta', 'orden_servicio', 'factura', 'boleta', 'recibo', 'contrato', 'garantia', 'personalizado'],
     duplicateQuotes: true,
     exportImport: true,
     watermark: true,
@@ -150,14 +241,16 @@ export const PLANS = {
     historyDays: -1,
     pdfQuality: 'enterprise',
     features: [
-      'Cotizaciones ILIMITADAS',
+      'Documentos ILIMITADOS',
       '5 empresas',
       'Clientes ILIMITADOS',
-      'Plantillas ILIMITADAS',
+      '10 tipos de documentos + personalizados',
+      'Cotización, Propuesta, Nota de Venta, Orden de Servicio',
+      'Factura, Boleta, Recibo, Contrato, Garantía',
       'PDF enterprise personalizado',
       'Historial ilimitado',
       'Cuentas bancarias ilimitadas',
-      'Duplicar cotizaciones',
+      'Duplicar documentos',
       'Exportar/Importar Excel y CSV',
       'Marca de agua personalizada',
       'Multi-usuario (hasta 5)',
