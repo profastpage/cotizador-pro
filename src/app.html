@@ -460,95 +460,80 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
 
-  <!-- PWA Install Handler - Simple & Bulletproof -->
+  <!-- PWA Install Handler - MINIMAL & WORKING -->
   <script>
-    window.pwaDeferredPrompt = null;
+    let deferredPrompt = null;
 
-    // Register Service Worker first
+    // STEP 1: Register Service Worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((reg) => console.log('[PWA] SW registrado:', reg.scope))
-          .catch((err) => console.log('[PWA] Error SW:', err));
-      });
+      navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
 
-    // Capture install prompt as early as possible
+    // STEP 2: Capture install event
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
-      window.pwaDeferredPrompt = e;
-      console.log('[PWA] ✅ Install prompt captured!');
+      deferredPrompt = e;
+      console.log('[PWA] Install prompt captured');
       
-      // Enable install button
+      // Show the install button
       const btn = document.getElementById('btn-install-app');
       if (btn) {
+        btn.style.display = '';
         btn.disabled = false;
-        btn.textContent = '📲 Instalar Aplicación';
-        btn.style.opacity = '1';
       }
-    });
-
-    // Listen for successful install
-    window.addEventListener('appinstalled', () => {
-      console.log('[PWA] ✅ App installed!');
+      
+      // Also show section if hidden
       const section = document.getElementById('install-app-section');
-      if (section) {
-        section.innerHTML = '<div style="text-align:center;padding:1rem;"><span style="font-size:2rem;">✅</span><p style="margin:0.5rem 0 0;color:var(--color-success);font-weight:600;">¡App Instalada!</p></div>';
-      }
+      if (section) section.style.display = '';
     });
 
-    // When DOM is ready, attach click handler
-    function initInstallButton() {
-      const btn = document.getElementById('btn-install-app');
-      if (!btn) {
-        // Retry after a short delay (DOM might not be fully ready)
-        setTimeout(initInstallButton, 500);
+    // STEP 3: Handle install success
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] Installed!');
+      const section = document.getElementById('install-app-section');
+      if (section) section.style.display = 'none';
+      deferredPrompt = null;
+    });
+
+    // STEP 4: Button click handler - SIMPLE
+    function handleInstallClick() {
+      if (!deferredPrompt) {
+        console.log('[PWA] No install prompt available');
+        alert('Para instalar:\n1. Toca ⋮ (tres puntos arriba)\n2. Toca "Instalar app"\n3. Toca "Instalar"');
         return;
       }
-
-      btn.addEventListener('click', async function() {
-        console.log('[PWA] 📲 Install button clicked');
-        
-        if (window.pwaDeferredPrompt) {
-          // Native install supported - show dialog
-          window.pwaDeferredPrompt.prompt();
-          const { outcome } = await window.pwaDeferredPrompt.userChoice;
-          console.log('[PWA] User choice:', outcome);
-          
-          if (outcome === 'accepted') {
-            this.textContent = '⏳ Instalando...';
-            this.disabled = true;
+      
+      console.log('[PWA] Showing install dialog...');
+      deferredPrompt.prompt();
+      
+      deferredPrompt.userChoice.then((choiceResult) => {
+        if (choiceResult.outcome === 'accepted') {
+          console.log('[PWA] User accepted');
+          const btn = document.getElementById('btn-install-app');
+          if (btn) {
+            btn.textContent = 'Instalando...';
+            btn.disabled = true;
           }
-          window.pwaDeferredPrompt = null;
         } else {
-          // Fallback: try to trigger via Chrome's native behavior
-          console.log('[PWA] No deferred prompt available');
-          
-          // On Android Chrome, sometimes the prompt needs to be triggered differently
-          // Try calling prompt on the event if it exists
-          if (window.pwaDeferredPrompt && window.pwaDeferredPrompt.prompt) {
-            window.pwaDeferredPrompt.prompt();
-          } else {
-            // Show manual instructions
-            alert('Para instalar CotizaPro:\n\n1. Toca el menú ⋮ (tres puntos)\n2. Selecciona "Instalar app" o "Añadir a pantalla de inicio"\n3. Toca "Instalar"');
-          }
+          console.log('[PWA] User dismissed');
         }
+        deferredPrompt = null;
+      }).catch(err => {
+        console.error('[PWA] Error:', err);
+        alert('Error al instalar. Intenta desde el menú ⋮');
       });
-
-      console.log('[PWA] ✅ Install button handler attached');
     }
 
-    // Initialize when DOM is ready
+    // Attach handler when DOM ready
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initInstallButton);
+      document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('btn-install-app');
+        if (btn) btn.addEventListener('click', handleInstallClick);
+      });
     } else {
-      initInstallButton();
+      const btn = document.getElementById('btn-install-app');
+      if (btn) btn.addEventListener('click', handleInstallClick);
     }
-
-    // Also try after page fully loads
-    window.addEventListener('load', () => {
-      setTimeout(initInstallButton, 1000);
-    });
   </script>
 </body>
 </html>
