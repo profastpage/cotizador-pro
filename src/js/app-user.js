@@ -1088,6 +1088,47 @@ function setupForms() {
 // HELPERS
 // ==========================================================
 
+// Convert number to Spanish text (for invoices/receipts)
+function numberToWords(n) {
+  if (n === 0) return 'Cero';
+  
+  const units = ['', 'Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco', 'Seis', 'Siete', 'Ocho', 'Nueve'];
+  const teens = ['Diez', 'Once', 'Doce', 'Trece', 'Catorce', 'Quince', 'Dieciséis', 'Diecisiete', 'Dieciocho', 'Diecinueve'];
+  const tens = ['', 'Diez', 'Veinte', 'Treinta', 'Cuarenta', 'Cincuenta', 'Sesenta', 'Setenta', 'Ochenta', 'Noventa'];
+  const hundreds = ['', 'Ciento', 'Doscientos', 'Trescientos', 'Cuatrocientos', 'Quinientos', 'Seiscientos', 'Setecientos', 'Ochocientos', 'Novecientos'];
+  
+  if (n === 100) return 'Cien';
+  
+  let result = '';
+  
+  if (n >= 1000) {
+    const thousands = Math.floor(n / 1000);
+    if (thousands === 1) result += 'Mil ';
+    else result += numberToWords(thousands) + ' Mil ';
+    n %= 1000;
+  }
+  
+  if (n >= 100) {
+    result += hundreds[Math.floor(n / 100)] + ' ';
+    n %= 100;
+  }
+  
+  if (n >= 20) {
+    result += tens[Math.floor(n / 10)];
+    if (n % 10 > 0) {
+      if (n >= 30) result += ' y ' + units[n % 10];
+      else result = result.slice(0, -1) + 'i' + units[n % 10]; // Veintiuno, etc.
+    }
+    result += ' ';
+  } else if (n >= 10) {
+    result += teens[n - 10] + ' ';
+  } else if (n > 0) {
+    result += units[n] + ' ';
+  }
+  
+  return result.trim();
+}
+
 function getPlanQuota(plan) {
   return { free: 3, basic: 60, business: 200, pro: -1 }[plan] || 3;
 }
