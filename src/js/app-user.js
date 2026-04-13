@@ -175,10 +175,11 @@ async function loadHistory() {
 }
 
 function createQuoteCard(quote, showActions = false) {
+  const quoteNum = quote.number || 'N/A';
   return `
     <div class="quote-card">
       <div class="quote-card-header">
-        <span class="quote-number">#${quote.number || 'N/A'}</span>
+        <span class="quote-number">#${quoteNum}</span>
         <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
       </div>
       <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
@@ -238,6 +239,45 @@ function resetWizard() {
   document.getElementById('items-container').innerHTML = '';
   updateWizardUI();
   updateSummary();
+  
+  // Load and populate client selector
+  loadClientSelector();
+}
+
+// Load clients into selector dropdown
+async function loadClientSelector() {
+  const selector = document.getElementById('client-selector');
+  if (!selector) return;
+  
+  const clients = await loadClients();
+  selector.innerHTML = '<option value="">— Nuevo cliente —</option>';
+  
+  clients.forEach(client => {
+    const option = document.createElement('option');
+    option.value = client.id;
+    option.textContent = `${client.name}${client.document ? ` (${client.document})` : ''}`;
+    option.dataset.client = JSON.stringify(client);
+    selector.appendChild(option);
+  });
+  
+  // Handle client selection
+  selector.onchange = function() {
+    if (this.value) {
+      const client = JSON.parse(this.options[this.selectedIndex].dataset.client);
+      document.getElementById('client-name').value = client.name || '';
+      document.getElementById('client-document').value = client.document || '';
+      document.getElementById('client-email').value = client.email || '';
+      document.getElementById('client-phone').value = client.phone || '';
+      document.getElementById('client-address').value = client.address || '';
+    } else {
+      // Clear form for new client
+      document.getElementById('client-name').value = '';
+      document.getElementById('client-document').value = '';
+      document.getElementById('client-email').value = '';
+      document.getElementById('client-phone').value = '';
+      document.getElementById('client-address').value = '';
+    }
+  };
 }
 
 function updateWizardUI() {
@@ -414,8 +454,79 @@ function updateReview() {
 }
 
 // ==========================================================
-// GENERATE PDF - Professional Design
+// CLIENTS - Save and load clients
 // ==========================================================
+
+async function saveClient(clientData) {
+  try {
+    // Check if client already exists by name or document
+    const clientsRef = collection(db, 'clients');
+    const q = query(clientsRef, where('userId', '==', currentUser.uid), where('name', '==', clientData.name));
+    const existing = await getDocs(q);
+    
+    if (!existing.empty) {
+      // Update existing client
+      const docRef = existing.docs[0].ref;
+      await updateDoc(docRef, {
+        ...clientData,
+        userId: currentUser.uid,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      // Create new client
+      await addDoc(clientsRef, {
+        ...clientData,
+        userId: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Error saving client:', error);
+  }
+}
+
+async function loadClients() {
+  try {
+    const clientsRef = collection(db, 'clients');
+    const q = query(clientsRef, where('userId', '==', currentUser.uid), orderBy('updatedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const clients = [];
+    snapshot.forEach(docSnap => clients.push({ id: docSnap.id, ...docSnap.data() }));
+    return clients;
+  } catch (error) {
+    console.error('Error loading clients:', error);
+    return [];
+  }
+}
+
+// ==========================================================
+// QUOTE NUMBERING
+// ==========================================================
+
+async function getNextQuoteNumber() {
+  try {
+    const quotesRef = collection(db, 'quotes');
+    const q = query(quotesRef, where('userId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
+    const snapshot = await getDocs(q);
+    
+    if (snapshot.empty) return 1;
+    
+    // Get the highest number from existing quotes
+    let maxNumber = 0;
+    snapshot.forEach(docSnap => {
+      const data = docSnap.data();
+      if (data.number && data.number > maxNumber) {
+        maxNumber = data.number;
+      }
+    });
+    
+    return maxNumber + 1;
+  } catch (error) {
+    console.error('Error getting quote number:', error);
+    return 1;
+  }
+}
 
 async function generatePDF() {
   if (isGeneratingPDF) return;
@@ -461,19 +572,32 @@ async function generatePDF() {
       else { igvAmount = subtotal * 0.18; grandTotal = subtotal + igvAmount; }
     } else { grandTotal = subtotal; }
 
-    const quoteNum = String(Math.floor(Math.random() * 999999)).padStart(6, '0');
+    // Get sequential quote number
+    const quoteNumber = await getNextQuoteNumber();
     const issueDate = document.getElementById('quote-issue-date').value;
     const dueDate = document.getElementById('quote-due-date').value;
 
     const quoteData = {
       userId: currentUser.uid,
+      number: quoteNumber,
       client: { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress },
       items: quoteItems, issueDate, dueDate,
       subtotal, igv: igvAmount, total: grandTotal, igvEnabled, igvType,
       createdAt: new Date().toISOString()
     };
 
+    // Save quote to Firestore
     await addDoc(collection(db, 'quotes'), quoteData);
+    
+    // Save client for future use
+    await saveClient({
+      name: clientName,
+      document: clientDoc,
+      email: clientEmail,
+      phone: clientPhone,
+      address: clientAddress
+    });
+    
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
     // Load jsPDF
@@ -552,7 +676,7 @@ async function generatePDF() {
     pdf.text('NÚMERO:', 25, barY + 5);
     pdf.setFontSize(9);
     pdf.setTextColor(...DARK);
-    pdf.text(`#${quoteNum}`, 25, barY + 10);
+    pdf.text(`#${String(quoteNumber).padStart(3, '0')}`, 25, barY + 10);
     
     // Fecha Emisión
     pdf.setFontSize(8);
@@ -794,7 +918,7 @@ async function generatePDF() {
     pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 290, { align: 'center' });
 
     // Save PDF
-    const fileName = `Cotizacion-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}-${quoteNum}.pdf`;
+    const fileName = `Cotizacion-${String(quoteNumber).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
     pdf.save(fileName);
 
     showToast('¡PDF generado exitosamente!');
@@ -912,8 +1036,177 @@ window.deleteQuote = async function(id) {
   }
 };
 
-window.downloadQuote = function(id) {
-  showToast('Generando PDF...', 'info');
+window.downloadQuote = async function(id) {
+  try {
+    showToast('Generando PDF...', 'info');
+    
+    // Get quote data from Firestore
+    const quoteDoc = await getDoc(doc(db, 'quotes', id));
+    if (!quoteDoc.exists()) {
+      showToast('Cotización no encontrada', 'error');
+      return;
+    }
+    
+    const quote = quoteDoc.data();
+    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+    if (!companySnap.exists()) {
+      showToast('Configura los datos de tu empresa primero', 'error');
+      return;
+    }
+    
+    const company = companySnap.data();
+    const clientName = quote.client?.name || 'Sin nombre';
+    const { jsPDF } = window.jspdf || await new Promise((resolve, reject) => {
+      const scriptTag = document.createElement('script');
+      scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      scriptTag.onload = () => resolve(window.jspdf);
+      scriptTag.onerror = reject;
+      document.head.appendChild(scriptTag);
+    });
+    
+    const pdf = new jsPDF();
+    const BLUE = [30, 64, 175];
+    const LIGHT_BLUE = [240, 244, 255];
+    const GRAY_BG = [245, 247, 250];
+    const GRAY_TEXT = [100, 116, 139];
+    const DARK = [15, 23, 42];
+    const GREEN = [5, 150, 105];
+    
+    // Header
+    pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...DARK);
+    pdf.text(company.name || 'Mi Empresa', 20, 20);
+    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
+    let companyY = 27;
+    if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
+    if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
+    if (company.phone) { pdf.text(company.phone, 20, companyY); }
+    
+    pdf.setFontSize(22); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+    pdf.text('COTIZACIÓN', 190, 20, { align: 'right' });
+    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
+    
+    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1); pdf.line(20, 42, 190, 42);
+    
+    // Info bar
+    const barY = 47;
+    pdf.setFillColor(...LIGHT_BLUE); pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
+    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('NÚMERO:', 25, barY + 5);
+    pdf.setFontSize(9); pdf.setTextColor(...DARK);
+    pdf.text(`#${String(quote.number || 0).padStart(3, '0')}`, 25, barY + 10);
+    
+    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('FECHA EMISIÓN:', 65, barY + 5);
+    pdf.setFontSize(9); pdf.setTextColor(...DARK);
+    pdf.text(quote.issueDate || '-', 65, barY + 10);
+    
+    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
+    pdf.setFontSize(9); pdf.setTextColor(...DARK);
+    pdf.text(quote.dueDate || '-', 105, barY + 10);
+    
+    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('MONEDA:', 155, barY + 5);
+    pdf.setFontSize(9); pdf.setTextColor(...DARK);
+    pdf.text('PEN (Soles)', 155, barY + 10);
+    
+    // Client section
+    const clientY = 68;
+    pdf.setFillColor(...BLUE); pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
+    
+    const boxY = clientY + 11;
+    pdf.setFillColor(...GRAY_BG); pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
+    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+    
+    pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('RUC/DNI:', 25, boxY + 7);
+    pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+    pdf.text(quote.client?.document || '-', 55, boxY + 7);
+    
+    pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
+    pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+    pdf.text(clientName, 145, boxY + 7);
+    
+    // Items table
+    let tableY = boxY + 35;
+    pdf.setFillColor(...BLUE); pdf.rect(20, tableY, 170, 9, 'F');
+    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text('CANT.', 25, tableY + 6);
+    pdf.text('DESCRIPCIÓN', 45, tableY + 6);
+    pdf.text('P. UNIT.', 130, tableY + 6);
+    pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+    
+    pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+    tableY += 9;
+    
+    const items = quote.items || [];
+    for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
+      const item = items[rowIdx];
+      const qty = item.quantity || 0;
+      const price = item.unitPrice || 0;
+      const lineTotal = qty * price;
+      
+      if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
+      
+      pdf.setTextColor(...DARK);
+      pdf.text(String(qty), 25, tableY + 5.5);
+      const desc = item.description || '';
+      const splitDesc = pdf.splitTextToSize(desc, 80);
+      pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
+      pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
+      pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+      tableY += 8;
+    }
+    
+    // Totals
+    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
+    pdf.line(20, tableY + 2, 190, tableY + 2);
+    tableY += 8;
+    
+    pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('SUBTOTAL:', 120, tableY);
+    pdf.setTextColor(...DARK);
+    pdf.text(`S/ ${(quote.subtotal || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
+    tableY += 6;
+    
+    if (quote.igvEnabled) {
+      pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('IGV (18%):', 120, tableY);
+      pdf.setTextColor(...DARK);
+      pdf.text(`S/ ${(quote.igv || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
+      tableY += 4;
+      if (quote.igvType === 'included') {
+        pdf.setFontSize(7); pdf.setTextColor(...GREEN);
+        pdf.text('(Incluido en el precio)', 120, tableY);
+        pdf.setTextColor(...DARK); pdf.setFontSize(9);
+        tableY += 5;
+      } else { tableY += 2; }
+    }
+    
+    tableY += 2;
+    pdf.line(120, tableY, 190, tableY);
+    tableY += 7;
+    pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+    pdf.text('TOTAL:', 120, tableY);
+    pdf.text(`S/ ${(quote.total || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
+    
+    // Footer
+    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1); pdf.line(20, 278, 190, 278);
+    pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+    pdf.text('¡GRACIAS POR SU PREFERENCIA!', 105, 286, { align: 'center' });
+    pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('Documento generado por CotizaPro', 105, 292, { align: 'center' });
+    
+    pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
+    showToast('¡PDF descargado!');
+  } catch (error) {
+    console.error('Download error:', error);
+    showToast('Error al generar PDF', 'error');
+  }
 };
 
 window.showUpgradeModal = function() {

@@ -92,7 +92,8 @@ body {
   /* Mobile: thin single-line banner */
   .plan-banner {
     display: flex;
-    padding: 0.4rem 0.75rem;
+    padding: 0.3rem 0.75rem;
+    min-height: 28px;
   }
   .plan-banner .container {
     max-width: 100%;
@@ -101,26 +102,32 @@ body {
     justify-content: space-between;
   }
   .plan-banner span {
-    font-size: 0.7rem;
+    font-size: 0.6rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     flex: 1;
-    line-height: 1.2;
+    line-height: 1.1;
   }
   .plan-banner .btn {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.65rem;
+    padding: 0.15rem 0.4rem;
+    font-size: 0.55rem;
     background: white;
     color: var(--color-warning);
     border-radius: 999px;
     white-space: nowrap;
     flex-shrink: 0;
     border: none;
-    line-height: 1.2;
+    line-height: 1.1;
   }
   .main-content {
-    padding-top: calc(var(--topbar-height) + 34px);
+    padding-top: calc(var(--topbar-height) + 26px);
+  }
+  
+  /* Remove focus outline from bottom nav */
+  .bottom-nav .nav-item:focus {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
   }
 }
 
