@@ -1185,65 +1185,94 @@ if ('serviceWorker' in navigator) {
 function checkInstallStatus() {
   const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
                       window.matchMedia('(display-mode: fullscreen)').matches ||
+                      navigator.standalone ||
                       document.referrer.includes('android-app://');
   const section = document.getElementById('install-app-section');
   const btn = document.getElementById('btn-install-app');
   
   if (isInstalled) {
-    if (section) section.style.display = 'none';
+    // Already installed - hide section or show "installed" state
+    if (section) {
+      section.innerHTML = `
+        <div style="display:flex;align-items:center;gap:1rem;padding:0.5rem 0;">
+          <div style="width:48px;height:48px;background:var(--color-success);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <span style="font-size:1.5rem;">✅</span>
+          </div>
+          <div>
+            <h4 style="margin:0;font-size:1rem;">App Instalada</h4>
+            <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--color-gray-500);">CotizaPro ya está en tu dispositivo</p>
+          </div>
+        </div>
+      `;
+    }
     return;
   }
   
-  // Always show the install section - button text will change based on support
+  // Not installed yet - always show the install section
   if (section) section.style.display = '';
-  if (btn) btn.textContent = '📲 Instalar Aplicación';
+  if (btn) {
+    btn.textContent = '📲 Instalar Aplicación';
+    btn.style.display = '';
+  }
 }
 
 function setupPWAInstall() {
-  let installPromptFired = false;
+  let deferredPromptReady = false;
   
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    installPromptFired = true;
+    deferredPromptReady = true;
+    console.log('[PWA] Install prompt ready');
     const btn = document.getElementById('btn-install-app');
     if (btn) {
       btn.textContent = '📲 Instalar Aplicación';
-      btn.style.display = '';
+      btn.disabled = false;
     }
   });
 
   const handleInstall = async () => {
-    if (!deferredPrompt) {
-      // Browser doesn't support install prompt - show manual instructions
-      showToast('Para instalar: menú del navegador → "Añadir a pantalla de inicio"', 'info');
-      return;
-    }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      showToast('¡CotizaPro instalada! 🎉');
-      const btn = document.getElementById('btn-install-app');
-      if (btn) btn.textContent = '✅ App Instalada';
+    const btn = document.getElementById('btn-install-app');
+    
+    if (deferredPrompt && deferredPromptReady) {
+      // Browser supports install prompt (Chrome Android, Edge)
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        showToast('¡CotizaPro instalada! 🎉 Revisa tu pantalla de inicio.');
+        if (btn) btn.textContent = '✅ Instalando...';
+      } else {
+        showToast('Instalación cancelada', 'info');
+      }
+      deferredPrompt = null;
+      deferredPromptReady = false;
     } else {
-      showToast('Instalación cancelada', 'info');
+      // Browser doesn't support install prompt (iOS Safari, some Android)
+      // Show manual instructions based on platform
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isAndroid = /Android/.test(navigator.userAgent);
+      
+      if (isIOS) {
+        showToast('Toca el botón Compartir (↑) → "Añadir a pantalla de inicio"', 'info');
+      } else if (isAndroid) {
+        showToast('Toca ⋮ → "Añadir a pantalla de inicio" o "Instalar app"', 'info');
+      } else {
+        showToast('Usa el menú del navegador → "Instalar" o "Añadir a pantalla de inicio"', 'info');
+      }
     }
-    deferredPrompt = null;
   };
 
   const btn = document.getElementById('btn-install-app');
   if (btn) {
     btn.addEventListener('click', handleInstall);
-    // Default text if prompt hasn't fired yet
-    btn.textContent = '📲 Instalar Aplicación';
+    btn.disabled = false;
   }
 
   // Listen for app installed
   window.addEventListener('appinstalled', () => {
     console.log('[PWA] App instalada correctamente');
-    showToast('¡CotizaPro instalada! 🎉');
-    const section = document.getElementById('install-app-section');
-    if (section) section.style.display = 'none';
+    showToast('¡CotizaPro instalada exitosamente! 🎉');
+    checkInstallStatus();
   });
 }
 

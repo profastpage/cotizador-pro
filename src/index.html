@@ -385,6 +385,30 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/auth.js"></script>
 
+  <!-- PWA: Auto-show login when opened from installed app -->
+  <script>
+    // Detect if running as installed PWA
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.matchMedia('(display-mode: fullscreen)').matches ||
+                         navigator.standalone ||
+                         document.referrer.includes('android-app://');
+    
+    // Check if coming from PWA install URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromPWA = urlParams.get('utm_source') === 'pwa';
+    
+    // If PWA or from install URL, auto-open login modal
+    if (isStandalone || fromPWA) {
+      window.addEventListener('DOMContentLoaded', () => {
+        // Hide marketing sections, show login directly
+        setTimeout(() => {
+          const loginBtn = document.getElementById('btn-login-nav');
+          if (loginBtn) loginBtn.click();
+        }, 500);
+      });
+    }
+  </script>
+
   <!-- PWA Service Worker Registration -->
   <script>
     if ('serviceWorker' in navigator) {

@@ -2,7 +2,7 @@
   "name": "CotizaPro - Cotizaciones Profesionales",
   "short_name": "CotizaPro",
   "description": "Generador de Cotizaciones Profesionales en PDF. Crea, envía y gestiona cotizaciones como un profesional.",
-  "start_url": "/app.html",
+  "start_url": "/?utm_source=pwa&utm_medium=install",
   "scope": "/",
   "display": "standalone",
   "background_color": "#f1f5f9",
