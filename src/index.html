@@ -259,6 +259,9 @@
           </div>
           <button type="submit" class="btn btn-primary btn-block">Iniciar Sesión</button>
         </form>
+        <p style="text-align:center;margin-top:0.75rem;">
+          <a href="#" onclick="showForgotPassword()" style="color:var(--color-primary);font-size:0.875rem;">¿Olvidaste tu contraseña?</a>
+        </p>
         <p class="modal-footer-text">
           ¿No tienes cuenta? <a href="#" onclick="switchToRegister()">Regístrate gratis</a>
         </p>
@@ -318,7 +321,42 @@
     </div>
   </div>
 
+  <!-- Forgot Password Modal -->
+  <div id="modal-forgot" class="modal hidden">
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h2 class="modal-title">Recuperar Contraseña</h2>
+        <button class="modal-close" data-close-modal>✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom:1rem;color:var(--color-gray-600);">Ingresa tu email y te enviaremos un enlace para restablecer tu contraseña.</p>
+        <form id="form-forgot-password" class="form">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="forgot-email" class="form-input" placeholder="tu@email.com" required>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Enviar Enlace de Recuperación</button>
+        </form>
+        <p class="modal-footer-text">
+          <a href="#" onclick="switchToLogin()">← Volver al login</a>
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/auth.js"></script>
+
+  <!-- PWA Service Worker Registration -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((reg) => console.log('[PWA] SW registrado:', reg.scope))
+          .catch((err) => console.log('[PWA] Error SW:', err));
+      });
+    }
+  </script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -109,6 +109,7 @@ async function processUser(user) {
         company: '',
         role: isSuperAdmin ? 'superadmin' : 'user',
         plan: 'free',
+        licenseDuration: 0,
         planStartDate: null,
         planEndDate: null,
         quotesUsedThisMonth: 0,
@@ -244,3 +245,37 @@ if (formLogin) {
 window.logout = function() {
   signOut(auth).then(() => { window.location.href = 'index.html'; });
 };
+
+// ==========================================================
+// PASSWORD RESET
+// ==========================================================
+
+window.showForgotPassword = function() {
+  document.getElementById('modal-login').classList.add('hidden');
+  document.getElementById('modal-forgot').classList.remove('hidden');
+};
+
+const formForgot = document.getElementById('form-forgot-password');
+if (formForgot) {
+  formForgot.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgot-email').value.trim();
+    if (!email) {
+      showToast('Ingresa tu email', 'error');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      showToast('¡Email de recuperación enviado! Revisa tu bandeja.', 'success');
+      document.getElementById('modal-forgot').classList.add('hidden');
+      document.getElementById('form-forgot-password').reset();
+    } catch (error) {
+      console.error('Password reset error:', error);
+      let message = 'Error al enviar el email de recuperación';
+      if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
+      else if (error.code === 'auth/invalid-email') message = 'Email inválido';
+      else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
+      showToast(message, 'error');
+    }
+  });
+}

@@ -562,13 +562,20 @@ function updateReview() {
 
 async function saveClient(clientData) {
   try {
-    // Check if client already exists by name or document
+    // Validate RUC/DNI if provided
+    if (clientData.document && clientData.document.trim()) {
+      const doc = clientData.document.trim();
+      if (/^\d{11}$/.test(doc) && !isValidRUC(doc)) {
+        showToast(`RUC "${doc}" no es válido`, 'error');
+        return false;
+      }
+    }
+
     const clientsRef = collection(db, 'clients');
     const q = query(clientsRef, where('userId', '==', currentUser.uid), where('name', '==', clientData.name));
     const existing = await getDocs(q);
-    
+
     if (!existing.empty) {
-      // Update existing client
       const docRef = existing.docs[0].ref;
       await updateDoc(docRef, {
         ...clientData,
@@ -576,7 +583,6 @@ async function saveClient(clientData) {
         updatedAt: new Date().toISOString()
       });
     } else {
-      // Create new client
       await addDoc(clientsRef, {
         ...clientData,
         userId: currentUser.uid,
@@ -584,8 +590,10 @@ async function saveClient(clientData) {
         updatedAt: new Date().toISOString()
       });
     }
+    return true;
   } catch (error) {
     console.error('Error saving client:', error);
+    return false;
   }
 }
 
@@ -601,6 +609,194 @@ async function loadClients() {
     console.error('Error loading clients:', error);
     return [];
   }
+}
+
+// ==========================================================
+// PDF GENERATION - Centralized
+// ==========================================================
+
+// Load jsPDF dynamically (single source of truth)
+async function loadJsPDF() {
+  if (window.jspdf) return window.jspdf;
+  return new Promise((resolve, reject) => {
+    const scriptTag = document.createElement('script');
+    scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    scriptTag.onload = () => resolve(window.jspdf);
+    scriptTag.onerror = reject;
+    document.head.appendChild(scriptTag);
+  });
+}
+
+// Centralized PDF renderer - used by both generatePDF and downloadQuote
+async function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType = 'cotizacion') {
+  const { jsPDF } = await loadJsPDF();
+  const pdf = new jsPDF();
+
+  // Colors
+  const BLUE = [30, 64, 175];
+  const LIGHT_BLUE = [240, 244, 255];
+  const GRAY_BG = [245, 247, 250];
+  const GRAY_TEXT = [100, 116, 139];
+  const DARK = [15, 23, 42];
+  const GREEN = [5, 150, 105];
+
+  const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
+
+  // ==========================================
+  // HEADER - Company Info + Title
+  // ==========================================
+  pdf.setFontSize(11);
+  pdf.setFont(undefined, 'bold');
+  pdf.setTextColor(...DARK);
+  pdf.text(company.name || 'Mi Empresa', 20, 20);
+
+  pdf.setFontSize(8);
+  pdf.setFont(undefined, 'normal');
+  pdf.setTextColor(...GRAY_TEXT);
+
+  let companyY = 27;
+  if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
+  if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
+  if (company.phone) { pdf.text(company.phone, 20, companyY); companyY += 5; }
+
+  pdf.setFontSize(22);
+  pdf.setFont(undefined, 'bold');
+  pdf.setTextColor(...BLUE);
+  pdf.text(docTypeInfo.headerTitle, 190, 20, { align: 'right' });
+
+  pdf.setFontSize(8);
+  pdf.setFont(undefined, 'normal');
+  pdf.setTextColor(...GRAY_TEXT);
+  pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
+  if (company.phone) pdf.text(`Tel: ${company.phone}`, 190, 32, { align: 'right' });
+  if (company.email) pdf.text(company.email, 190, 37, { align: 'right' });
+
+  pdf.setDrawColor(...BLUE);
+  pdf.setLineWidth(1);
+  pdf.line(20, 42, 190, 42);
+
+  // ==========================================
+  // QUOTE INFO BAR
+  // ==========================================
+  const barY = 47;
+  pdf.setFillColor(...LIGHT_BLUE);
+  pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
+
+  pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('NÚMERO:', 25, barY + 5);
+  pdf.setFontSize(9); pdf.setTextColor(...DARK);
+  pdf.text(`#${String(quoteNumber).padStart(3, '0')}`, 25, barY + 10);
+
+  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('FECHA EMISIÓN:', 65, barY + 5);
+  pdf.setFontSize(9); pdf.setTextColor(...DARK);
+  pdf.text(issueDate || '-', 65, barY + 10);
+
+  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
+  pdf.setFontSize(9); pdf.setTextColor(...DARK);
+  pdf.text(dueDate || '-', 105, barY + 10);
+
+  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('MONEDA:', 155, barY + 5);
+  pdf.setFontSize(9); pdf.setTextColor(...DARK);
+  pdf.text('PEN (Soles)', 155, barY + 10);
+
+  // ==========================================
+  // CLIENT DATA SECTION
+  // ==========================================
+  const clientY = 68;
+  pdf.setFillColor(...BLUE);
+  pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
+  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+  pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
+
+  const boxY = clientY + 11;
+  pdf.setFillColor(...GRAY_BG);
+  pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
+
+  pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+  pdf.setFont(undefined, 'bold'); pdf.text('RUC/DNI:', 25, boxY + 7);
+  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 55, boxY + 7);
+
+  pdf.setFont(undefined, 'bold'); pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
+  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 145, boxY + 7);
+
+  // ==========================================
+  // ITEMS TABLE
+  // ==========================================
+  let tableY = boxY + 35;
+  pdf.setFillColor(...BLUE);
+  pdf.rect(20, tableY, 170, 9, 'F');
+
+  pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+  pdf.text('CANT.', 25, tableY + 6);
+  pdf.text('DESCRIPCIÓN', 45, tableY + 6);
+  pdf.text('P. UNIT.', 130, tableY + 6);
+  pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+
+  pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+  tableY += 9;
+
+  for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
+    const item = items[rowIdx];
+    const qty = item.quantity || 0;
+    const price = item.unitPrice || 0;
+    const lineTotal = qty * price;
+
+    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
+
+    pdf.setTextColor(...DARK);
+    pdf.text(String(qty), 25, tableY + 5.5);
+    const desc = item.description || '';
+    const splitDesc = pdf.splitTextToSize(desc, 80);
+    pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
+    pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
+    pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+    tableY += 8;
+  }
+
+  // Totals
+  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
+  pdf.line(20, tableY + 2, 190, tableY + 2);
+  tableY += 8;
+
+  pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('SUBTOTAL:', 120, tableY);
+  pdf.setTextColor(...DARK);
+  pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+  tableY += 6;
+
+  if (igvEnabled) {
+    pdf.setTextColor(...GRAY_TEXT);
+    pdf.text('IGV (18%):', 120, tableY);
+    pdf.setTextColor(...DARK);
+    pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
+    tableY += 4;
+    if (igvType === 'included') {
+      pdf.setFontSize(7); pdf.setTextColor(...GREEN);
+      pdf.text('(Incluido en el precio)', 120, tableY);
+      pdf.setTextColor(...DARK); pdf.setFontSize(9);
+      tableY += 5;
+    } else { tableY += 2; }
+  }
+
+  tableY += 2;
+  pdf.line(120, tableY, 190, tableY);
+  tableY += 7;
+  pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+  pdf.text('TOTAL:', 120, tableY);
+  pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
+
+  // Footer
+  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
+  pdf.line(20, 278, 190, 278);
+  pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+  pdf.text(docTypeInfo.footerText, 105, 286, { align: 'center' });
+  pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
+  pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 292, { align: 'center' });
+
+  return { pdf, docTypeInfo };
 }
 
 // ==========================================================
@@ -665,9 +861,7 @@ async function generatePDF() {
     const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
 
     let subtotal = 0;
-    for (let idx = 0; idx < quoteItems.length; idx++) {
-      subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
-    }
+    quoteItems.forEach(item => { subtotal += (item.quantity || 0) * (item.unitPrice || 0); });
 
     let igvAmount = 0, grandTotal = 0;
     if (igvEnabled) {
@@ -675,356 +869,34 @@ async function generatePDF() {
       else { igvAmount = subtotal * 0.18; grandTotal = subtotal + igvAmount; }
     } else { grandTotal = subtotal; }
 
-    // Get sequential quote number
     const quoteNumber = await getNextQuoteNumber();
     const issueDate = document.getElementById('quote-issue-date').value;
     const dueDate = document.getElementById('quote-due-date').value;
-    
-    // Get selected document type
+
     const docTypeSelector = document.getElementById('document-type-selector');
     const documentType = docTypeSelector?.value || 'cotizacion';
-    const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
 
     const quoteData = {
       userId: currentUser.uid,
       number: quoteNumber,
-      documentType: documentType,
+      documentType,
       client: { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress },
       items: quoteItems, issueDate, dueDate,
       subtotal, igv: igvAmount, total: grandTotal, igvEnabled, igvType,
       createdAt: new Date().toISOString()
     };
 
-    // Save quote to Firestore
     await addDoc(collection(db, 'quotes'), quoteData);
-    
-    // Save client for future use
-    await saveClient({
-      name: clientName,
-      document: clientDoc,
-      email: clientEmail,
-      phone: clientPhone,
-      address: clientAddress
-    });
-    
+    const clientSaved = await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
+    if (!clientSaved) {
+      isGeneratingPDF = false;
+      return;
+    }
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
-    // Load jsPDF
-    if (!window.jspdf) {
-      await new Promise((resolve, reject) => {
-        const scriptTag = document.createElement('script');
-        scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-        scriptTag.onload = resolve;
-        scriptTag.onerror = reject;
-        document.head.appendChild(scriptTag);
-      });
-    }
+    // Use centralized PDF renderer
+    const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType);
 
-    // Generate Professional PDF
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF();
-    
-    // Colors
-    const BLUE = [30, 64, 175];
-    const LIGHT_BLUE = [240, 244, 255];
-    const GRAY_BG = [245, 247, 250];
-    const GRAY_TEXT = [100, 116, 139];
-    const DARK = [15, 23, 42];
-    const GREEN = [5, 150, 105];
-
-    // ==========================================
-    // HEADER - Company Info + Title
-    // ==========================================
-    
-    // Company info (left)
-    pdf.setFontSize(11);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(...DARK);
-    pdf.text(company.name || 'Mi Empresa', 20, 20);
-    
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...GRAY_TEXT);
-    
-    let companyY = 27;
-    if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
-    if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
-    if (company.phone) { pdf.text(company.phone, 20, companyY); companyY += 5; }
-    
-    // COTIZACIÓN title (right)
-    pdf.setFontSize(22);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(...BLUE);
-    pdf.text('COTIZACIÓN', 190, 20, { align: 'right' });
-    
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
-    if (company.phone) pdf.text(`Tel: ${company.phone}`, 190, 32, { align: 'right' });
-    if (company.email) pdf.text(company.email, 190, 37, { align: 'right' });
-    
-    // Blue divider line
-    pdf.setDrawColor(...BLUE);
-    pdf.setLineWidth(1);
-    pdf.line(20, 42, 190, 42);
-
-    // ==========================================
-    // QUOTE INFO BAR
-    // ==========================================
-    
-    const barY = 47;
-    pdf.setFillColor(...LIGHT_BLUE);
-    pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
-    
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(...GRAY_TEXT);
-    
-    // Número
-    pdf.text('NÚMERO:', 25, barY + 5);
-    pdf.setFontSize(9);
-    pdf.setTextColor(...DARK);
-    pdf.text(`#${String(quoteNumber).padStart(3, '0')}`, 25, barY + 10);
-    
-    // Fecha Emisión
-    pdf.setFontSize(8);
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('FECHA EMISIÓN:', 65, barY + 5);
-    pdf.setFontSize(9);
-    pdf.setTextColor(...DARK);
-    pdf.text(issueDate || '-', 65, barY + 10);
-    
-    // Fecha Vencimiento
-    pdf.setFontSize(8);
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
-    pdf.setFontSize(9);
-    pdf.setTextColor(...DARK);
-    pdf.text(dueDate || '-', 105, barY + 10);
-    
-    // Moneda
-    pdf.setFontSize(8);
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('MONEDA:', 155, barY + 5);
-    pdf.setFontSize(9);
-    pdf.setTextColor(...DARK);
-    pdf.text('PEN (Soles)', 155, barY + 10);
-
-    // ==========================================
-    // CLIENT DATA SECTION
-    // ==========================================
-    
-    const clientY = 68;
-    
-    // Blue header bar
-    pdf.setFillColor(...BLUE);
-    pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
-    
-    // Gray info box
-    const boxY = clientY + 11;
-    pdf.setFillColor(...GRAY_BG);
-    pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
-    
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...DARK);
-    
-    // Left column
-    pdf.setFont(undefined, 'bold');
-    pdf.text('RUC/DNI:', 25, boxY + 7);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(clientDoc || '-', 55, boxY + 7);
-    
-    pdf.setFont(undefined, 'bold');
-    pdf.text('EMAIL:', 25, boxY + 14);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(clientEmail || '-', 55, boxY + 14);
-    
-    pdf.setFont(undefined, 'bold');
-    pdf.text('DIRECCIÓN:', 25, boxY + 21);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(clientAddress || '-', 58, boxY + 21);
-    
-    // Right column
-    pdf.setFont(undefined, 'bold');
-    pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(clientName, 145, boxY + 7);
-    
-    pdf.setFont(undefined, 'bold');
-    pdf.text('TELÉFONO:', 110, boxY + 14);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(clientPhone || '-', 135, boxY + 14);
-
-    // ==========================================
-    // ITEMS TABLE
-    // ==========================================
-    
-    let tableY = boxY + 35;
-    
-    // Table header
-    pdf.setFillColor(...BLUE);
-    pdf.rect(20, tableY, 170, 9, 'F');
-    
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('CANT.', 25, tableY + 6);
-    pdf.text('DESCRIPCIÓN', 45, tableY + 6);
-    pdf.text('P. UNIT.', 130, tableY + 6);
-    pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
-    
-    // Table rows
-    pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8);
-    tableY += 9;
-    
-    for (let rowIdx = 0; rowIdx < quoteItems.length; rowIdx++) {
-      const item = quoteItems[rowIdx];
-      const qty = item.quantity || 0;
-      const price = item.unitPrice || 0;
-      const lineTotal = qty * price;
-      
-      // Alternate row colors
-      if (rowIdx % 2 === 0) {
-        pdf.setFillColor(249, 250, 251);
-        pdf.rect(20, tableY, 170, 8, 'F');
-      }
-      
-      pdf.setTextColor(...DARK);
-      pdf.text(String(qty), 25, tableY + 5.5);
-      
-      // Description (with word wrap)
-      const desc = item.description || '';
-      const splitDesc = pdf.splitTextToSize(desc, 80);
-      pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
-      
-      pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
-      pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
-      
-      tableY += 8;
-    }
-    
-    // Thick blue line before totals
-    pdf.setDrawColor(...BLUE);
-    pdf.setLineWidth(1.5);
-    pdf.line(20, tableY + 2, 190, tableY + 2);
-    
-    // Totals
-    tableY += 8;
-    pdf.setLineWidth(0.2);
-    pdf.setDrawColor(200, 200, 200);
-    
-    pdf.setFontSize(9);
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('SUBTOTAL:', 120, tableY);
-    pdf.setTextColor(...DARK);
-    pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
-    tableY += 6;
-    
-    if (igvEnabled) {
-      pdf.setTextColor(...GRAY_TEXT);
-      pdf.text('IGV (18%):', 120, tableY);
-      pdf.setTextColor(...DARK);
-      pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
-      tableY += 4;
-      if (igvType === 'included') {
-        pdf.setFontSize(7);
-        pdf.setTextColor(...GREEN);
-        pdf.text('(Incluido en el precio)', 120, tableY);
-        pdf.setTextColor(...DARK);
-        pdf.setFontSize(9);
-        tableY += 5;
-      } else {
-        tableY += 2;
-      }
-    }
-    
-    tableY += 2;
-    pdf.line(120, tableY, 190, tableY);
-    tableY += 8;
-    
-    // Grand Total - Large and bold
-    pdf.setFontSize(14);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(...BLUE);
-    pdf.text('TOTAL:', 120, tableY);
-    pdf.text(`S/ ${grandTotal.toFixed(2)}`, 188, tableY, { align: 'right' });
-
-    // ==========================================
-    // PAYMENT CONDITIONS
-    // ==========================================
-    
-    tableY += 15;
-    pdf.setFillColor(...BLUE);
-    pdf.roundedRect(20, tableY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('CONDICIONES DE PAGO', 25, tableY + 5.5);
-    
-    tableY += 12;
-    pdf.setFontSize(8);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...DARK);
-    pdf.text('Contado', 25, tableY);
-
-    // ==========================================
-    // TERMS AND CONDITIONS
-    // ==========================================
-    
-    tableY += 12;
-    pdf.setFillColor(...BLUE);
-    pdf.roundedRect(20, tableY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('TÉRMINOS Y CONDICIONES', 25, tableY + 5.5);
-    
-    tableY += 11;
-    pdf.setFillColor(...GRAY_BG);
-    pdf.roundedRect(20, tableY, 170, 32, 2, 2, 'F');
-    
-    pdf.setFontSize(7);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...GRAY_TEXT);
-    
-    const terms = [
-      'Esta cotización tiene una validez de 30 días calendario.',
-      'Los precios están expresados en Soles (PEN) e incluyen IGV.' + (igvEnabled ? '' : ' (No incluye IGV)'),
-      'La forma de pago y plazos están detallados en la sección de condiciones de pago.',
-      'Esta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.',
-      'Para consultas, comuníquese a los datos de contacto indicados en el encabezado.'
-    ];
-    
-    let termY = tableY + 6;
-    terms.forEach(term => {
-      pdf.text('• ' + term, 25, termY);
-      termY += 5;
-    });
-
-    // ==========================================
-    // FOOTER
-    // ==========================================
-
-    pdf.setDrawColor(...BLUE);
-    pdf.setLineWidth(1);
-    pdf.line(20, 278, 190, 278);
-
-    pdf.setFontSize(10);
-    pdf.setFont(undefined, 'bold');
-    pdf.setTextColor(...BLUE);
-    pdf.text(docTypeInfo.footerText, 105, 285, { align: 'center' });
-
-    pdf.setFontSize(7);
-    pdf.setFont(undefined, 'normal');
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 290, { align: 'center' });
     const fileName = `Cotizacion-${String(quoteNumber).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
     pdf.save(fileName);
 
@@ -1079,6 +951,10 @@ function setupForms() {
         showToast('Nombre y RUC son obligatorios', 'error');
         return;
       }
+      if (!isValidRUC(company.ruc)) {
+        showToast('RUC peruano inválido. Debe tener 11 dígitos y ser válido.', 'error');
+        return;
+      }
       await setDoc(doc(db, 'companies', currentUser.uid), company, { merge: true });
       showToast('Datos guardados');
     });
@@ -1088,6 +964,34 @@ function setupForms() {
 // ==========================================================
 // HELPERS
 // ==========================================================
+
+// Validate Peruvian RUC (11 digits + Modulo 11 algorithm)
+function isValidRUC(ruc) {
+  if (!ruc) return false;
+  ruc = ruc.trim();
+
+  // Must be exactly 11 digits
+  if (!/^\d{11}$/.test(ruc)) return false;
+
+  // First 2 digits validation
+  const prefix = parseInt(ruc.substring(0, 2));
+  const validPrefixes = [10, 15, 17, 20]; // 10=DNI, 15=Passport, 17=DNI foreign, 20=Empresa
+  if (!validPrefixes.includes(prefix)) return false;
+
+  // Modulo 11 verification
+  const weights = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+  let sum = 0;
+
+  for (let i = 0; i < 10; i++) {
+    sum += parseInt(ruc[i]) * weights[i];
+  }
+
+  const remainder = sum % 11;
+  const checkDigit = remainder === 0 ? 0 : 11 - remainder;
+  const actualCheckDigit = parseInt(ruc[10]);
+
+  return checkDigit === actualCheckDigit;
+}
 
 // Convert number to Spanish text (for invoices/receipts)
 function numberToWords(n) {
@@ -1187,169 +1091,46 @@ window.deleteQuote = async function(id) {
 window.downloadQuote = async function(id) {
   try {
     showToast('Generando PDF...', 'info');
-    
-    // Get quote data from Firestore
+
     const quoteDoc = await getDoc(doc(db, 'quotes', id));
     if (!quoteDoc.exists()) {
       showToast('Cotización no encontrada', 'error');
       return;
     }
-    
+
     const quote = quoteDoc.data();
+
+    // Verify ownership
+    if (quote.userId !== currentUser.uid) {
+      showToast('No tienes permiso para esta cotización', 'error');
+      return;
+    }
+
     const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
     if (!companySnap.exists()) {
       showToast('Configura los datos de tu empresa primero', 'error');
       return;
     }
-    
+
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
-    const docTypeInfo = DOCUMENT_TYPES[quote.documentType] || DOCUMENT_TYPES.cotizacion;
-    const { jsPDF } = window.jspdf || await new Promise((resolve, reject) => {
-      const scriptTag = document.createElement('script');
-      scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      scriptTag.onload = () => resolve(window.jspdf);
-      scriptTag.onerror = reject;
-      document.head.appendChild(scriptTag);
-    });
-    
-    const pdf = new jsPDF();
-    const BLUE = [30, 64, 175];
-    const LIGHT_BLUE = [240, 244, 255];
-    const GRAY_BG = [245, 247, 250];
-    const GRAY_TEXT = [100, 116, 139];
-    const DARK = [15, 23, 42];
-    const GREEN = [5, 150, 105];
-    
-    // Header
-    pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...DARK);
-    pdf.text(company.name || 'Mi Empresa', 20, 20);
-    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-    let companyY = 27;
-    if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
-    if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
-    if (company.phone) { pdf.text(company.phone, 20, companyY); }
-    
-    pdf.setFontSize(22); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-    pdf.text(docTypeInfo.headerTitle, 190, 20, { align: 'right' });
-    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
-    
-    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1); pdf.line(20, 42, 190, 42);
-    
-    // Info bar
-    const barY = 47;
-    pdf.setFillColor(...LIGHT_BLUE); pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
-    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('NÚMERO:', 25, barY + 5);
-    pdf.setFontSize(9); pdf.setTextColor(...DARK);
-    pdf.text(`#${String(quote.number || 0).padStart(3, '0')}`, 25, barY + 10);
-    
-    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('FECHA EMISIÓN:', 65, barY + 5);
-    pdf.setFontSize(9); pdf.setTextColor(...DARK);
-    pdf.text(quote.issueDate || '-', 65, barY + 10);
-    
-    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
-    pdf.setFontSize(9); pdf.setTextColor(...DARK);
-    pdf.text(quote.dueDate || '-', 105, barY + 10);
-    
-    pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('MONEDA:', 155, barY + 5);
-    pdf.setFontSize(9); pdf.setTextColor(...DARK);
-    pdf.text('PEN (Soles)', 155, barY + 10);
-    
-    // Client section
-    const clientY = 68;
-    pdf.setFillColor(...BLUE); pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-    pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
-    
-    const boxY = clientY + 11;
-    pdf.setFillColor(...GRAY_BG); pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
-    pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-    
-    pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('RUC/DNI:', 25, boxY + 7);
-    pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-    pdf.text(quote.client?.document || '-', 55, boxY + 7);
-    
-    pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
-    pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-    pdf.text(clientName, 145, boxY + 7);
-    
-    // Items table
-    let tableY = boxY + 35;
-    pdf.setFillColor(...BLUE); pdf.rect(20, tableY, 170, 9, 'F');
-    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-    pdf.text('CANT.', 25, tableY + 6);
-    pdf.text('DESCRIPCIÓN', 45, tableY + 6);
-    pdf.text('P. UNIT.', 130, tableY + 6);
-    pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
-    
-    pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
-    tableY += 9;
-    
-    const items = quote.items || [];
-    for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
-      const item = items[rowIdx];
-      const qty = item.quantity || 0;
-      const price = item.unitPrice || 0;
-      const lineTotal = qty * price;
-      
-      if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
-      
-      pdf.setTextColor(...DARK);
-      pdf.text(String(qty), 25, tableY + 5.5);
-      const desc = item.description || '';
-      const splitDesc = pdf.splitTextToSize(desc, 80);
-      pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
-      pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
-      pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
-      tableY += 8;
-    }
-    
-    // Totals
-    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
-    pdf.line(20, tableY + 2, 190, tableY + 2);
-    tableY += 8;
-    
-    pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('SUBTOTAL:', 120, tableY);
-    pdf.setTextColor(...DARK);
-    pdf.text(`S/ ${(quote.subtotal || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
-    tableY += 6;
-    
-    if (quote.igvEnabled) {
-      pdf.setTextColor(...GRAY_TEXT);
-      pdf.text('IGV (18%):', 120, tableY);
-      pdf.setTextColor(...DARK);
-      pdf.text(`S/ ${(quote.igv || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
-      tableY += 4;
-      if (quote.igvType === 'included') {
-        pdf.setFontSize(7); pdf.setTextColor(...GREEN);
-        pdf.text('(Incluido en el precio)', 120, tableY);
-        pdf.setTextColor(...DARK); pdf.setFontSize(9);
-        tableY += 5;
-      } else { tableY += 2; }
-    }
-    
-    tableY += 2;
-    pdf.line(120, tableY, 190, tableY);
-    tableY += 7;
-    pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-    pdf.text('TOTAL:', 120, tableY);
-    pdf.text(`S/ ${(quote.total || 0).toFixed(2)}`, 188, tableY, { align: 'right' });
-    
-    // Footer
-    pdf.setDrawColor(...BLUE); pdf.setLineWidth(1); pdf.line(20, 278, 190, 278);
-    pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-    pdf.text('¡GRACIAS POR SU PREFERENCIA!', 105, 286, { align: 'center' });
-    pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('Documento generado por CotizaPro', 105, 292, { align: 'center' });
-    
+
+    // Use centralized PDF renderer
+    const { pdf } = await renderPDF(
+      company,
+      clientName,
+      quote.items || [],
+      quote.number || 0,
+      quote.issueDate,
+      quote.dueDate,
+      quote.subtotal || 0,
+      quote.igv || 0,
+      quote.total || 0,
+      quote.igvEnabled,
+      quote.igvType || 'apart',
+      quote.documentType || 'cotizacion'
+    );
+
     pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
     showToast('¡PDF descargado!');
   } catch (error) {
@@ -1382,11 +1163,20 @@ window.logout = function() {
 };
 
 // ==========================================================
-// PWA INSTALL
+// PWA INSTALL & SERVICE WORKER
 // ==========================================================
 
 let deferredPrompt = null;
 let isCompanyConfigured = false;
+
+// Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((reg) => console.log('[PWA] Service Worker registrado:', reg.scope))
+      .catch((err) => console.log('[PWA] Error registrando SW:', err));
+  });
+}
 
 function setupPWAInstall() {
   window.addEventListener('beforeinstallprompt', (e) => {
@@ -1399,25 +1189,31 @@ function setupPWAInstall() {
     if (b) b.classList.remove('hidden');
     if (t) t.classList.remove('hidden');
   });
-  
+
   const handleInstall = async () => {
     if (!deferredPrompt) return;
     deferredPrompt.prompt();
     await deferredPrompt.userChoice;
     deferredPrompt = null;
   };
-  
+
   const b = document.getElementById('btn-install-pwa');
   const t = document.getElementById('btn-install-app');
   if (b) b.addEventListener('click', handleInstall);
   if (t) t.addEventListener('click', handleInstall);
-  
+
   if (window.matchMedia('(display-mode: standalone)').matches) {
     const s = document.getElementById('install-app-section');
     const tt = document.getElementById('btn-install-app');
     if (s) s.classList.add('hidden');
     if (tt) tt.classList.add('hidden');
   }
+
+  // Listen for app installed
+  window.addEventListener('appinstalled', () => {
+    console.log('[PWA] App instalada correctamente');
+    showToast('¡CotizaPro instalada! 🎉');
+  });
 }
 
 // ==========================================================
