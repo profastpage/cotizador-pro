@@ -144,7 +144,7 @@ function loadClients() {
 function renderClients(users) {
   const tbody = document.getElementById('clients-tbody');
   if (!tbody) return;
-  
+
   if (users.length === 0) {
     tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No hay clientes registrados</td></tr>';
     return;
@@ -155,8 +155,11 @@ function renderClients(users) {
     const isExpired = planEndDate && planEndDate < new Date() && u.licenseDuration !== 0;
     return `
       <tr>
-        <td><strong>${u.name}</strong>${u.company ? `<br><small>${u.company}</small>` : ''}</td>
-        <td>${u.email}</td>
+        <td>
+          <strong>${u.name}</strong>
+          <br><small style="color:var(--color-gray-500);word-break:break-all">${u.email}</small>
+          ${u.company ? `<br><small style="color:var(--color-gray-600)">${u.company}</small>` : ''}
+        </td>
         <td><span class="badge badge-${u.plan}">${getPlanName(u.plan)}</span></td>
         <td>${u.licenseDuration === 0 ? '∞ Ilimitado' : planEndDate && !isExpired ? formatDateShort(planEndDate) : isExpired ? 'Vencido' : 'Gratis'}</td>
         <td>${u.quotesUsedThisMonth || 0} / ${getPlanQuota(u.plan)}</td>
