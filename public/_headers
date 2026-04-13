@@ -1,0 +1,13 @@
+/*
+  # Prevent caching of HTML files - always serve fresh
+  Cache-Control: no-cache, no-store, must-revalidate
+  Pragma: no-cache
+  Expires: 0
+
+/assets/*.js
+  # JS files have content hashes - safe to cache
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.css
+  # CSS files have content hashes - safe to cache
+  Cache-Control: public, max-age=31536000, immutable
