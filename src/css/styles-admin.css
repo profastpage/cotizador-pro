@@ -340,6 +340,19 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Sidebar Footer - Close session white text */
+.sidebar-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-footer .btn {
+  color: white !important;
+  border-color: rgba(255,255,255,0.3) !important;
+}
+.sidebar-footer .btn:hover {
+  background: rgba(255,255,255,0.1) !important;
+}
+
 /* Responsive - Mobile First */
 @media (max-width: 768px) {
   body {

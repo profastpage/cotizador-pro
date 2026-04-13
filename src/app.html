@@ -7,6 +7,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#1e40af">
+  <link rel="manifest" href="/manifest.json">
   <title>CotizaPro - Mi Panel</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles-app.css">
@@ -68,7 +69,10 @@
     <!-- Top Bar (Mobile) -->
     <header class="topbar-mobile">
       <span class="topbar-logo">📊 CotizaPro</span>
-      <button onclick="logout()" class="btn-icon">🚪</button>
+      <div class="topbar-actions">
+        <button id="btn-install-app" class="btn-icon hidden" title="Instalar App">📲</button>
+        <button onclick="logout()" class="btn-icon" title="Cerrar Sesión">🚪</button>
+      </div>
     </header>
 
     <!-- Dashboard -->
@@ -272,6 +276,14 @@
     <section id="screen-settings" class="screen">
       <div class="container">
         <h3 class="section-title">Datos de mi Empresa</h3>
+        
+        <!-- Company Validation Warning -->
+        <div id="company-warning" class="company-warning hidden">
+          <div class="warning-icon">⚠️</div>
+          <h4>Configura tu empresa primero</h4>
+          <p>Para generar cotizaciones, primero debes configurar los datos de tu empresa aquí abajo.</p>
+        </div>
+        
         <form id="form-company" class="form">
           <div class="form-group">
             <label class="form-label">Nombre / Razón Social *</label>
@@ -293,8 +305,58 @@
             <label class="form-label">Email</label>
             <input type="email" id="company-email" class="form-input">
           </div>
-          <button type="submit" class="btn btn-primary btn-block">💾 Guardar</button>
+          <button type="submit" class="btn btn-primary btn-block">💾 Guardar Datos</button>
         </form>
+
+        <!-- PWA Install Button -->
+        <div id="install-app-section" class="install-section hidden">
+          <h3 class="section-title">Instalar Aplicación</h3>
+          <button id="btn-install-pwa" class="btn btn-gold btn-block">📲 Instalar CotizaPro</button>
+          <p class="install-hint">Instala la app para un acceso más rápido y mejor experiencia</p>
+        </div>
+
+        <!-- Help Toggle -->
+        <div class="help-section">
+          <button id="btn-help-toggle" class="btn btn-outline btn-block">❓ Ayuda / Guía de Uso</button>
+          <div id="help-content" class="help-content hidden">
+            <h4>🚀 Cómo usar CotizaPro</h4>
+            <div class="help-step">
+              <span class="step-number">1</span>
+              <div>
+                <strong>Configura tu Empresa</strong>
+                <p>Ve a Ajustes y llena los datos de tu empresa (nombre, RUC, dirección).</p>
+              </div>
+            </div>
+            <div class="help-step">
+              <span class="step-number">2</span>
+              <div>
+                <strong>Crear Cotización</strong>
+                <p>Click en "Nueva" → Selecciona tipo de documento → Ingresa datos del cliente → Agrega items → Click en "Generar PDF".</p>
+              </div>
+            </div>
+            <div class="help-step">
+              <span class="step-number">3</span>
+              <div>
+                <strong>Clientes Guardados</strong>
+                <p>Los clientes se guardan automáticamente. La próxima vez, selecciónalos del menú desplegable.</p>
+              </div>
+            </div>
+            <div class="help-step">
+              <span class="step-number">4</span>
+              <div>
+                <strong>Historial</strong>
+                <p>Todas tus cotizaciones se guardan. Puedes verlas y descargar el PDF nuevamente.</p>
+              </div>
+            </div>
+            <div class="help-step">
+              <span class="step-number">5</span>
+              <div>
+                <strong>IGV Opcional</strong>
+                <p>Al crear cotización, puedes activar/desactivar IGV y elegir si está incluido o aparte.</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <h3 class="section-title mt-6">Mi Plan</h3>
         <div class="plan-card-user">
