@@ -1,15 +1,13 @@
 // Service Worker para CotizaPro PWA
-const CACHE_NAME = 'cotizapro-v1';
-const STATIC_CACHE = 'cotizapro-static-v1';
-const DYNAMIC_CACHE = 'cotizapro-dynamic-v1';
+const CACHE_NAME = 'cotizapro-v2';
+const STATIC_CACHE = 'cotizapro-static-v2';
+const DYNAMIC_CACHE = 'cotizapro-dynamic-v2';
 
-// Recursos para cachear en instalación
+// Recursos para cachear en instalación (SOLO assets estáticos, NO HTML)
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/app.html',
-  '/superadmin.html',
   '/manifest.json',
+  '/icon.svg',
+  '/og-image.svg',
   '/css/styles-app.css',
   '/css/styles-landing.css',
   '/css/styles-superadmin.css',
@@ -48,7 +46,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch - Estrategia Cache First con fallback a red
+// Fetch - Network-first for HTML, Cache-first for assets
 self.addEventListener('fetch', (event) => {
   // Ignorar solicitudes de Firebase (Firestore, Auth, etc.)
   if (
@@ -59,6 +57,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // HTML pages - Network first, fallback to cache (NO cache HTML)
+  if (event.request.mode === 'navigate' || event.request.url.endsWith('.html')) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(DYNAMIC_CACHE).then((cache) => {
+              cache.put(event.request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          return caches.match(event.request);
+        })
+    );
+    return;
+  }
+
+  // Assets - Cache first
   event.respondWith(
     caches.match(event.request)
       .then((cachedResponse) => {
@@ -68,12 +87,10 @@ self.addEventListener('fetch', (event) => {
 
         return fetch(event.request)
           .then((response) => {
-            // No cachear respuestas inválidas
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // Clonar respuesta para cachear
             const responseToCache = response.clone();
             caches.open(DYNAMIC_CACHE).then((cache) => {
               cache.put(event.request, responseToCache);
@@ -82,10 +99,6 @@ self.addEventListener('fetch', (event) => {
             return response;
           })
           .catch(() => {
-            // Fallback offline para páginas HTML
-            if (event.request.mode === 'navigate') {
-              return caches.match('/index.html');
-            }
             return new Response('Offline', { status: 503 });
           });
       })
