@@ -8,6 +8,17 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#1e40af">
 
+  <!-- PWA Install Prompt Capture - MUST BE FIRST -->
+  <script>
+    // Capture install event immediately
+    window.deferredPWAInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      window.deferredPWAInstallPrompt = e;
+      console.log('[PWA] ✅ CAPTURED');
+    });
+  </script>
+
   <!-- Social Meta -->
   <title>CotizaPro - Mi Panel</title>
   <meta name="description" content="Panel de CotizaPro - Gestiona tus cotizaciones profesionales">
@@ -460,79 +471,39 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
 
-  <!-- PWA Install Handler - MINIMAL & WORKING -->
+  <!-- PWA Install Button Handler -->
   <script>
-    let deferredPrompt = null;
-
-    // STEP 1: Register Service Worker
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(console.error);
     }
 
-    // STEP 2: Capture install event
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      console.log('[PWA] Install prompt captured');
-      
-      // Show the install button
-      const btn = document.getElementById('btn-install-app');
-      if (btn) {
-        btn.style.display = '';
-        btn.disabled = false;
-      }
-      
-      // Also show section if hidden
-      const section = document.getElementById('install-app-section');
-      if (section) section.style.display = '';
-    });
-
-    // STEP 3: Handle install success
-    window.addEventListener('appinstalled', () => {
-      console.log('[PWA] Installed!');
-      const section = document.getElementById('install-app-section');
-      if (section) section.style.display = 'none';
-      deferredPrompt = null;
-    });
-
-    // STEP 4: Button click handler - SIMPLE
-    function handleInstallClick() {
-      if (!deferredPrompt) {
-        console.log('[PWA] No install prompt available');
-        alert('Para instalar:\n1. Toca ⋮ (tres puntos arriba)\n2. Toca "Instalar app"\n3. Toca "Instalar"');
-        return;
-      }
-      
-      console.log('[PWA] Showing install dialog...');
-      deferredPrompt.prompt();
-      
-      deferredPrompt.userChoice.then((choiceResult) => {
-        if (choiceResult.outcome === 'accepted') {
-          console.log('[PWA] User accepted');
-          const btn = document.getElementById('btn-install-app');
-          if (btn) {
-            btn.textContent = 'Instalando...';
-            btn.disabled = true;
+    // Button click - uses the GLOBAL deferredPrompt captured in head
+    function installApp() {
+      const dp = window.deferredPWAInstallPrompt;
+      if (dp) {
+        dp.prompt();
+        dp.userChoice.then(r => {
+          if (r.outcome === 'accepted') {
+            document.getElementById('btn-install-app').textContent = '✅ Instalando...';
           }
-        } else {
-          console.log('[PWA] User dismissed');
-        }
-        deferredPrompt = null;
-      }).catch(err => {
-        console.error('[PWA] Error:', err);
-        alert('Error al instalar. Intenta desde el menú ⋮');
-      });
+          window.deferredPWAInstallPrompt = null;
+        });
+      } else {
+        alert('Toca ⋮ arriba → "Instalar app"');
+      }
     }
 
-    // Attach handler when DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('btn-install-app');
-        if (btn) btn.addEventListener('click', handleInstallClick);
-      });
-    } else {
+    // Attach to button
+    window.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('btn-install-app');
-      if (btn) btn.addEventListener('click', handleInstallClick);
+      if (btn) btn.addEventListener('click', installApp);
+    });
+
+    // Hide install section if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      const s = document.getElementById('install-app-section');
+      if (s) s.style.display = 'none';
     }
   </script>
 </body>
