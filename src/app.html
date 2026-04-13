@@ -460,8 +460,11 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
 
-  <!-- PWA Service Worker Registration -->
+  <!-- PWA Service Worker + Install Handler -->
   <script>
+    let pwaDeferredPrompt = null;
+
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
@@ -469,6 +472,40 @@
           .catch((err) => console.log('[PWA] Error SW:', err));
       });
     }
+
+    // Capture install prompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      pwaDeferredPrompt = e;
+      console.log('[PWA] Install prompt captured on app');
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = '';
+    });
+
+    // Install button handler - connects to app-user.js button
+    window.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('btn-install-app');
+      if (btn) {
+        btn.addEventListener('click', async function() {
+          if (pwaDeferredPrompt) {
+            pwaDeferredPrompt.prompt();
+            const { outcome } = await pwaDeferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+              this.textContent = '✅ Instalando...';
+              this.disabled = true;
+            }
+            pwaDeferredPrompt = null;
+          } else {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+            if (isIOS) {
+              alert('Para instalar: toca Compartir (↑) → "Añadir a pantalla de inicio"');
+            } else {
+              alert('Para instalar: toca ⋮ → "Instalar app" o "Añadir a pantalla de inicio"');
+            }
+          }
+        });
+      }
+    });
   </script>
 </body>
 </html>

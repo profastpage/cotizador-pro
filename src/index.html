@@ -385,37 +385,63 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/auth.js"></script>
 
-  <!-- PWA: Auto-show login when opened from installed app -->
+  <!-- PWA Service Worker Registration + Install Prompt -->
   <script>
-    // Detect if running as installed PWA
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-                         window.matchMedia('(display-mode: fullscreen)').matches ||
-                         navigator.standalone ||
-                         document.referrer.includes('android-app://');
-    
-    // Check if coming from PWA install URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const fromPWA = urlParams.get('utm_source') === 'pwa';
-    
-    // If PWA or from install URL, auto-open login modal
-    if (isStandalone || fromPWA) {
-      window.addEventListener('DOMContentLoaded', () => {
-        // Hide marketing sections, show login directly
-        setTimeout(() => {
-          const loginBtn = document.getElementById('btn-login-nav');
-          if (loginBtn) loginBtn.click();
-        }, 500);
-      });
-    }
-  </script>
+    let pwaDeferredPrompt = null;
 
-  <!-- PWA Service Worker Registration -->
-  <script>
+    // Register Service Worker
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then((reg) => console.log('[PWA] SW registrado:', reg.scope))
           .catch((err) => console.log('[PWA] Error SW:', err));
+      });
+    }
+
+    // Capture install prompt event
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      pwaDeferredPrompt = e;
+      console.log('[PWA] Install prompt captured on landing');
+      // Show install banner if exists
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = '';
+    });
+
+    // Global install handler
+    window.triggerPWAInstall = async function() {
+      if (pwaDeferredPrompt) {
+        pwaDeferredPrompt.prompt();
+        const { outcome } = await pwaDeferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          console.log('[PWA] User accepted install');
+        }
+        pwaDeferredPrompt = null;
+      } else {
+        // Manual instructions
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        if (isIOS) {
+          alert('Para instalar: toca Compartir (↑) → "Añadir a pantalla de inicio"');
+        } else {
+          alert('Para instalar: toca ⋮ → "Instalar app" o "Añadir a pantalla de inicio"');
+        }
+      }
+    };
+
+    // Detect PWA mode and auto-show login
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                         window.matchMedia('(display-mode: fullscreen)').matches ||
+                         navigator.standalone ||
+                         document.referrer.includes('android-app://');
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromPWA = urlParams.get('utm_source') === 'pwa';
+    
+    if (isStandalone || fromPWA) {
+      window.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const loginBtn = document.getElementById('btn-login-nav');
+          if (loginBtn) loginBtn.click();
+        }, 500);
       });
     }
   </script>

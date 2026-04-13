@@ -1164,7 +1164,7 @@ window.logout = function() {
 };
 
 // ==========================================================
-// PWA INSTALL & SERVICE WORKER
+// PWA INSTALL STATUS CHECK (UI only - install prompt handled in HTML)
 // ==========================================================
 
 let deferredPrompt = null;
@@ -1188,10 +1188,8 @@ function checkInstallStatus() {
                       navigator.standalone ||
                       document.referrer.includes('android-app://');
   const section = document.getElementById('install-app-section');
-  const btn = document.getElementById('btn-install-app');
   
   if (isInstalled) {
-    // Already installed - hide section or show "installed" state
     if (section) {
       section.innerHTML = `
         <div style="display:flex;align-items:center;gap:1rem;padding:0.5rem 0;">
@@ -1205,75 +1203,13 @@ function checkInstallStatus() {
         </div>
       `;
     }
-    return;
-  }
-  
-  // Not installed yet - always show the install section
-  if (section) section.style.display = '';
-  if (btn) {
-    btn.textContent = '📲 Instalar Aplicación';
-    btn.style.display = '';
   }
 }
 
 function setupPWAInstall() {
-  let deferredPromptReady = false;
-  
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    deferredPromptReady = true;
-    console.log('[PWA] Install prompt ready');
-    const btn = document.getElementById('btn-install-app');
-    if (btn) {
-      btn.textContent = '📲 Instalar Aplicación';
-      btn.disabled = false;
-    }
-  });
-
-  const handleInstall = async () => {
-    const btn = document.getElementById('btn-install-app');
-    
-    if (deferredPrompt && deferredPromptReady) {
-      // Browser supports install prompt (Chrome Android, Edge)
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        showToast('¡CotizaPro instalada! 🎉 Revisa tu pantalla de inicio.');
-        if (btn) btn.textContent = '✅ Instalando...';
-      } else {
-        showToast('Instalación cancelada', 'info');
-      }
-      deferredPrompt = null;
-      deferredPromptReady = false;
-    } else {
-      // Browser doesn't support install prompt (iOS Safari, some Android)
-      // Show manual instructions based on platform
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-      const isAndroid = /Android/.test(navigator.userAgent);
-      
-      if (isIOS) {
-        showToast('Toca el botón Compartir (↑) → "Añadir a pantalla de inicio"', 'info');
-      } else if (isAndroid) {
-        showToast('Toca ⋮ → "Añadir a pantalla de inicio" o "Instalar app"', 'info');
-      } else {
-        showToast('Usa el menú del navegador → "Instalar" o "Añadir a pantalla de inicio"', 'info');
-      }
-    }
-  };
-
-  const btn = document.getElementById('btn-install-app');
-  if (btn) {
-    btn.addEventListener('click', handleInstall);
-    btn.disabled = false;
-  }
-
-  // Listen for app installed
-  window.addEventListener('appinstalled', () => {
-    console.log('[PWA] App instalada correctamente');
-    showToast('¡CotizaPro instalada exitosamente! 🎉');
-    checkInstallStatus();
-  });
+  // Install prompt is now handled by the inline script in app.html
+  // This function just checks if already installed
+  checkInstallStatus();
 }
 
 // ==========================================================
