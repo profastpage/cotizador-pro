@@ -92,6 +92,8 @@ async function loadDashboard() {
     let activeUsers = 0;
     let freeUsers = 0;
     let paidUsers = 0;
+    let totalQuotes = 0;
+    let basicUsers = 0, businessUsers = 0, proUsers = 0;
 
     snapshot.forEach(docSnap => {
       const user = { id: docSnap.id, ...docSnap.data() };
@@ -99,32 +101,51 @@ async function loadDashboard() {
       users.push(user);
       if (user.isActive) {
         activeUsers++;
+        totalQuotes += (user.quotesUsedThisMonth || 0);
         if (user.plan === 'free') freeUsers++;
-        else {
-          paidUsers++;
-          monthlyRevenue += getPlanPrice(user.plan);
-        }
+        else if (user.plan === 'basic') { basicUsers++; monthlyRevenue += 35; }
+        else if (user.plan === 'business') { businessUsers++; monthlyRevenue += 59; }
+        else if (user.plan === 'pro') { proUsers++; monthlyRevenue += 99; }
+        else paidUsers++;
       }
     });
 
     allUsers = users;
 
+    // Update stat cards
     document.getElementById('stat-total-users').textContent = allUsers.length;
     document.getElementById('stat-active-users').textContent = activeUsers;
     document.getElementById('stat-free-users').textContent = freeUsers;
-    document.getElementById('stat-paid-users').textContent = paidUsers;
+    document.getElementById('stat-paid-users').textContent = basicUsers + businessUsers + proUsers;
     document.getElementById('stat-monthly-revenue').textContent = `S/ ${monthlyRevenue}`;
 
+    // Update plan breakdown
+    const elBasic = document.getElementById('stat-basic-users');
+    const elBusiness = document.getElementById('stat-business-users');
+    const elPro = document.getElementById('stat-pro-users');
+    const elQuotes = document.getElementById('stat-total-quotes');
+    if (elBasic) elBasic.textContent = basicUsers;
+    if (elBusiness) elBusiness.textContent = businessUsers;
+    if (elPro) elPro.textContent = proUsers;
+    if (elQuotes) elQuotes.textContent = totalQuotes;
+
+    // Recent users table with phone
     const recent = allUsers.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
     const tbody = document.getElementById('recent-users-tbody');
     if (tbody) {
       tbody.innerHTML = recent.map(u => `
         <tr>
-          <td>${u.name}</td>
+          <td><strong>${u.name}</strong></td>
           <td>${u.email}</td>
+          <td>${u.phone || '-'}</td>
           <td><span class="badge badge-${u.plan}">${getPlanName(u.plan)}</span></td>
           <td>${formatDate(u.createdAt)}</td>
           <td><span class="badge ${u.isActive ? 'badge-active' : 'badge-inactive'}">${u.isActive ? 'Activo' : 'Inactivo'}</span></td>
+          <td>
+            <button class="btn btn-xs btn-primary" onclick="window.quickPlan('${u.id}','basic')" title="Plan Básico">Básico</button>
+            <button class="btn btn-xs btn-success" onclick="window.quickPlan('${u.id}','business')" title="Plan Business">Business</button>
+            <button class="btn btn-xs btn-warning" onclick="window.quickPlan('${u.id}','pro')" title="Plan Pro">Pro</button>
+          </td>
         </tr>
       `).join('');
     }
@@ -146,7 +167,7 @@ function renderClients(users) {
   if (!tbody) return;
 
   if (users.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;">No hay clientes registrados</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;">No hay clientes registrados</td></tr>';
     return;
   }
 
@@ -158,15 +179,23 @@ function renderClients(users) {
         <td>
           <strong>${u.name}</strong>
           <br><small style="color:var(--color-gray-500);word-break:break-all">${u.email}</small>
-          ${u.company ? `<br><small style="color:var(--color-gray-600)">${u.company}</small>` : ''}
+          ${u.phone ? `<br><small>📱 ${u.phone}</small>` : ''}
+          ${u.company ? `<br><small>🏢 ${u.company}</small>` : ''}
         </td>
         <td><span class="badge badge-${u.plan}">${getPlanName(u.plan)}</span></td>
         <td>${u.licenseDuration === 0 ? '∞ Ilimitado' : planEndDate && !isExpired ? formatDateShort(planEndDate) : isExpired ? 'Vencido' : 'Gratis'}</td>
         <td>${u.quotesUsedThisMonth || 0} / ${getPlanQuota(u.plan)}</td>
         <td><span class="badge ${u.isActive && !isExpired ? 'badge-active' : 'badge-inactive'}">${u.isActive ? 'Activo' : 'Inactivo'}</span></td>
         <td>
-          <button class="btn btn-sm btn-primary" onclick="window.editClient('${u.id}')">✏️</button>
-          <button class="btn btn-sm btn-warning" onclick="window.toggleClient('${u.id}', ${!u.isActive})">${u.isActive ? '⏸️' : '▶️'}</button>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;">
+            <button class="btn btn-xs btn-primary" onclick="window.quickPlan('${u.id}','basic')" title="Activar Básico">B</button>
+            <button class="btn btn-xs btn-success" onclick="window.quickPlan('${u.id}','business')" title="Activar Business">Bu</button>
+            <button class="btn btn-xs btn-warning" onclick="window.quickPlan('${u.id}','pro')" title="Activar Pro">P</button>
+            <button class="btn btn-xs btn-info" onclick="window.applyCoupon('${u.id}')" title="Aplicar Cupón">🎁</button>
+            <button class="btn btn-xs btn-secondary" onclick="window.editClient('${u.id}')" title="Editar">✏️</button>
+            <button class="btn btn-xs ${u.isActive ? 'btn-danger' : 'btn-success'}" onclick="window.toggleClient('${u.id}', ${!u.isActive})" title="${u.isActive ? 'Desactivar' : 'Activar'}">${u.isActive ? '⏸️' : '▶️'}</button>
+            <button class="btn btn-xs btn-danger" onclick="window.resetClientData('${u.id}')" title="Eliminar datos">🗑️</button>
+          </div>
         </td>
       </tr>
     `;
@@ -249,15 +278,112 @@ document.addEventListener('click', async (e) => {
 // Toggle client
 window.toggleClient = async function(userId, newState) {
   try {
-    await updateDoc(doc(db, 'users', userId), { 
-      isActive: newState, 
-      updatedAt: new Date().toISOString() 
+    await updateDoc(doc(db, 'users', userId), {
+      isActive: newState,
+      updatedAt: new Date().toISOString()
     });
     showToast(`Cliente ${newState ? 'activado' : 'desactivado'}`);
     loadDashboard();
     loadClients();
   } catch (err) {
     showToast('Error', 'error');
+  }
+};
+
+// Quick plan activation from dashboard
+window.quickPlan = async function(userId, plan) {
+  const user = allUsers.find(u => u.id === userId);
+  if (!user) return;
+  
+  const planNames = { basic: 'Básico', business: 'Business', pro: 'Pro' };
+  if (!confirm(`¿Activar plan ${planNames[plan]} para ${user.name}?`)) return;
+  
+  try {
+    await updateDoc(doc(db, 'users', userId), {
+      plan,
+      isActive: true,
+      licenseDuration: 1,
+      planStartDate: new Date().toISOString(),
+      planEndDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      quotesUsedThisMonth: 0,
+      lastQuoteReset: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    showToast(`✅ Plan ${planNames[plan]} activado para ${user.name}`);
+    loadDashboard();
+    loadClients();
+  } catch (err) {
+    showToast('Error al activar plan', 'error');
+  }
+};
+
+// Coupon/Discount system
+window.applyCoupon = async function(userId) {
+  const user = allUsers.find(u => u.id === userId);
+  if (!user) return;
+  
+  const discount = prompt(`Descuento para ${user.name} (%):`, '20');
+  if (!discount || isNaN(discount)) return;
+  
+  const months = prompt(`Meses de descuento:`, '1');
+  if (!months || isNaN(months)) return;
+  
+  try {
+    const now = new Date();
+    const endDate = new Date(now.getTime() + parseInt(months) * 30 * 24 * 60 * 60 * 1000);
+    
+    await updateDoc(doc(db, 'users', userId), {
+      isActive: true,
+      licenseDuration: parseInt(months),
+      planStartDate: now.toISOString(),
+      planEndDate: endDate.toISOString(),
+      discountPercent: parseInt(discount),
+      quotesUsedThisMonth: 0,
+      lastQuoteReset: now.toISOString(),
+      updatedAt: now.toISOString()
+    });
+    showToast(`🎁 Cupón ${discount}% por ${months} mes(es) aplicado a ${user.name}`);
+    loadDashboard();
+    loadClients();
+  } catch (err) {
+    showToast('Error al aplicar cupón', 'error');
+  }
+};
+
+// Reset client data (delete all quotes and clients)
+window.resetClientData = async function(userId) {
+  const user = allUsers.find(u => u.id === userId);
+  if (!user) return;
+  if (!confirm(`¿Eliminar TODOS los datos de ${user.name}?\nSe borrarán cotizaciones y clientes.`)) return;
+  
+  try {
+    // Delete all quotes
+    const quotesRef = collection(db, 'quotes');
+    const qQuotes = query(quotesRef, where('userId', '==', userId));
+    const quotesSnap = await getDocs(qQuotes);
+    const deletePromises = quotesSnap.docs.map(docSnap => deleteDoc(doc(db, 'quotes', docSnap.id)));
+    await Promise.all(deletePromises);
+    
+    // Delete all clients
+    const clientsRef = collection(db, 'clients');
+    const qClients = query(clientsRef, where('userId', '==', userId));
+    const clientsSnap = await getDocs(qClients);
+    const deleteClientPromises = clientsSnap.docs.map(docSnap => deleteDoc(doc(db, 'clients', docSnap.id)));
+    await Promise.all(deleteClientPromises);
+    
+    // Reset user counters
+    await updateDoc(doc(db, 'users', userId), {
+      quotesUsedThisMonth: 0,
+      lastQuoteReset: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    });
+    
+    showToast(`🗑️ Datos de ${user.name} eliminados`);
+    loadDashboard();
+    loadClients();
+  } catch (err) {
+    showToast('Error al eliminar datos', 'error');
+    console.error(err);
   }
 };
 

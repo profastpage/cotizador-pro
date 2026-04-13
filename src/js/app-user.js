@@ -947,11 +947,12 @@ function setupForms() {
         email: document.getElementById('company-email').value.trim(),
         userId: currentUser.uid, updatedAt: new Date().toISOString()
       };
-      if (!company.name || !company.ruc) {
-        showToast('Nombre y RUC son obligatorios', 'error');
+      if (!company.name) {
+        showToast('El nombre de la empresa es obligatorio', 'error');
         return;
       }
-      if (!isValidRUC(company.ruc)) {
+      // RUC is now optional - only validate if provided
+      if (company.ruc && !isValidRUC(company.ruc)) {
         showToast('RUC peruano inválido. Debe tener 11 dígitos y ser válido.', 'error');
         return;
       }
@@ -1175,64 +1176,74 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js')
       .then((reg) => {
         console.log('[PWA] Service Worker registrado:', reg.scope);
-        // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches || document.referrer.includes('android-app://')) {
-          const s = document.getElementById('install-app-section');
-          const t = document.getElementById('btn-install-app');
-          if (s) s.style.display = 'none';
-          if (t) t.textContent = '✅ App Instalada';
-        }
+        checkInstallStatus();
       })
       .catch((err) => console.log('[PWA] Error registrando SW:', err));
   });
 }
 
+function checkInstallStatus() {
+  const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
+                      window.matchMedia('(display-mode: fullscreen)').matches ||
+                      document.referrer.includes('android-app://');
+  const section = document.getElementById('install-app-section');
+  const btn = document.getElementById('btn-install-app');
+  
+  if (isInstalled) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  
+  // Always show the install section - button text will change based on support
+  if (section) section.style.display = '';
+  if (btn) btn.textContent = '📲 Instalar Aplicación';
+}
+
 function setupPWAInstall() {
+  let installPromptFired = false;
+  
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    const s = document.getElementById('install-app-section');
-    const b = document.getElementById('btn-install-pwa');
-    const t = document.getElementById('btn-install-app');
-    if (s) s.style.display = '';
-    if (t) t.textContent = '📲 Instalar Aplicación';
+    installPromptFired = true;
+    const btn = document.getElementById('btn-install-app');
+    if (btn) {
+      btn.textContent = '📲 Instalar Aplicación';
+      btn.style.display = '';
+    }
   });
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
-      showToast('Tu navegador no soporta instalación directa. Usa el menú del navegador para "Añadir a pantalla de inicio".', 'info');
+      // Browser doesn't support install prompt - show manual instructions
+      showToast('Para instalar: menú del navegador → "Añadir a pantalla de inicio"', 'info');
       return;
     }
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
     if (outcome === 'accepted') {
       showToast('¡CotizaPro instalada! 🎉');
-      const s = document.getElementById('install-app-section');
-      const t = document.getElementById('btn-install-app');
-      if (t) t.textContent = '✅ App Instalada';
+      const btn = document.getElementById('btn-install-app');
+      if (btn) btn.textContent = '✅ App Instalada';
+    } else {
+      showToast('Instalación cancelada', 'info');
     }
     deferredPrompt = null;
   };
 
-  const b = document.getElementById('btn-install-pwa');
-  const t = document.getElementById('btn-install-app');
-  if (b) b.addEventListener('click', handleInstall);
-  if (t) t.addEventListener('click', handleInstall);
-
-  if (window.matchMedia('(display-mode: standalone)').matches) {
-    const s = document.getElementById('install-app-section');
-    const tt = document.getElementById('btn-install-app');
-    if (s) s.style.display = 'none';
-    if (tt) tt.textContent = '✅ App Instalada';
+  const btn = document.getElementById('btn-install-app');
+  if (btn) {
+    btn.addEventListener('click', handleInstall);
+    // Default text if prompt hasn't fired yet
+    btn.textContent = '📲 Instalar Aplicación';
   }
 
   // Listen for app installed
   window.addEventListener('appinstalled', () => {
     console.log('[PWA] App instalada correctamente');
     showToast('¡CotizaPro instalada! 🎉');
-    const s = document.getElementById('install-app-section');
-    const t = document.getElementById('btn-install-app');
-    if (t) t.textContent = '✅ App Instalada';
+    const section = document.getElementById('install-app-section');
+    if (section) section.style.display = 'none';
   });
 }
 
