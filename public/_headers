@@ -12,10 +12,10 @@
   # CSS files have content hashes - safe to cache
   Cache-Control: public, max-age=31536000, immutable
 
-/og-image.svg
+/og-image.png
   # Open Graph image - allow caching
   Cache-Control: public, max-age=86400
-  Content-Type: image/svg+xml
+  Content-Type: image/png
 
 /icon.svg
   # App icon - allow caching
