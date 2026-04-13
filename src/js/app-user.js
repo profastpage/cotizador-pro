@@ -1164,23 +1164,10 @@ window.logout = function() {
 };
 
 // ==========================================================
-// PWA INSTALL STATUS CHECK (UI only - install prompt handled in HTML)
+// PWA INSTALL STATUS CHECK (UI only - install prompt handled in HTML inline script)
 // ==========================================================
 
-let deferredPrompt = null;
 let isCompanyConfigured = false;
-
-// Register Service Worker
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((reg) => {
-        console.log('[PWA] Service Worker registrado:', reg.scope);
-        checkInstallStatus();
-      })
-      .catch((err) => console.log('[PWA] Error registrando SW:', err));
-  });
-}
 
 function checkInstallStatus() {
   const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
@@ -1207,7 +1194,7 @@ function checkInstallStatus() {
 }
 
 function setupPWAInstall() {
-  // Install prompt is now handled by the inline script in app.html
+  // Install prompt is handled by inline script in app.html
   // This function just checks if already installed
   checkInstallStatus();
 }
