@@ -25,9 +25,11 @@ onAuthStateChanged(auth, async (user) => {
   currentUserData = userDoc.data();
   document.getElementById('admin-name').textContent = currentUserData.name;
   document.getElementById('setting-admin-email').value = SUPER_ADMIN_EMAIL;
-  
-  loadDashboard();
-  loadClients();
+
+  // Load dashboard first, then clients (fixes race condition where clients table was empty)
+  loadDashboard().then(() => {
+    loadClients();
+  });
 });
 
 function showLoginPrompt() {
