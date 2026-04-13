@@ -17,8 +17,18 @@
   Cache-Control: public, max-age=86400
   Content-Type: image/png
 
+/icon-192.png
+  # PWA icon - allow caching
+  Cache-Control: public, max-age=86400
+  Content-Type: image/png
+
+/icon-512.png
+  # PWA icon - allow caching
+  Cache-Control: public, max-age=86400
+  Content-Type: image/png
+
 /icon.svg
-  # App icon - allow caching
+  # Favicon SVG - allow caching
   Cache-Control: public, max-age=86400
   Content-Type: image/svg+xml
 

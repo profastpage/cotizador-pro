@@ -1,13 +1,14 @@
 // Service Worker para CotizaPro PWA
-const CACHE_NAME = 'cotizapro-v2';
-const STATIC_CACHE = 'cotizapro-static-v2';
-const DYNAMIC_CACHE = 'cotizapro-dynamic-v2';
+const CACHE_NAME = 'cotizapro-v3';
+const STATIC_CACHE = 'cotizapro-static-v3';
+const DYNAMIC_CACHE = 'cotizapro-dynamic-v3';
 
 // Recursos para cachear en instalación (SOLO assets estáticos, NO HTML)
 const STATIC_ASSETS = [
   '/manifest.json',
-  '/icon.svg',
-  '/og-image.svg',
+  '/icon-192.png',
+  '/icon-512.png',
+  '/og-image.png',
   '/css/styles-app.css',
   '/css/styles-landing.css',
   '/css/styles-superadmin.css',

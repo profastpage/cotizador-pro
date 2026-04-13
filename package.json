@@ -6,7 +6,7 @@
   "description": "CotizaPro SaaS - Sistema de Cotizaciones Profesionales",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/generate-og-image.js && vite build",
+    "build": "node scripts/generate-icons.js && node scripts/generate-og-image.js && vite build",
     "preview": "vite preview"
   },
   "repository": {
