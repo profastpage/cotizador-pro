@@ -1011,11 +1011,11 @@ async function generatePDF() {
     // ==========================================
     // FOOTER
     // ==========================================
-    
+
     pdf.setDrawColor(...BLUE);
     pdf.setLineWidth(1);
     pdf.line(20, 278, 190, 278);
-    
+
     pdf.setFontSize(10);
     pdf.setFont(undefined, 'bold');
     pdf.setTextColor(...BLUE);
@@ -1025,8 +1025,6 @@ async function generatePDF() {
     pdf.setFont(undefined, 'normal');
     pdf.setTextColor(...GRAY_TEXT);
     pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 290, { align: 'center' });
-
-    // Save PDF
     const fileName = `Cotizacion-${String(quoteNumber).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
     pdf.save(fileName);
 
@@ -1381,4 +1379,83 @@ function showToast(message, type = 'success') {
 
 window.logout = function() {
   signOut(auth).then(() => { window.location.href = 'index.html'; });
+};
+
+// ==========================================================
+// PWA INSTALL
+// ==========================================================
+
+let deferredPrompt = null;
+let isCompanyConfigured = false;
+
+function setupPWAInstall() {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const s = document.getElementById('install-app-section');
+    const b = document.getElementById('btn-install-pwa');
+    const t = document.getElementById('btn-install-app');
+    if (s) s.classList.remove('hidden');
+    if (b) b.classList.remove('hidden');
+    if (t) t.classList.remove('hidden');
+  });
+  
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  };
+  
+  const b = document.getElementById('btn-install-pwa');
+  const t = document.getElementById('btn-install-app');
+  if (b) b.addEventListener('click', handleInstall);
+  if (t) t.addEventListener('click', handleInstall);
+  
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    const s = document.getElementById('install-app-section');
+    const tt = document.getElementById('btn-install-app');
+    if (s) s.classList.add('hidden');
+    if (tt) tt.classList.add('hidden');
+  }
+}
+
+// ==========================================================
+// HELP TOGGLE
+// ==========================================================
+
+function setupHelpToggle() {
+  const btn = document.getElementById('btn-help-toggle');
+  const content = document.getElementById('help-content');
+  if (btn && content) {
+    btn.addEventListener('click', () => {
+      content.classList.toggle('hidden');
+      btn.textContent = content.classList.contains('hidden') ? '❓ Ayuda / Guía de Uso' : '❌ Cerrar Ayuda';
+    });
+  }
+}
+
+// ==========================================================
+// COMPANY CONFIG
+// ==========================================================
+
+async function checkCompanyConfig() {
+  try {
+    const snap = await getDoc(doc(db, 'companies', currentUser.uid));
+    isCompanyConfigured = snap.exists() && snap.data().ruc;
+    const w = document.getElementById('company-warning');
+    if (w) {
+      if (!isCompanyConfigured) w.classList.remove('hidden');
+      else w.classList.add('hidden');
+    }
+  } catch (e) { console.error('Company check error:', e); }
+}
+
+// Update initUI to call these
+const originalInitUI = initUI;
+initUI = function() {
+  originalInitUI();
+  setupPWAInstall();
+  setupHelpToggle();
+  checkCompanyConfig();
 };
