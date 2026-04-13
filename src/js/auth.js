@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -65,20 +65,16 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN - Using onAuthStateChanged for reliability
+// GOOGLE SIGN IN
 // ==========================================================
-
-let googleUserJustSignedIn = false;
 
 async function signInWithGoogle() {
   try {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-    googleUserJustSignedIn = true;
     await signInWithRedirect(auth, googleProvider);
   } catch (error) {
     console.error('Google Sign-In Error:', error);
     showToast('Error al conectar con Google', 'error');
-    googleUserJustSignedIn = false;
   }
 }
 
@@ -86,6 +82,97 @@ const btnGoogleLogin = document.getElementById('btn-google-login');
 const btnGoogleRegister = document.getElementById('btn-google-register');
 if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
 if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
+
+// ==========================================================
+// PROCESS USER - Create or redirect
+// ==========================================================
+
+let userProcessed = false;
+
+async function processUser(user) {
+  if (userProcessed || !user) return;
+  userProcessed = true;
+  
+  console.log('✅ Processing user:', user.email);
+  
+  try {
+    const userDoc = await getDoc(doc(db, 'users', user.uid));
+    
+    if (!userDoc.exists()) {
+      // NEW user - create account
+      const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+      console.log('🆕 New user, creating account...', isSuperAdmin ? 'as Super Admin' : 'as User');
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        name: user.displayName || user.email.split('@')[0],
+        email: user.email.toLowerCase(),
+        company: '',
+        role: isSuperAdmin ? 'superadmin' : 'user',
+        plan: 'free',
+        planStartDate: null,
+        planEndDate: null,
+        quotesUsedThisMonth: 0,
+        lastQuoteReset: new Date().toISOString(),
+        isActive: true,
+        providerId: user.providerData[0]?.providerId || 'email',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      showToast('¡Bienvenido!');
+      setTimeout(() => {
+        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
+      }, 500);
+    } else {
+      // EXISTING user - redirect based on role
+      const userData = userDoc.data();
+      console.log('🔄 Existing user, role:', userData.role);
+      
+      if (userData.role === 'superadmin') {
+        window.location.replace('superadmin.html');
+      } else if (!userData.isActive) {
+        showToast('Tu cuenta está desactivada.', 'error');
+        signOut(auth);
+      } else {
+        window.location.replace('app.html');
+      }
+    }
+  } catch (error) {
+    console.error('❌ Error processing user:', error);
+    showToast('Error: ' + error.message, 'error');
+    userProcessed = false;
+  }
+}
+
+// ==========================================================
+// INITIALIZE - Firebase Official Flow
+// ==========================================================
+
+// Step 1: Check if user is returning from Google redirect
+getRedirectResult(auth)
+  .then((result) => {
+    if (result && result.user) {
+      console.log('🔄 Google redirect detected, processing user...');
+      processUser(result.user);
+    } else {
+      console.log('ℹ️ No redirect result, setting up auth listener...');
+      // Step 2: No redirect - just listen for auth changes
+      onAuthStateChanged(auth, (user) => {
+        if (user && !userProcessed) {
+          processUser(user);
+        }
+      });
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Redirect result error:', error);
+    // Fallback: still set up auth listener
+    onAuthStateChanged(auth, (user) => {
+      if (user && !userProcessed) {
+        processUser(user);
+      }
+    });
+  });
 
 // ==========================================================
 // EMAIL/PASSWORD REGISTER
@@ -116,22 +203,7 @@ if (formRegister) {
 
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      const isSuperAdmin = email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-
-      await setDoc(doc(db, 'users', user.uid), {
-        name, email: email.toLowerCase(), company: company || '',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free', planStartDate: null, planEndDate: null,
-        quotesUsedThisMonth: 0, lastQuoteReset: new Date().toISOString(),
-        isActive: true, providerId: 'email',
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
-      });
-
-      showToast('¡Cuenta creada!');
-      setTimeout(() => {
-        window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
-      }, 1000);
+      await processUser(userCredential.user);
     } catch (error) {
       console.error('Register Error:', error);
       let message = 'Error al crear la cuenta';
@@ -155,7 +227,8 @@ if (formLogin) {
     if (!email || !password) { showToast('Completa todos los campos', 'error'); return; }
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      await processUser(userCredential.user);
     } catch (error) {
       console.error('Login Error:', error);
       let message = 'Error al iniciar sesión';
@@ -167,90 +240,6 @@ if (formLogin) {
     }
   });
 }
-
-// ==========================================================
-// AUTH STATE LISTENER - Handles ALL auth including Google
-// ==========================================================
-
-let authProcessed = false;
-
-onAuthStateChanged(auth, (user) => {
-  console.log('🔔 onAuthStateChanged fired:', user ? user.email : 'no user');
-  
-  if (!user) {
-    console.log('👤 No user - staying on landing');
-    return;  // Don't set authProcessed here!
-  }
-
-  // User IS logged in - prevent duplicate processing
-  if (authProcessed) {
-    console.log('⏭️ Already processed, skipping');
-    return;
-  }
-  authProcessed = true;
-  
-  console.log('✅ User authenticated:', user.email);
-
-  // Check if user exists in Firestore
-  getDoc(doc(db, 'users', user.uid))
-    .then((userDoc) => {
-      console.log('📄 User doc exists:', userDoc.exists());
-      
-      if (!userDoc.exists()) {
-        // NEW user from Google - create account
-        const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-        console.log('🆕 New user, superadmin:', isSuperAdmin);
-        
-        setDoc(doc(db, 'users', user.uid), {
-          name: user.displayName || user.email.split('@')[0],
-          email: user.email.toLowerCase(),
-          company: '',
-          role: isSuperAdmin ? 'superadmin' : 'user',
-          plan: 'free',
-          planStartDate: null,
-          planEndDate: null,
-          quotesUsedThisMonth: 0,
-          lastQuoteReset: new Date().toISOString(),
-          isActive: true,
-          providerId: user.providerData[0]?.providerId || 'email',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }).then(() => {
-          console.log('✅ User created, redirecting...');
-          showToast('¡Bienvenido!');
-          setTimeout(() => {
-            window.location.replace(isSuperAdmin ? 'superadmin.html' : 'app.html');
-          }, 500);
-        }).catch((err) => {
-          console.error('❌ Failed to create user:', err);
-          showToast('Error al crear cuenta: ' + err.message, 'error');
-        });
-      } else {
-        // EXISTING user - redirect based on role
-        const userData = userDoc.data();
-        console.log('🔄 Existing user, role:', userData.role);
-        
-        if (userData.role === 'superadmin') {
-          console.log('👑 Redirecting to superadmin');
-          window.location.replace('superadmin.html');
-        } else if (!userData.isActive) {
-          console.log('⛔ Account inactive');
-          showToast('Tu cuenta está desactivada.', 'error');
-          signOut(auth);
-        } else {
-          console.log('🚀 Redirecting to app');
-          window.location.replace('app.html');
-        }
-      }
-    })
-    .catch((error) => {
-      console.error('❌ Firestore error:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      authProcessed = false;
-      showToast('Error de base de datos: ' + error.message, 'error');
-    });
-});
 
 window.logout = function() {
   signOut(auth).then(() => { window.location.href = 'index.html'; });
