@@ -159,7 +159,7 @@ async function loadDashboard() {
   const container = document.getElementById('dashboard-recent-quotes');
   container.innerHTML = recent.length === 0 ? `
     <div class="empty-state"><div class="empty-state-icon">📋</div><h3>No hay cotizaciones aún</h3><p>Crea tu primera cotización profesional</p></div>
-  ` : recent.map(q => createQuoteCard(q)).join('');
+  ` : recent.map((q, idx) => createQuoteCard(q, false, quotes.length - idx)).join('');
 }
 
 // ==========================================================
@@ -171,15 +171,18 @@ async function loadHistory() {
   const container = document.getElementById('history-quotes-list');
   container.innerHTML = quotes.length === 0 ? `
     <div class="empty-state"><div class="empty-state-icon">📋</div><h3>No hay cotizaciones guardadas</h3></div>
-  ` : quotes.map(q => createQuoteCard(q, true)).join('');
+  ` : quotes.map((q, idx) => createQuoteCard(q, true, quotes.length - idx)).join('');
 }
 
-function createQuoteCard(quote, showActions = false) {
-  const quoteNum = quote.number || 'N/A';
+function createQuoteCard(quote, showActions = false, position = null) {
+  // Use stored number if exists, otherwise use position-based number
+  const quoteNum = quote.number || position || 'N/A';
+  const displayNum = typeof quoteNum === 'number' ? String(quoteNum).padStart(3, '0') : quoteNum;
+  
   return `
     <div class="quote-card">
       <div class="quote-card-header">
-        <span class="quote-number">#${quoteNum}</span>
+        <span class="quote-number">#${displayNum}</span>
         <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
       </div>
       <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
