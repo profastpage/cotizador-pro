@@ -385,6 +385,23 @@
           <p id="current-plan-desc">5 cotizaciones por mes</p>
           <button onclick="showUpgradeModal()" class="btn btn-primary">Mejorar Plan</button>
         </div>
+
+        <!-- PWA Install Button -->
+        <h3 class="section-title mt-6">Instalar Aplicación</h3>
+        <div class="plan-card-user" id="install-app-section" style="display:none;">
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div style="width:48px;height:48px;background:var(--color-primary);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <span style="font-size:1.5rem;">📱</span>
+            </div>
+            <div style="flex:1;">
+              <h4 style="margin:0;font-size:1rem;">CotizaPro App</h4>
+              <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--color-gray-500);">Instala en tu dispositivo para acceso rápido</p>
+            </div>
+          </div>
+          <button id="btn-install-app" class="btn btn-primary" style="width:100%;margin-top:1rem;">
+            📲 Instalar Aplicación
+          </button>
+        </div>
       </div>
     </section>
   </main>

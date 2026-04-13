@@ -121,40 +121,22 @@ async function processUser(user) {
       });
       
       showToast('¡Bienvenido! Cuenta creada exitosamente.');
-      // Show manual navigation instead of auto-redirect to avoid SW cache issues
-      const toastContainer = document.getElementById('toast-container');
-      if (toastContainer) {
-        const navBtn = document.createElement('div');
-        navBtn.style.cssText = 'margin-top:0.5rem;text-align:center;';
-        navBtn.innerHTML = `<a href="${isSuperAdmin ? 'superadmin.html' : 'app.html'}" class="btn btn-primary" style="display:inline-block;padding:0.5rem 1.5rem;color:white;text-decoration:none;border-radius:0.5rem;background:#1e40af;font-weight:600;">Ir al Panel →</a>`;
-        toastContainer.appendChild(navBtn);
-      }
+      // Auto-redirect to app after successful registration
+      setTimeout(() => {
+        window.location.href = isSuperAdmin ? 'superadmin.html' : 'app.html';
+      }, 800);
     } else {
       // EXISTING user - redirect based on role
       const userData = userDoc.data();
       console.log('🔄 Existing user, role:', userData.role);
       
       if (userData.role === 'superadmin') {
-        showToast('Bienvenido Admin');
-        const toastContainer = document.getElementById('toast-container');
-        if (toastContainer) {
-          const navBtn = document.createElement('div');
-          navBtn.style.cssText = 'margin-top:0.5rem;text-align:center;';
-          navBtn.innerHTML = '<a href="superadmin.html" class="btn btn-primary" style="display:inline-block;padding:0.5rem 1.5rem;color:white;text-decoration:none;border-radius:0.5rem;background:#1e40af;font-weight:600;">Ir al Panel Admin →</a>';
-          toastContainer.appendChild(navBtn);
-        }
+        window.location.href = 'superadmin.html';
       } else if (!userData.isActive) {
         showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
         signOut(auth);
       } else {
-        showToast('¡Bienvenido de vuelta!');
-        const toastContainer = document.getElementById('toast-container');
-        if (toastContainer) {
-          const navBtn = document.createElement('div');
-          navBtn.style.cssText = 'margin-top:0.5rem;text-align:center;';
-          navBtn.innerHTML = '<a href="app.html" class="btn btn-primary" style="display:inline-block;padding:0.5rem 1.5rem;color:white;text-decoration:none;border-radius:0.5rem;background:#1e40af;font-weight:600;">Ir a Mi Panel →</a>';
-          toastContainer.appendChild(navBtn);
-        }
+        window.location.href = 'app.html';
       }
     }
   } catch (error) {

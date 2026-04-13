@@ -1173,7 +1173,16 @@ let isCompanyConfigured = false;
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
-      .then((reg) => console.log('[PWA] Service Worker registrado:', reg.scope))
+      .then((reg) => {
+        console.log('[PWA] Service Worker registrado:', reg.scope);
+        // Check if already installed
+        if (window.matchMedia('(display-mode: standalone)').matches || document.referrer.includes('android-app://')) {
+          const s = document.getElementById('install-app-section');
+          const t = document.getElementById('btn-install-app');
+          if (s) s.style.display = 'none';
+          if (t) t.textContent = '✅ App Instalada';
+        }
+      })
       .catch((err) => console.log('[PWA] Error registrando SW:', err));
   });
 }
@@ -1185,15 +1194,23 @@ function setupPWAInstall() {
     const s = document.getElementById('install-app-section');
     const b = document.getElementById('btn-install-pwa');
     const t = document.getElementById('btn-install-app');
-    if (s) s.classList.remove('hidden');
-    if (b) b.classList.remove('hidden');
-    if (t) t.classList.remove('hidden');
+    if (s) s.style.display = '';
+    if (t) t.textContent = '📲 Instalar Aplicación';
   });
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {
+      showToast('Tu navegador no soporta instalación directa. Usa el menú del navegador para "Añadir a pantalla de inicio".', 'info');
+      return;
+    }
     deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('¡CotizaPro instalada! 🎉');
+      const s = document.getElementById('install-app-section');
+      const t = document.getElementById('btn-install-app');
+      if (t) t.textContent = '✅ App Instalada';
+    }
     deferredPrompt = null;
   };
 
@@ -1205,14 +1222,17 @@ function setupPWAInstall() {
   if (window.matchMedia('(display-mode: standalone)').matches) {
     const s = document.getElementById('install-app-section');
     const tt = document.getElementById('btn-install-app');
-    if (s) s.classList.add('hidden');
-    if (tt) tt.classList.add('hidden');
+    if (s) s.style.display = 'none';
+    if (tt) tt.textContent = '✅ App Instalada';
   }
 
   // Listen for app installed
   window.addEventListener('appinstalled', () => {
     console.log('[PWA] App instalada correctamente');
     showToast('¡CotizaPro instalada! 🎉');
+    const s = document.getElementById('install-app-section');
+    const t = document.getElementById('btn-install-app');
+    if (t) t.textContent = '✅ App Instalada';
   });
 }
 
