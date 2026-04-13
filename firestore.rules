@@ -1,13 +1,8 @@
-# Reglas de Firestore para CotizaPro SaaS
-# Copiar y pegar en Firebase Console → Firestore → Rules
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users: solo el propio usuario puede leer su propio documento
-    // Los admins pueden leer todos los usuarios
-    // Los nuevos usuarios solo pueden crear su propio documento
+    // Users: read own or superadmin can read all
     match /users/{userId} {
       allow read: if request.auth != null && (
         request.auth.uid == userId ||
@@ -22,8 +17,7 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superadmin';
     }
 
-    // Quotes: solo el propio usuario puede CRUD sus cotizaciones
-    // Los admins pueden leer todas las cotizaciones
+    // Quotes: own user CRUD, superadmin read all
     match /quotes/{quoteId} {
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
       allow read, update, delete: if request.auth != null && (
@@ -32,9 +26,15 @@ service cloud.firestore {
       );
     }
 
-    // Companies: solo el propio usuario puede CRUD su empresa
+    // Companies: own user CRUD
     match /companies/{companyId} {
       allow read, write: if request.auth != null && request.auth.uid == companyId;
+    }
+
+    // Clients: own user CRUD
+    match /clients/{clientId} {
+      allow read, write: if request.auth != null && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != null;
     }
   }
 }

@@ -215,8 +215,11 @@ async function loadDashboard() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
-  const totalAmount = thisMonth.reduce((sum, q) => sum + (q.total || 0), 0);
-  document.getElementById('stat-quotes-month').textContent = thisMonth.length;
+  // Exclude demo quotes from count and total
+  const realQuotes = thisMonth.filter(q => !q.isDemo);
+  const totalAmount = realQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
+  
+  document.getElementById('stat-quotes-month').textContent = realQuotes.length;
   document.getElementById('stat-total-amount').textContent = formatCurrency(totalAmount);
 
   const recent = quotes.slice(0, 5);
@@ -1203,6 +1206,7 @@ window.downloadQuote = async function(id) {
     
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
+    const docTypeInfo = DOCUMENT_TYPES[quote.documentType] || DOCUMENT_TYPES.cotizacion;
     const { jsPDF } = window.jspdf || await new Promise((resolve, reject) => {
       const scriptTag = document.createElement('script');
       scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
