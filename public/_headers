@@ -1,5 +1,5 @@
-/*
-  # Prevent caching of HTML files - always serve fresh
+/*.html
+  # HTML files - always serve fresh
   Cache-Control: no-cache, no-store, must-revalidate
   Pragma: no-cache
   Expires: 0
