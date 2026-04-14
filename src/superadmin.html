@@ -248,6 +248,57 @@
           <button type="submit" class="btn btn-primary">💾 Guardar</button>
         </form>
       </div>
+
+      <!-- Data Migration Tool -->
+      <div class="card" style="margin-top:24px;">
+        <h3 class="card-title">🔧 Herramienta de Migración de Datos</h3>
+        <p style="color:var(--color-gray-500);margin:0 0 16px;font-size:0.875rem;">
+          Recupera datos de usuarios que perdieron su cuenta Firebase Auth. 
+          Busca por email y migra cotizaciones, clientes y empresas a una nueva cuenta.
+        </p>
+
+        <!-- Search orphaned data -->
+        <div style="margin-bottom:20px;">
+          <h4 style="margin:0 0 12px;font-size:0.95rem;">🔍 Buscar Datos Huérfanos</h4>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="email" id="migration-search-email" class="form-input" placeholder="Email del usuario" style="flex:1;min-width:200px;">
+            <button id="btn-search-orphaned" class="btn btn-primary" onclick="window.searchOrphanedData()">Buscar</button>
+          </div>
+          <div id="orphaned-data-result" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Manual migration -->
+        <div style="border-top:1px solid var(--color-border, #e2e8f0);padding-top:20px;">
+          <h4 style="margin:0 0 12px;font-size:0.95rem;">🔄 Migración Manual</h4>
+          <p style="color:var(--color-gray-500);margin:0 0 12px;font-size:0.85rem;">
+            Ingresa el UID antiguo y el UID nuevo para migrar datos manualmente.
+          </p>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">UID Antiguo (origen)</label>
+              <input type="text" id="migration-old-uid" class="form-input" placeholder="UID de la cuenta anterior">
+            </div>
+            <div class="form-group">
+              <label class="form-label">UID Nuevo (destino)</label>
+              <input type="text" id="migration-new-uid" class="form-input" placeholder="UID de la cuenta nueva">
+            </div>
+            <div class="form-group" style="display:flex;align-items:flex-end;">
+              <button class="btn btn-warning" onclick="window.manualMigrate()">⚠️ Migrar Datos</button>
+            </div>
+          </div>
+          <div id="manual-migration-result" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- Cleanup orphaned user docs -->
+        <div style="border-top:1px solid var(--color-border, #e2e8f0);padding-top:20px;margin-top:20px;">
+          <h4 style="margin:0 0 12px;font-size:0.95rem;">🧹 Limpieza de Datos Huérfanos</h4>
+          <p style="color:var(--color-gray-500);margin:0 0 12px;font-size:0.85rem;">
+            Busca documentos de usuario que no tienen cuenta Firebase Auth asociada.
+          </p>
+          <button class="btn btn-danger" onclick="window.scanOrphanedUsers()">🔍 Escanear Usuarios Huérfanos</button>
+          <div id="orphaned-scan-result" style="margin-top:12px;"></div>
+        </div>
+      </div>
     </section>
   </main>
 

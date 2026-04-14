@@ -1,4 +1,5 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
+/* v2.1.0 - Con sistema de recuperación de cuentas y migración de datos */
 
 import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, linkWithCredential, fetchSignInMethodsForEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
@@ -9,12 +10,14 @@ import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithPopup, signInWit
 function showLogin() {
   document.getElementById('modal-login').classList.remove('hidden');
   document.getElementById('modal-register').classList.add('hidden');
+  document.getElementById('modal-forgot')?.classList.add('hidden');
 }
 window.showLogin = showLogin;
 
 function showRegister() {
   document.getElementById('modal-register').classList.remove('hidden');
   document.getElementById('modal-login').classList.add('hidden');
+  document.getElementById('modal-forgot')?.classList.add('hidden');
 }
 window.showRegister = showRegister;
 
@@ -34,9 +37,9 @@ function showToast(message, type = 'success') {
   if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span><span>${message}</span>`;
+  toast.innerHTML = `<span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }
 
 document.querySelectorAll('[data-close-modal]').forEach(btn => {
@@ -65,6 +68,267 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
+// DATA MIGRATION ENGINE - Recover orphaned Firestore data
+// ==========================================================
+
+/**
+ * Busca datos huérfanos en Firestore asociados a un email.
+ * Cuando una cuenta Firebase Auth es eliminada y recreada, el uid cambia,
+ * pero los datos en Firestore quedan asociados al uid anterior.
+ * Esta función busca esos datos por email y los migra al nuevo uid.
+ */
+async function findOrphanedDataByEmail(email) {
+  const orphaned = { userDoc: null, quotes: [], clients: [], companies: [], oldUid: null };
+
+  try {
+    // Buscar en la colección 'users' por email
+    const usersRef = collection(db, 'users');
+    const qUsers = query(usersRef, where('email', '==', email.toLowerCase()));
+    const usersSnap = await getDocs(qUsers);
+
+    for (const userDoc of usersSnap.docs) {
+      const uid = userDoc.id;
+      // Ignorar el documento del usuario actual (si ya existe)
+      if (auth.currentUser && uid === auth.currentUser.uid) continue;
+
+      orphaned.userDoc = { id: uid, ...userDoc.data() };
+      orphaned.oldUid = uid;
+      console.log(`[Migration] Found orphaned user doc: ${uid} for email: ${email}`);
+      break;
+    }
+
+    if (orphaned.oldUid) {
+      // Buscar cotizaciones huérfanas
+      const quotesRef = collection(db, 'quotes');
+      const qQuotes = query(quotesRef, where('userId', '==', orphaned.oldUid));
+      const quotesSnap = await getDocs(qQuotes);
+      quotesSnap.forEach(d => orphaned.quotes.push({ id: d.id, ...d.data() }));
+
+      // Buscar clientes huérfanos
+      const clientsRef = collection(db, 'clients');
+      const qClients = query(clientsRef, where('userId', '==', orphaned.oldUid));
+      const clientsSnap = await getDocs(qClients);
+      clientsSnap.forEach(d => orphaned.clients.push({ id: d.id, ...d.data() }));
+
+      // Buscar empresas huérfanas
+      const companiesRef = collection(db, 'companies');
+      const qCompanies = query(companiesRef, where('userId', '==', orphaned.oldUid));
+      const companiesSnap = await getDocs(qCompanies);
+      companiesSnap.forEach(d => orphaned.companies.push({ id: d.id, ...d.data() }));
+
+      console.log(`[Migration] Found: ${orphaned.quotes.length} quotes, ${orphaned.clients.length} clients, ${orphaned.companies.length} companies`);
+    }
+  } catch (error) {
+    console.error('[Migration] Error finding orphaned data:', error);
+  }
+
+  return orphaned;
+}
+
+/**
+ * Migra datos huérfanos al nuevo uid del usuario autenticado.
+ */
+async function migrateOrphanedData(newUid, orphaned) {
+  if (!orphaned.oldUid) return { success: false, message: 'No hay datos huérfanos' };
+
+  try {
+    const batchResults = { quotes: 0, clients: 0, companies: 0, errors: [] };
+
+    // Migrar user doc - sobrescribir con datos antiguos preservando el rol
+    if (orphaned.userDoc) {
+      const oldData = orphaned.userDoc;
+      const newUserData = {
+        name: oldData.name || '',
+        email: oldData.email || '',
+        company: oldData.company || '',
+        role: oldData.role || 'user',
+        plan: oldData.plan || 'free',
+        licenseDuration: oldData.licenseDuration || 0,
+        planStartDate: oldData.planStartDate || null,
+        planEndDate: oldData.planEndDate || null,
+        quotesUsedThisMonth: oldData.quotesUsedThisMonth || 0,
+        lastQuoteReset: oldData.lastQuoteReset || new Date().toISOString(),
+        isActive: oldData.isActive !== undefined ? oldData.isActive : true,
+        providerId: oldData.providerId || 'email',
+        phone: oldData.phone || '',
+        createdAt: oldData.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        migratedFrom: orphaned.oldUid,
+        migratedAt: new Date().toISOString()
+      };
+
+      // Verificar si el super admin email coincide y preservar el rol
+      if (oldData.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase()) {
+        newUserData.role = 'superadmin';
+      }
+
+      await setDoc(doc(db, 'users', newUid), newUserData);
+      console.log(`[Migration] User doc migrated from ${orphaned.oldUid} to ${newUid}`);
+
+      // Eliminar el documento de usuario antiguo
+      try {
+        await deleteDoc(doc(db, 'users', orphaned.oldUid));
+        console.log(`[Migration] Old user doc ${orphaned.oldUid} deleted`);
+      } catch (e) {
+        console.warn(`[Migration] Could not delete old user doc:`, e);
+      }
+    }
+
+    // Migrar cotizaciones
+    for (const quote of orphaned.quotes) {
+      try {
+        const { id, ...data } = quote;
+        data.userId = newUid;
+        data.migratedFrom = orphaned.oldUid;
+        data.migratedAt = new Date().toISOString();
+        await addDoc(collection(db, 'quotes'), data);
+        batchResults.quotes++;
+      } catch (e) {
+        batchResults.errors.push(`Quote ${quote.id}: ${e.message}`);
+      }
+    }
+
+    // Migrar clientes
+    for (const client of orphaned.clients) {
+      try {
+        const { id, ...data } = client;
+        data.userId = newUid;
+        data.migratedFrom = orphaned.oldUid;
+        data.migratedAt = new Date().toISOString();
+        await addDoc(collection(db, 'clients'), data);
+        batchResults.clients++;
+      } catch (e) {
+        batchResults.errors.push(`Client ${client.id}: ${e.message}`);
+      }
+    }
+
+    // Migrar empresas
+    for (const company of orphaned.companies) {
+      try {
+        const { id, ...data } = company;
+        data.userId = newUid;
+        data.migratedFrom = orphaned.oldUid;
+        data.migratedAt = new Date().toISOString();
+        await setDoc(doc(db, 'companies', newUid), data);
+        batchResults.companies++;
+      } catch (e) {
+        batchResults.errors.push(`Company ${company.id}: ${e.message}`);
+      }
+    }
+
+    // Eliminar datos antiguos si la migración fue exitosa
+    if (batchResults.errors.length === 0) {
+      console.log('[Migration] Cleaning up old data...');
+      for (const quote of orphaned.quotes) {
+        try { await deleteDoc(doc(db, 'quotes', quote.id)); } catch (e) { /* ignore */ }
+      }
+      for (const client of orphaned.clients) {
+        try { await deleteDoc(doc(db, 'clients', client.id)); } catch (e) { /* ignore */ }
+      }
+      for (const company of orphaned.companies) {
+        try { await deleteDoc(doc(db, 'companies', company.id)); } catch (e) { /* ignore */ }
+      }
+    }
+
+    console.log(`[Migration] Complete: ${batchResults.quotes} quotes, ${batchResults.clients} clients, ${batchResults.companies} companies migrated`);
+    return { success: true, ...batchResults };
+  } catch (error) {
+    console.error('[Migration] Fatal error:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Muestra el modal de recuperación con opciones para el usuario.
+ */
+function showAccountRecoveryModal(email) {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.zIndex = '10000';
+  modal.innerHTML = `
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" style="max-width:480px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔄 Recuperación de Cuenta</h2>
+        <button class="modal-close" onclick="this.closest('.modal').remove()">✕</button>
+      </div>
+      <div class="modal-body" style="text-align:left;">
+        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:12px;padding:16px;margin-bottom:20px;">
+          <p style="margin:0;color:#92400e;font-weight:500;">⚠️ No encontramos una cuenta activa para <strong>${email}</strong>.</p>
+          <p style="margin:8px 0 0;color:#92400e;font-size:0.875rem;">Es posible que la cuenta haya sido eliminada o necesite ser creada nuevamente.</p>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button id="btn-recover-register" class="btn btn-primary btn-block" style="padding:14px;">
+            🆕 Crear cuenta nueva con este email
+            <small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Se migrarán automáticamente los datos anteriores si existen</small>
+          </button>
+          <button id="btn-recover-google" class="btn btn-google btn-block" style="padding:14px;">
+            <svg viewBox="0 0 24 24" style="width:20px;height:20px;margin-right:8px;vertical-align:middle;"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+            Registrarse con Google
+          </button>
+          <button class="btn btn-outline btn-block" onclick="this.closest('.modal').remove()" style="padding:12px;">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Pre-fill register form with email
+  modal.querySelector('#btn-recover-register').onclick = () => {
+    modal.remove();
+    document.getElementById('register-email').value = email;
+    document.getElementById('register-name').value = email.split('@')[0];
+    document.getElementById('register-name').focus();
+    showRegister();
+  };
+
+  modal.querySelector('#btn-recover-google').onclick = () => {
+    modal.remove();
+    signInWithGoogle();
+  };
+
+  modal.querySelector('.modal-backdrop').onclick = () => modal.remove();
+}
+
+/**
+ * Muestra modal de progreso/results de migración.
+ */
+function showMigrationResults(results) {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.style.zIndex = '10001';
+  modal.innerHTML = `
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" style="max-width:420px;">
+      <div class="modal-header">
+        <h2 class="modal-title">${results.success ? '✅ Datos Recuperados' : '⚠️ Migración Parcial'}</h2>
+      </div>
+      <div class="modal-body" style="text-align:center;">
+        <div style="font-size:3rem;margin-bottom:16px;">${results.success ? '🎉' : '📦'}</div>
+        ${results.success ? `
+          <p style="margin:0 0 16px;color:#166534;font-weight:500;">Tus datos anteriores han sido restaurados exitosamente.</p>
+          <div style="text-align:left;background:#f0fdf4;border-radius:12px;padding:16px;">
+            <p>📄 Cotizaciones migradas: <strong>${results.quotes}</strong></p>
+            <p>👥 Clientes migrados: <strong>${results.clients}</strong></p>
+            <p>🏢 Empresas migradas: <strong>${results.companies}</strong></p>
+          </div>
+        ` : `
+          <p style="margin:0 0 16px;color:#92400e;">Se creó tu cuenta pero hubo errores en la migración.</p>
+          <p style="font-size:0.875rem;color:#64748b;">Contacta al administrador si necesitas recuperar datos antiguos.</p>
+          ${results.errors?.length > 0 ? `<div style="text-align:left;background:#fef2f2;border-radius:12px;padding:12px;margin-top:12px;"><small>${results.errors.join('<br>')}</small></div>` : ''}
+        `}
+        <button class="btn btn-primary btn-block" style="margin-top:20px;" onclick="this.closest('.modal').remove()">Continuar</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.querySelector('.modal-backdrop').onclick = () => modal.remove();
+}
+
+// ==========================================================
 // GOOGLE SIGN IN - Using Popup with Account Linking
 // ==========================================================
 
@@ -74,20 +338,18 @@ async function signInWithGoogle() {
     console.log('[Auth] Google sign-in with popup...');
     const result = await signInWithPopup(auth, googleProvider);
     console.log('[Auth] Google popup success:', result.user.email);
-    
+
     // Check if this email already has a password account
     const methods = await fetchSignInMethodsForEmail(auth, result.user.email);
     if (methods && methods.includes('password')) {
-      // User has both Google and password methods - check if linked
       const providers = result.user.providerData.map(p => p.providerId);
       if (!providers.includes('password')) {
         console.log('[Auth] Email has password account but not linked yet');
-        // Offer to link accounts
         showLinkingModal(result.user, 'google');
         return;
       }
     }
-    
+
     await processUser(result.user);
   } catch (error) {
     console.error('[Auth] Google Sign-In Error:', error);
@@ -109,7 +371,7 @@ if (btnGoogleLogin) btnGoogleLogin.addEventListener('click', signInWithGoogle);
 if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoogle);
 
 // ==========================================================
-// PROCESS USER - Create or redirect
+// PROCESS USER - Create, migrate or redirect
 // ==========================================================
 
 let userProcessed = false;
@@ -117,44 +379,70 @@ let userProcessed = false;
 async function processUser(user) {
   if (userProcessed || !user) return;
   userProcessed = true;
-  
+
   console.log('✅ Processing user:', user.email);
-  
+
   try {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
-    
+
     if (!userDoc.exists()) {
-      // NEW user - create account
+      // NEW Firebase Auth user (o uid nuevo por re-registro)
       const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
-      console.log('🆕 New user, creating account...', isSuperAdmin ? 'as Super Admin' : 'as User');
-      
-      await setDoc(doc(db, 'users', user.uid), {
-        name: user.displayName || user.email.split('@')[0],
-        email: user.email.toLowerCase(),
-        company: '',
-        role: isSuperAdmin ? 'superadmin' : 'user',
-        plan: 'free',
-        licenseDuration: 0,
-        planStartDate: null,
-        planEndDate: null,
-        quotesUsedThisMonth: 0,
-        lastQuoteReset: new Date().toISOString(),
-        isActive: true,
-        providerId: user.providerData[0]?.providerId || 'email',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      
-      showToast('¡Bienvenido! Cuenta creada exitosamente.');
-      // Auto-redirect to app after successful registration
-      setTimeout(() => {
-        redirectOnce(isSuperAdmin ? '/superadmin.html' : '/app.html');
-      }, 800);
+      console.log('🆕 New auth user detected, checking for orphaned data...');
+
+      // Buscar datos huérfanos por email
+      const orphaned = await findOrphanedDataByEmail(user.email);
+
+      if (orphaned.oldUid) {
+        console.log('📦 Orphaned data found! Starting migration...');
+        showToast('Recuperando datos anteriores...', 'info');
+
+        // Migrar datos al nuevo uid
+        const migrationResult = await migrateOrphanedData(user.uid, orphaned);
+
+        if (migrationResult.success) {
+          showToast('¡Datos recuperados exitosamente!', 'success');
+          setTimeout(() => showMigrationResults(migrationResult), 500);
+        } else {
+          showToast('Cuenta creada. Algunos datos no pudieron recuperarse.', 'error');
+        }
+
+        // Esperar un momento y redirigir
+        setTimeout(() => {
+          const isSA = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+          redirectOnce(isSA ? '/superadmin.html' : '/app.html');
+        }, 1500);
+      } else {
+        // No hay datos huérfanos, crear cuenta nueva
+        console.log('🆕 No orphaned data found, creating fresh account...', isSuperAdmin ? 'as Super Admin' : 'as User');
+
+        await setDoc(doc(db, 'users', user.uid), {
+          name: user.displayName || user.email.split('@')[0],
+          email: user.email.toLowerCase(),
+          company: '',
+          role: isSuperAdmin ? 'superadmin' : 'user',
+          plan: 'free',
+          licenseDuration: 0,
+          planStartDate: null,
+          planEndDate: null,
+          quotesUsedThisMonth: 0,
+          lastQuoteReset: new Date().toISOString(),
+          isActive: true,
+          providerId: user.providerData[0]?.providerId || 'email',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+
+        showToast('¡Bienvenido! Cuenta creada exitosamente.');
+        setTimeout(() => {
+          redirectOnce(isSuperAdmin ? '/superadmin.html' : '/app.html');
+        }, 800);
+      }
     } else {
-      // EXISTING user - redirect based on role
+      // EXISTING user doc - redirect based on role
       const userData = userDoc.data();
       console.log('🔄 Existing user, role:', userData.role);
-      
+
       if (userData.role === 'superadmin') {
         redirectOnce('/superadmin.html');
       } else if (!userData.isActive) {
@@ -214,7 +502,9 @@ if (formRegister) {
     } catch (error) {
       console.error('Register Error:', error);
       let message = 'Error al crear la cuenta';
-      if (error.code === 'auth/email-already-in-use') message = 'Este email ya está registrado';
+      if (error.code === 'auth/email-already-in-use') {
+        message = 'Este email ya está registrado. Intenta iniciar sesión o usa "Recuperar contraseña".';
+      }
       else if (error.code === 'auth/weak-password') message = 'La contraseña es muy débil';
       showToast(message, 'error');
     }
@@ -222,7 +512,7 @@ if (formRegister) {
 }
 
 // ==========================================================
-// EMAIL/PASSWORD LOGIN - With Account Linking
+// EMAIL/PASSWORD LOGIN - With Account Recovery
 // ==========================================================
 
 const formLogin = document.getElementById('form-login');
@@ -247,37 +537,39 @@ function showLinkingModal(userOrError, method) {
     showToast('Error: No se pudo identificar la cuenta', 'error');
     return;
   }
-  
+
   const otherMethod = method === 'google' ? 'email y contraseña' : 'Google';
   const modal = document.createElement('div');
-  modal.style.cssText = `
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: rgba(0,0,0,0.6); display: flex; align-items: center;
-    justify-content: center; z-index: 10000; padding: 20px;
-  `;
-  
+  modal.className = 'modal';
+  modal.style.zIndex = '10000';
+
   modal.innerHTML = `
-    <div style="background: var(--color-card, #fff); border-radius: 16px; padding: 24px; max-width: 400px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.3);">
-      <h3 style="margin: 0 0 16px; color: var(--color-text-primary, #0f172a);">🔗 Vincular Cuentas</h3>
-      <p style="margin: 0 0 20px; color: var(--color-text-secondary, #475569);">
-        El email <strong>${email}</strong> ya tiene una cuenta registrada con <strong>${otherMethod}</strong>.
-        <br><br>¿Qué deseas hacer?
-      </p>
-      <div style="display: flex; flex-direction: column; gap: 12px;">
-        <button id="btn-link-accounts" style="background: var(--color-primary, #1e40af); color: white; border: none; padding: 12px 20px; border-radius: 8px; font-weight: 600; cursor: pointer;">✅ Usar misma cuenta (vincular)</button>
-        <button id="btn-signin-other" style="background: var(--color-bg-tertiary, #f1f5f9); color: var(--color-text-primary, #0f172a); border: 1px solid var(--color-border, #e2e8f0); padding: 12px 20px; border-radius: 8px; font-weight: 500; cursor: pointer;">🔁 Iniciar con ${otherMethod}</button>
-        <button id="btn-cancel-link" style="background: transparent; color: var(--color-text-muted, #64748b); border: none; padding: 8px; cursor: pointer;">Cancelar</button>
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" style="max-width:420px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🔗 Vincular Cuentas</h2>
+        <button class="modal-close" onclick="this.closest('.modal').remove()">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin:0 0 20px;color:var(--color-gray-600);">
+          El email <strong>${email}</strong> ya tiene una cuenta registrada con <strong>${otherMethod}</strong>.
+          <br><br>¿Qué deseas hacer?
+        </p>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <button id="btn-link-accounts" class="btn btn-primary btn-block">✅ Usar misma cuenta (vincular)</button>
+          <button id="btn-signin-other" class="btn btn-outline btn-block">🔁 Iniciar con ${otherMethod}</button>
+          <button id="btn-cancel-link" class="btn btn-block" style="color:var(--color-gray-500);background:none;border:none;cursor:pointer;padding:8px;">Cancelar</button>
+        </div>
       </div>
     </div>
   `;
-  
+
   document.body.appendChild(modal);
-  
+
   modal.querySelector('#btn-link-accounts').onclick = async () => {
     modal.remove();
     try {
       if (method === 'google') {
-        // User signed in with Google, needs to link email/password
         const password = await promptForPassword(email);
         if (!password) return;
         const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -285,7 +577,6 @@ function showLinkingModal(userOrError, method) {
         showToast('✅ Cuentas vinculadas exitosamente', 'success');
         processUser(cred.user);
       } else {
-        // User signed in with email, needs to link Google
         const result = await signInWithPopup(auth, googleProvider);
         showToast('✅ Vincula tu cuenta en Ajustes > Seguridad', 'info');
         processUser(result.user);
@@ -295,7 +586,7 @@ function showLinkingModal(userOrError, method) {
       showToast('Error al vincular: ' + err.message, 'error');
     }
   };
-  
+
   modal.querySelector('#btn-signin-other').onclick = () => {
     modal.remove();
     if (method === 'google') {
@@ -305,45 +596,53 @@ function showLinkingModal(userOrError, method) {
       signInWithGoogle();
     }
   };
-  
+
   modal.querySelector('#btn-cancel-link').onclick = () => modal.remove();
-  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  modal.querySelector('.modal-backdrop').onclick = () => modal.remove();
 }
 
 function promptForPassword(email) {
   return new Promise((resolve) => {
     const modal = document.createElement('div');
-    modal.style.cssText = `
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.7); display: flex; align-items: center;
-      justify-content: center; z-index: 10001; padding: 20px;
-    `;
-    
+    modal.className = 'modal';
+    modal.style.zIndex = '10001';
+
     modal.innerHTML = `
-      <div style="background: var(--color-card, #fff); border-radius: 16px; padding: 24px; max-width: 400px; width: 100%;">
-        <h3 style="margin: 0 0 16px; color: var(--color-text-primary, #0f172a);">🔐 Ingresa tu contraseña</h3>
-        <p style="margin: 0 0 20px; color: var(--color-text-muted, #64748b);">Para vincular con Google, confirma tu identidad:</p>
-        <input type="email" value="${email}" disabled style="width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid var(--color-border, #e2e8f0); background: var(--color-bg-secondary, #f8fafc);">
-        <input type="password" id="link-password" placeholder="Contraseña" style="width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 6px; border: 1px solid var(--color-border, #e2e8f0);">
-        <div style="display: flex; gap: 12px;">
-          <button id="btn-confirm-pass" style="flex: 1; background: var(--color-primary, #1e40af); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer;">Confirmar</button>
-          <button id="btn-cancel-pass" style="flex: 1; background: var(--color-bg-tertiary, #f1f5f9); color: var(--color-text-primary, #0f172a); border: 1px solid var(--color-border, #e2e8f0); padding: 12px; border-radius: 8px; cursor: pointer;">Cancelar</button>
+      <div class="modal-backdrop"></div>
+      <div class="modal-dialog" style="max-width:400px;">
+        <div class="modal-header">
+          <h2 class="modal-title">🔐 Confirmar Identidad</h2>
+        </div>
+        <div class="modal-body">
+          <p style="margin:0 0 16px;color:var(--color-gray-500);">Para vincular con Google, confirma tu contraseña:</p>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" value="${email}" disabled class="form-input" style="opacity:0.7;">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Contraseña</label>
+            <input type="password" id="link-password" class="form-input" placeholder="Tu contraseña">
+          </div>
+          <div style="display:flex;gap:12px;">
+            <button id="btn-confirm-pass" class="btn btn-primary" style="flex:1;">Confirmar</button>
+            <button id="btn-cancel-pass" class="btn btn-outline" style="flex:1;">Cancelar</button>
+          </div>
         </div>
       </div>
     `;
-    
+
     document.body.appendChild(modal);
-    
+
     const input = modal.querySelector('#link-password');
     const confirmBtn = modal.querySelector('#btn-confirm-pass');
     const cancelBtn = modal.querySelector('#btn-cancel-pass');
-    
+
     const handleConfirm = () => {
       const pass = input.value;
       modal.remove();
       resolve(pass || null);
     };
-    
+
     confirmBtn.onclick = handleConfirm;
     cancelBtn.onclick = () => { modal.remove(); resolve(null); };
     input.onkeydown = (e) => { if (e.key === 'Enter') handleConfirm(); };
@@ -379,25 +678,25 @@ export function protectRoute(requiredAuth = true) {
     console.log('⏳ Auth check already in progress...');
     return;
   }
-  
+
   authCheckInProgress = true;
-  
+
   const path = window.location.pathname;
   const isLoginPage = path.includes('index.html') || path === '/' || path === '';
-  
+
   console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
   if (!isLoginPage) {
     sessionStorage.removeItem(REDIRECT_LOCK_KEY);
   }
-  
+
   if (isLoggingOut || sessionStorage.getItem(LOGOUT_FLAG_KEY) === '1') {
     authCheckInProgress = false;
     return;
   }
-  
+
   const unsubscribe = onAuthStateChanged(auth, (user) => {
     console.log('👤 Auth state changed:', user?.email || 'No user');
-    
+
     if (requiredAuth && !user) {
       if (!isLoginPage && !window.location.href.includes('index.html')) {
         console.log('🔐 No auth, redirecting to login...');
@@ -412,13 +711,13 @@ export function protectRoute(requiredAuth = true) {
     } else if (user) {
       updateUI(user);
       saveSession(user);
-      
+
       if (!isInitialized) {
         isInitialized = true;
         onAppReady(user);
       }
     }
-    
+
     authCheckInProgress = false;
     unsubscribe();
   });
@@ -433,34 +732,26 @@ export async function logout() {
     console.log('⏳ Logout already in progress...');
     return;
   }
-  
+
   try {
     isLoggingOut = true;
     sessionStorage.setItem(LOGOUT_FLAG_KEY, '1');
     console.log('🚪 Starting logout...');
-    
-    // Clear local session first
+
     clearSession();
-    
-    // Sign out from Firebase
     await signOut(auth);
-    
+
     console.log('✅ Logout successful');
     showToast('Sesión cerrada correctamente', 'info');
-    
-    // Small delay to ensure Firebase processed logout
+
     await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // Redirect to login
     redirectOnce('/index.html');
-    
+
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
-    
-    // Force logout even on error
     clearSession();
     redirectOnce('/index.html');
-    
+
   } finally {
     setTimeout(() => {
       isLoggingOut = false;
@@ -480,7 +771,9 @@ export async function loginWithEmail(email, password) {
 
   const methods = await fetchSignInMethodsForEmail(auth, safeEmail);
   if (!methods || methods.length === 0) {
-    showToast('No existe una cuenta con este email', 'error');
+    // ✅ MEJORA: En lugar de solo mostrar error, ofrecer recuperar cuenta
+    console.log('[Auth] No auth methods found for:', safeEmail);
+    showAccountRecoveryModal(safeEmail);
     return null;
   }
 
@@ -498,6 +791,10 @@ export async function loginWithEmail(email, password) {
       message = 'Email o contraseña incorrectos';
     } else if (error.code === 'auth/too-many-requests') {
       message = 'Demasiados intentos. Intenta más tarde.';
+    } else if (error.code === 'auth/user-not-found') {
+      // ✅ MEJORA: Ofrecer recuperación cuando el usuario no existe
+      showAccountRecoveryModal(safeEmail);
+      return null;
     }
     showToast(message, 'error');
     return null;
@@ -533,6 +830,13 @@ export async function registerWithEmail(email, password, name = '', company = ''
     throw new Error('Cuenta ya existe con Google');
   }
 
+  // ✅ MEJORA: Si el email ya existe con password, ofrecer login
+  if (methods && methods.includes('password')) {
+    showToast('Este email ya está registrado. Intenta iniciar sesión.', 'error');
+    showLogin();
+    throw new Error('Cuenta ya existe');
+  }
+
   const userCredential = await createUserWithEmailAndPassword(auth, safeEmail, password);
   await processUser(userCredential.user);
   return userCredential.user;
@@ -565,7 +869,7 @@ function updateUI(user) {
   const nameEls = document.querySelectorAll('.user-name');
   const emailEls = document.querySelectorAll('.user-email');
   const photoEls = document.querySelectorAll('.user-photo');
-  
+
   nameEls.forEach(el => el.textContent = user.displayName || 'Usuario');
   emailEls.forEach(el => el.textContent = user.email || '');
   photoEls.forEach(el => { if (user.photoURL) el.src = user.photoURL; });
@@ -608,7 +912,11 @@ if (formForgot) {
     } catch (error) {
       console.error('Password reset error:', error);
       let message = 'Error al enviar el email de recuperación';
-      if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
+      if (error.code === 'auth/user-not-found') {
+        // ✅ MEJORA: Ofrecer crear cuenta nueva
+        showAccountRecoveryModal(email);
+        return;
+      }
       else if (error.code === 'auth/invalid-email') message = 'Email inválido';
       else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
       showToast(message, 'error');

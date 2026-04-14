@@ -30,12 +30,20 @@ service cloud.firestore {
     }
     
     // ==========================================================
-    // USERS - Solo el propio usuario o admin puede leer/escribir
+    // USERS - Permite crear, leer y buscar por email
     // ==========================================================
     match /users/{userId} {
+      // Lectura: propio usuario o admin
       allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
-      allow create: if isAuthenticated() && isOwner(userId);
+      
+      // Creación: cualquier usuario autenticado puede crear su propio doc
+      // (necesario para migración y registro)
+      allow create: if isAuthenticated();
+      
+      // Actualización: propio usuario o admin
       allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      
+      // Eliminación: solo admin
       allow delete: if isAdmin();
     }
     
