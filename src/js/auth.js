@@ -739,7 +739,7 @@ const REDIRECT_LOCK_KEY = 'cotizapro_redirect_lock';
 
 function isLoginPagePath() {
   const path = window.location.pathname;
-  return path === '/' || path === '' || path === '/index.html';
+  return path === '/' || path === '' || path === '/index.html' || path === '/index';
 }
 
 function redirectOnce(targetPath, force = false) {
@@ -763,7 +763,7 @@ export function protectRoute(requiredAuth = true) {
   authCheckInProgress = true;
 
   const path = window.location.pathname;
-  const isLoginPage = path === '/' || path === '' || path === '/index.html';
+  const isLoginPage = path === '/' || path === '' || path === '/index.html' || path === '/index';
 
   console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
   if (!isLoginPage) {
