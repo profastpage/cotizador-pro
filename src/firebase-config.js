@@ -20,7 +20,7 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 
 // Super Admin Email (SOLO ESTE EMAIL TIENE ACCESO AL PANEL ADMIN)
-export const SUPER_ADMIN_EMAIL = "admin@cotizadorpro.com";
+export const SUPER_ADMIN_EMAIL = "profastpage@gmail.com";
 
 // Tipos de documentos disponibles
 export const DOCUMENT_TYPES = {
