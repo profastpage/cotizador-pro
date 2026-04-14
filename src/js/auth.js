@@ -1,7 +1,13 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
-/* v2.1.0 - Con sistema de recuperación de cuentas y migración de datos */
+/* v2.2.0 - Fix TDZ error: move const declarations before usage */
 
 import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, linkWithCredential, fetchSignInMethodsForEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+
+// ==========================================================
+// CONSTANTS - Must be declared before any usage (TDZ fix)
+// ==========================================================
+const LOGOUT_FLAG_KEY = 'cotizapro_is_logging_out';
+const REDIRECT_LOCK_KEY = 'cotizapro_redirect_lock';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -66,6 +72,15 @@ const btnLoginNav = document.getElementById('btn-login-nav');
 const btnRegisterNav = document.getElementById('btn-register-nav');
 if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
+
+// ==========================================================
+// STATE VARIABLES
+// ==========================================================
+
+let userProcessed = false;
+let authCheckInProgress = false;
+let isLoggingOut = false;
+let isInitialized = false;
 
 // ==========================================================
 // DATA MIGRATION ENGINE - Recover orphaned Firestore data
@@ -445,8 +460,6 @@ if (btnGoogleRegister) btnGoogleRegister.addEventListener('click', signInWithGoo
 // PROCESS USER - Create, migrate or redirect
 // ==========================================================
 
-let userProcessed = false;
-
 async function processUser(user) {
   if (userProcessed || !user) return;
   userProcessed = true;
@@ -537,8 +550,12 @@ async function processUser(user) {
 // ==========================================================
 
 // Reset all locks on page load to prevent stale state
-sessionStorage.removeItem(REDIRECT_LOCK_KEY);
-sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+  try {
+    sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+    sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+  } catch (e) { /* ignore in restricted contexts */ }
+}
 
 onAuthStateChanged(auth, (user) => {
   if (!isLoginPagePath() || isLoggingOut) return;
@@ -730,12 +747,6 @@ function promptForPassword(email) {
 // ==========================================================
 // ROUTE PROTECTION - Improved, No Infinite Loops
 // ==========================================================
-
-let authCheckInProgress = false;
-let isLoggingOut = false;
-let isInitialized = false;
-const LOGOUT_FLAG_KEY = 'cotizapro_is_logging_out';
-const REDIRECT_LOCK_KEY = 'cotizapro_redirect_lock';
 
 function isLoginPagePath() {
   const path = window.location.pathname;
