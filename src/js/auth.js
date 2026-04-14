@@ -7,14 +7,22 @@ import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithPopup, signInWit
 // ==========================================================
 
 function showLogin() {
-  document.getElementById('modal-login').classList.remove('hidden');
-  document.getElementById('modal-register').classList.add('hidden');
+  const modal = document.getElementById('modal-login');
+  if(modal) {
+    modal.classList.remove('hidden');
+    const regModal = document.getElementById('modal-register');
+    if(regModal) regModal.classList.add('hidden');
+  }
 }
 window.showLogin = showLogin;
 
 function showRegister() {
-  document.getElementById('modal-register').classList.remove('hidden');
-  document.getElementById('modal-login').classList.add('hidden');
+  const modal = document.getElementById('modal-register');
+  if(modal) {
+    modal.classList.remove('hidden');
+    const loginModal = document.getElementById('modal-login');
+    if(loginModal) loginModal.classList.add('hidden');
+  }
 }
 window.showRegister = showRegister;
 
@@ -25,18 +33,25 @@ function switchToRegister() { showRegister(); }
 window.switchToRegister = switchToRegister;
 
 function scrollToPlans() {
-  document.getElementById('plans').scrollIntoView({ behavior: 'smooth' });
+  const plans = document.getElementById('plans');
+  if(plans) plans.scrollIntoView({ behavior: 'smooth' });
 }
 window.scrollToPlans = scrollToPlans;
 
 function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
-  if (!container) return;
+  if (!container) { console.warn('Toast container not found'); return; }
+  
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span><span>${message}</span>`;
+  toast.style.cssText = "background:white; color:#333; padding:12px 20px; border-radius:8px; margin-bottom:10px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:flex; align-items:center; gap:10px; animation:slideIn 0.3s ease;";
+  
   container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+  setTimeout(() => { 
+    toast.style.opacity = '0'; 
+    setTimeout(() => toast.remove(), 300); 
+  }, 3000);
 }
 
 document.querySelectorAll('[data-close-modal]').forEach(btn => {
@@ -49,10 +64,10 @@ document.querySelectorAll('.password-toggle').forEach(btn => {
   btn.addEventListener('click', () => {
     const inputId = btn.dataset.toggle;
     const input = document.getElementById(inputId);
-    if (input.type === 'password') {
+    if (input && input.type === 'password') {
       input.type = 'text';
       btn.textContent = '🙈';
-    } else {
+    } else if (input) {
       input.type = 'password';
       btn.textContent = '👁️';
     }
@@ -75,14 +90,11 @@ async function signInWithGoogle() {
     const result = await signInWithPopup(auth, googleProvider);
     console.log('[Auth] Google popup success:', result.user.email);
     
-    // Check if this email already has a password account
     const methods = await fetchSignInMethodsForEmail(auth, result.user.email);
     if (methods && methods.includes('password')) {
-      // User has both Google and password methods - check if linked
       const providers = result.user.providerData.map(p => p.providerId);
       if (!providers.includes('password')) {
         console.log('[Auth] Email has password account but not linked yet');
-        // Offer to link accounts
         showLinkingModal(result.user, 'google');
         return;
       }
@@ -124,7 +136,6 @@ async function processUser(user) {
     const userDoc = await getDoc(doc(db, 'users', user.uid));
     
     if (!userDoc.exists()) {
-      // NEW user - create account
       const isSuperAdmin = user.email.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
       console.log('🆕 New user, creating account...', isSuperAdmin ? 'as Super Admin' : 'as User');
       
@@ -146,12 +157,10 @@ async function processUser(user) {
       });
       
       showToast('¡Bienvenido! Cuenta creada exitosamente.');
-      // Auto-redirect to app after successful registration
       setTimeout(() => {
         window.location.href = isSuperAdmin ? 'superadmin.html' : 'app.html';
       }, 800);
     } else {
-      // EXISTING user - redirect based on role
       const userData = userDoc.data();
       console.log('🔄 Existing user, role:', userData.role);
       
@@ -182,86 +191,74 @@ onAuthStateChanged(auth, (user) => {
 });
 
 // ==========================================================
-// EMAIL/PASSWORD REGISTER
+// FUNCIONES DE LOGIN EXPLÍCITAS (EXPORTADAS)
 // ==========================================================
 
-const formRegister = document.getElementById('form-register');
-if (formRegister) {
-  formRegister.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const name = document.getElementById('register-name').value.trim();
-    const email = document.getElementById('register-email').value.trim();
-    const password = document.getElementById('register-password').value;
-    const passwordConfirm = document.getElementById('register-password-confirm').value;
-    const company = document.getElementById('register-company').value.trim();
-
-    if (!name || !email || !password || !passwordConfirm) {
-      showToast('Completa todos los campos obligatorios', 'error');
-      return;
-    }
-    if (password.length < 6) {
-      showToast('La contraseña debe tener al menos 6 caracteres', 'error');
-      return;
-    }
-    if (password !== passwordConfirm) {
-      showToast('Las contraseñas no coinciden', 'error');
-      return;
-    }
-
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await processUser(userCredential.user);
-    } catch (error) {
-      console.error('Register Error:', error);
-      let message = 'Error al crear la cuenta';
-      if (error.code === 'auth/email-already-in-use') message = 'Este email ya está registrado';
-      else if (error.code === 'auth/weak-password') message = 'La contraseña es muy débil';
-      showToast(message, 'error');
-    }
-  });
-}
-
-// ==========================================================
-// EMAIL/PASSWORD LOGIN - With Account Linking
-// ==========================================================
-
-const formLogin = document.getElementById('form-login');
-if (formLogin) {
-  formLogin.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    if (!email || !password) { showToast('Completa todos los campos', 'error'); return; }
-
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Check if this email has Google auth
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      if (methods && methods.includes('google.com')) {
-        const providers = userCredential.user.providerData.map(p => p.providerId);
-        if (!providers.includes('google.com')) {
-          console.log('[Auth] User has Google but entered with email - offer to link');
-          showLinkingModal(userCredential.user, 'email');
-          return;
-        }
-      }
-      
-      await processUser(userCredential.user);
-    } catch (error) {
-      console.error('Login Error:', error);
-      let message = 'Error al iniciar sesión';
-      if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
-      else if (error.code === 'auth/wrong-password') message = 'Contraseña incorrecta';
-      else if (error.code === 'auth/invalid-email') message = 'Email inválido';
-      else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
-      else if (error.code === 'auth/account-exists-with-different-credential') {
-        showLinkingModal(error, 'email');
+export async function loginWithEmail(email, password) {
+  try {
+    console.log('📧 Iniciando Email Login...');
+    if (!email || !password) throw new Error('Faltan datos');
+    
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    if (methods && methods.includes('google.com')) {
+      const providers = userCredential.user.providerData.map(p => p.providerId);
+      if (!providers.includes('google.com')) {
+        console.log('[Auth] User has Google but entered with email - offer to link');
+        showLinkingModal(userCredential.user, 'email');
         return;
       }
-      showToast(message, 'error');
     }
-  });
+    
+    await processUser(userCredential.user);
+    return userCredential.user;
+    
+  } catch (error) {
+    console.error('Login Error:', error);
+    let message = 'Error al iniciar sesión';
+    if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
+    else if (error.code === 'auth/wrong-password') message = 'Contraseña incorrecta';
+    else if (error.code === 'auth/invalid-email') message = 'Email inválido';
+    else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
+    else if (error.code === 'auth/account-exists-with-different-credential') {
+      showLinkingModal(error, 'email');
+      return;
+    }
+    showToast(message, 'error');
+    throw error;
+  }
+}
+
+export async function registerWithEmail(email, password, name = '', company = '') {
+  try {
+    console.log('📝 Registrando nuevo usuario...');
+    if (!email || !password) throw new Error('Faltan datos');
+    if (password.length < 6) throw new Error('La contraseña debe tener al menos 6 caracteres');
+    
+    const methods = await fetchSignInMethodsForEmail(auth, email);
+    if (methods && methods.includes('google.com')) {
+      throw new Error('Este email ya está registrado con Google. Usa "Iniciar con Google".');
+    }
+
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    
+    if (name) {
+      await userCredential.user.updateProfile({ displayName: name });
+    }
+    
+    await processUser(userCredential.user);
+    return userCredential.user;
+    
+  } catch (error) {
+    console.error('Register Error:', error);
+    let message = 'Error al crear la cuenta';
+    if (error.code === 'auth/email-already-in-use') message = 'Este email ya está registrado';
+    else if (error.code === 'auth/weak-password') message = 'La contraseña es muy débil (mínimo 6 caracteres)';
+    else if (error.code === 'auth/invalid-email') message = 'Email inválido';
+    showToast(message, 'error');
+    throw error;
+  }
 }
 
 // ==========================================================
@@ -304,7 +301,6 @@ function showLinkingModal(userOrError, method) {
     modal.remove();
     try {
       if (method === 'google') {
-        // User signed in with Google, needs to link email/password
         const password = await promptForPassword(email);
         if (!password) return;
         const cred = await signInWithEmailAndPassword(auth, email, password);
@@ -312,7 +308,6 @@ function showLinkingModal(userOrError, method) {
         showToast('✅ Cuentas vinculadas exitosamente', 'success');
         processUser(cred.user);
       } else {
-        // User signed in with email, needs to link Google
         const result = await signInWithPopup(auth, googleProvider);
         showToast('✅ Vincula tu cuenta en Ajustes > Seguridad', 'info');
         processUser(result.user);
@@ -391,7 +386,6 @@ export function protectRoute(requiredAuth = true) {
   authCheckInProgress = true;
 
   const path = window.location.pathname;
-  // Definimos explícitamente qué es la página de login
   const isLoginPage = path.includes('index.html') || path.endsWith('/') || path === '';
   
   console.log('🛡️ ProtectRoute:', path, 'IsLogin?', isLoginPage);
@@ -403,22 +397,18 @@ export function protectRoute(requiredAuth = true) {
     }
 
     if (requiredAuth && !user) {
-      // CASO 1: NO hay usuario
       if (!isLoginPage) {
         console.log('🔐 Sin usuario. Redirigiendo a index.html...');
         localStorage.setItem('redirectAfterLogin', window.location.href);
-        window.location.href = '/index.html'; // Usa ruta absoluta
+        window.location.href = '/index.html';
       }
     } else if (user) {
-      // CASO 2: SÍ hay usuario
       if (isLoginPage) {
-        // Si está en login pero ya tiene sesión, mandar al dashboard
         console.log('✅ Usuario logueado en login. Redirigiendo a app.html...');
         const redirect = localStorage.getItem('redirectAfterLogin') || '/app.html';
         localStorage.removeItem('redirectAfterLogin');
         window.location.href = redirect;
       } else {
-        // Está en dashboard y tiene sesión: Todo OK
         console.log('✅ Acceso concedido a:', path);
         updateUI(user);
         saveSession(user);
@@ -448,10 +438,8 @@ window.logout = async function() {
     
     showToast('Sesión cerrada correctamente', 'info');
     
-    // Pausa crítica para evitar que el guard detecte "no user" antes de tiempo
     await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Forzar redirección explícita
     window.location.href = '/index.html';
     
   } catch (error) {
@@ -504,14 +492,18 @@ function onAppReady(user) {
 window.protectRoute = protectRoute;
 window.cotizaAuth = {
   loginWithGoogle: signInWithGoogle,
+  loginWithEmail,
+  registerWithEmail,
   logout: window.logout,
   getCurrentUser: () => auth.currentUser,
   protectRoute
 };
 
 window.showForgotPassword = function() {
-  document.getElementById('modal-login').classList.add('hidden');
-  document.getElementById('modal-forgot').classList.remove('hidden');
+  const loginModal = document.getElementById('modal-login');
+  const forgotModal = document.getElementById('modal-forgot');
+  if(loginModal) loginModal.classList.add('hidden');
+  if(forgotModal) forgotModal.classList.remove('hidden');
 };
 
 const formForgot = document.getElementById('form-forgot-password');
@@ -526,8 +518,9 @@ if (formForgot) {
     try {
       await sendPasswordResetEmail(auth, email);
       showToast('¡Email de recuperación enviado! Revisa tu bandeja.', 'success');
-      document.getElementById('modal-forgot').classList.add('hidden');
-      document.getElementById('form-forgot-password').reset();
+      const forgotModal = document.getElementById('modal-forgot');
+      if(forgotModal) forgotModal.classList.add('hidden');
+      formForgot.reset();
     } catch (error) {
       console.error('Password reset error:', error);
       let message = 'Error al enviar el email de recuperación';
@@ -538,3 +531,5 @@ if (formForgot) {
     }
   });
 }
+
+console.log('✅ Auth System Loaded (Final Version)');
