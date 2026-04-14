@@ -341,14 +341,6 @@
               <h3 class="stat-value" id="stat-total-amount">S/ 0.00</h3>
             </div>
           </div>
-          <div class="stat-card" style="position:relative;">
-            <div class="stat-icon">📊</div>
-            <div class="stat-info">
-              <p class="stat-label">Cotizaciones restantes</p>
-              <h3 class="stat-value" id="stat-remaining-quotes">0</h3>
-            </div>
-            <button onclick="showUpgradeModal()" class="btn btn-sm btn-upgrade-inline" title="Mejorar Plan">⚡</button>
-          </div>
           <div class="stat-card">
             <div class="stat-icon">⏰</div>
             <div class="stat-info">
@@ -669,27 +661,6 @@
             <div id="plan-remaining-count" style="font-size:1.75rem;font-weight:800;color:var(--color-primary);">3</div>
           </div>
           <button onclick="showUpgradeModal()" class="btn btn-primary btn-block">⚡ Mejorar Plan</button>
-        </div>
-
-        <!-- Configuración de Cláusulas del PDF -->
-        <h3 class="section-title mt-6">Cláusulas del PDF</h3>
-        <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem;">Estas cláusulas se incluirán automáticamente en cada cotización generada.</p>
-        <div class="plan-card-user">
-          <div class="form-group">
-            <label class="form-label">💰 Condiciones de Pago</label>
-            <input type="text" id="clause-payment" class="form-input" placeholder="Ej: Contado">
-          </div>
-          <div class="form-group">
-            <label class="form-label">📋 Términos y Condiciones (una por línea)</label>
-            <textarea id="clause-terms" class="form-input" rows="6" placeholder="Ej: Esta cotización tiene una validez de 30 días calendario.
-Los precios están expresados en Soles (PEN) e incluyen IGV.
-...">Esta cotización tiene una validez de 30 días calendario.
-Los precios están expresados en Soles (PEN) e incluyen IGV.
-La forma de pago y plazos están detallados en la sección de condiciones de pago.
-Esta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.
-Para consultas, comuníquese a los datos de contacto indicados en el encabezado.</textarea>
-          </div>
-          <button id="btn-save-clauses" class="btn btn-primary btn-block">💾 Guardar Cláusulas</button>
         </div>
 
         <!-- PWA Install Button -->
