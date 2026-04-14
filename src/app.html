@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -16,6 +16,14 @@
       window.deferredPWAInstallPrompt = e;
       console.log('[PWA] ✅ CAPTURED');
     });
+
+    // 🔥 DARK MODE - Detectar preferencia al cargar
+    (function() {
+      const saved = localStorage.getItem('cotizapro-theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
   </script>
 
   <!-- Social Meta -->
@@ -39,6 +47,169 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles-app.css">
+
+  <!-- 🎨 THEME STYLES - Dark/Light Mode -->
+  <style>
+    /* Variables base (Light por defecto) */
+    :root {
+      --color-bg-primary: #ffffff;
+      --color-bg-secondary: #f8fafc;
+      --color-bg-tertiary: #f1f5f9;
+      --color-text-primary: #0f172a;
+      --color-text-secondary: #475569;
+      --color-text-muted: #64748b;
+      --color-border: #e2e8f0;
+      --color-card: #ffffff;
+      --color-sidebar-bg: #1e293b;
+      --color-sidebar-text: #f8fafc;
+      --color-sidebar-hover: #334155;
+      --color-primary: #1e40af;
+      --color-primary-hover: #1e3a8a;
+      --color-primary-light: #3b82f6;
+      --color-success: #10b981;
+      --color-warning: #f59e0b;
+      --color-error: #ef4444;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+      --transition: all 0.2s ease;
+    }
+
+    /* 🌙 Dark Mode Variables */
+    [data-theme="dark"] {
+      --color-bg-primary: #0f172a;
+      --color-bg-secondary: #1e293b;
+      --color-bg-tertiary: #334155;
+      --color-text-primary: #f8fafc;
+      --color-text-secondary: #cbd5e1;
+      --color-text-muted: #94a3b8;
+      --color-border: #334155;
+      --color-card: #1e293b;
+      --color-sidebar-bg: #020617;
+      --color-sidebar-text: #f1f5f9;
+      --color-sidebar-hover: #1e293b;
+      --color-primary: #3b82f6;
+      --color-primary-hover: #60a5fa;
+      --color-primary-light: #60a5fa;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4);
+    }
+
+    /* Aplicar variables globales */
+    body {
+      background-color: var(--color-bg-primary);
+      color: var(--color-text-primary);
+      transition: var(--transition);
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--color-sidebar-bg);
+      color: var(--color-sidebar-text);
+    }
+
+    .sidebar-nav .nav-item {
+      color: var(--color-sidebar-text);
+    }
+    .sidebar-nav .nav-item:hover {
+      background: var(--color-sidebar-hover);
+    }
+    .sidebar-nav .nav-item.active {
+      background: var(--color-primary);
+    }
+
+    /* 🔥 CERRAR SESIÓN - TEXTO BLANCO */
+    .sidebar-footer .btn-outline,
+    .topbar-mobile .btn-icon[title="Cerrar Sesión"] {
+      color: #ffffff !important;
+      border-color: rgba(255,255,255,0.3) !important;
+    }
+    .sidebar-footer .btn-outline:hover {
+      background: rgba(255,255,255,0.1) !important;
+      color: #ffffff !important;
+    }
+
+    /* Cards y secciones */
+    .stat-card, .plan-card-user, .modal-dialog, .form, .quote-summary {
+      background: var(--color-card);
+      border-color: var(--color-border);
+      color: var(--color-text-primary);
+    }
+
+    /* Inputs */
+    .form-input, .form-select {
+      background: var(--color-bg-secondary);
+      border-color: var(--color-border);
+      color: var(--color-text-primary);
+    }
+    .form-input::placeholder {
+      color: var(--color-text-muted);
+    }
+
+    /* Botones */
+    .btn-primary {
+      background: var(--color-primary);
+      color: white;
+    }
+    .btn-primary:hover {
+      background: var(--color-primary-hover);
+    }
+    .btn-secondary {
+      background: var(--color-bg-tertiary);
+      color: var(--color-text-primary);
+    }
+    .btn-outline {
+      border-color: var(--color-border);
+      color: var(--color-text-primary);
+    }
+
+    /* Toggle Theme Button */
+    .theme-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: var(--color-bg-tertiary);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 1.2rem;
+      margin-left: 8px;
+    }
+    .theme-toggle:hover {
+      background: var(--color-primary);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    /* Mobile topbar */
+    .topbar-mobile {
+      background: var(--color-sidebar-bg);
+      color: var(--color-sidebar-text);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--color-bg-secondary);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--color-primary);
+    }
+
+    /* Transiciones suaves */
+    *, *::before, *::after {
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+  </style>
 </head>
 <body>
   <div id="toast-container" class="toast-container"></div>
@@ -56,6 +227,10 @@
     <div class="sidebar-header">
       <span class="sidebar-logo">📊</span>
       <span class="sidebar-title">CotizaPro</span>
+      <!-- 🌙 Toggle Theme Button -->
+      <button class="theme-toggle" id="themeToggle" title="Cambiar tema" aria-label="Cambiar tema claro/oscuro">
+        <span class="theme-icon">🌙</span>
+      </button>
     </div>
     <div class="sidebar-plan">
       <span id="user-plan-badge" class="badge badge-free">Gratis</span>
@@ -88,7 +263,10 @@
       </button>
     </nav>
     <div class="sidebar-footer">
-      <button onclick="logout()" class="btn btn-outline btn-sm btn-block">🚪 Cerrar Sesión</button>
+      <!-- 🔥 Cerrar Sesión con texto blanco -->
+      <button onclick="logout()" class="btn btn-outline btn-sm btn-block" style="color: #ffffff; border-color: rgba(255,255,255,0.3);">
+        🚪 Cerrar Sesión
+      </button>
     </div>
   </aside>
 
@@ -99,7 +277,12 @@
       <span class="topbar-logo">📊 CotizaPro</span>
       <div class="topbar-actions">
         <button id="btn-install-app" class="btn-icon hidden" title="Instalar App">📲</button>
-        <button onclick="logout()" class="btn-icon" title="Cerrar Sesión">🚪</button>
+        <!-- 🌙 Toggle Theme Mobile -->
+        <button class="theme-toggle" id="themeToggleMobile" title="Cambiar tema" style="margin-right: 8px;">
+          <span class="theme-icon">🌙</span>
+        </button>
+        <!-- 🔥 Cerrar Sesión móvil con texto blanco -->
+        <button onclick="logout()" class="btn-icon" title="Cerrar Sesión" style="color: #ffffff;">🚪</button>
       </div>
     </header>
 
@@ -318,7 +501,7 @@
             <input type="text" id="company-name" class="form-input" required>
           </div>
           <div class="form-group">
-            <label class="form-label">RUC <small style="color:var(--color-gray-500)">(opcional)</small></label>
+            <label class="form-label">RUC <small style="color:var(--color-text-muted)">(opcional)</small></label>
             <input type="text" id="company-ruc" class="form-input" maxlength="11" inputmode="numeric" placeholder="Opcional - para personas naturales">
           </div>
           <div class="form-group">
@@ -335,13 +518,6 @@
           </div>
           <button type="submit" class="btn btn-primary btn-block">💾 Guardar Datos</button>
         </form>
-
-        <!-- PWA Install Button -->
-        <div id="install-app-section" class="install-section hidden">
-          <h3 class="section-title">Instalar Aplicación</h3>
-          <button id="btn-install-pwa" class="btn btn-gold btn-block">📲 Instalar CotizaPro</button>
-          <p class="install-hint">Instala la app para un acceso más rápido y mejor experiencia</p>
-        </div>
 
         <!-- Help Toggle -->
         <div class="help-section">
@@ -405,7 +581,7 @@
             </div>
             <div style="flex:1;">
               <h4 style="margin:0;font-size:1rem;">CotizaPro App</h4>
-              <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--color-gray-500);">Instala en tu dispositivo para acceso rápido</p>
+              <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--color-text-muted);">Instala en tu dispositivo para acceso rápido</p>
             </div>
           </div>
           <button id="btnInstalarApp" class="btn btn-primary" style="width:100%;margin-top:1rem;">
@@ -472,5 +648,61 @@
 
   <!-- PWA Install Script -->
   <script src="/js/pwa-install.js"></script>
+
+  <!-- 🌙 THEME TOGGLE SCRIPT -->
+  <script>
+    (function() {
+      'use strict';
+      
+      const toggleBtns = [
+        document.getElementById('themeToggle'),
+        document.getElementById('themeToggleMobile')
+      ].filter(Boolean);
+      
+      const themeIcons = {
+        light: '🌙',
+        dark: '☀️'
+      };
+      
+      // Función para actualizar iconos
+      function updateIcons(theme) {
+        document.querySelectorAll('.theme-icon').forEach(icon => {
+          icon.textContent = themeIcons[theme];
+        });
+      }
+      
+      // Función para cambiar tema
+      function toggleTheme() {
+        const html = document.documentElement;
+        const current = html.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('cotizapro-theme', next);
+        updateIcons(next);
+        
+        console.log(`🎨 Theme changed to: ${next}`);
+      }
+      
+      // Inicializar
+      document.addEventListener('DOMContentLoaded', () => {
+        const saved = localStorage.getItem('cotizapro-theme');
+        const current = document.documentElement.getAttribute('data-theme');
+        
+        // Actualizar iconos al cargar
+        updateIcons(current);
+        
+        // Agregar eventos a los botones
+        toggleBtns.forEach(btn => {
+          btn.addEventListener('click', toggleTheme);
+        });
+        
+        console.log('🌙 Theme toggle initialized');
+      });
+      
+      // Exponer globalmente por si se necesita
+      window.toggleCotizaTheme = toggleTheme;
+    })();
+  </script>
 </body>
 </html>
