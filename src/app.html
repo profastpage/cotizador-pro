@@ -237,7 +237,7 @@
       <div class="plan-progress">
         <div id="plan-progress-bar" class="plan-progress-bar" style="width: 0%"></div>
       </div>
-      <p class="plan-progress-text"><span id="quotes-used">0</span> / <span id="quotes-limit">5</span> cotizaciones</p>
+      <p class="plan-progress-text"><span id="quotes-used">0</span> / <span id="quotes-limit">3</span> cotizaciones</p>
     </div>
     <!-- Desktop sidebar upgrade button (hidden on mobile) -->
     <div class="sidebar-plan-upgrade" id="sidebar-upgrade-btn" style="display:none">
@@ -568,7 +568,7 @@
             <h4 id="current-plan-name">Prueba Gratis</h4>
             <span id="current-plan-price" class="plan-price">S/ 0</span>
           </div>
-          <p id="current-plan-desc">5 cotizaciones por mes</p>
+          <p id="current-plan-desc">3 cotizaciones por mes</p>
           <button onclick="showUpgradeModal()" class="btn btn-primary">Mejorar Plan</button>
         </div>
 
@@ -646,22 +646,6 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
   
-  <!-- Route Protection -->
-  <script>
-    if (typeof protectRoute === 'function') {
-      protectRoute(true);
-    } else {
-      window.addEventListener('load', () => {
-        setTimeout(() => {
-          const session = localStorage.getItem('cotizapro_session');
-          if (!session && !window.location.href.includes('index.html')) {
-            window.location.href = 'index.html';
-          }
-        }, 1000);
-      });
-    }
-  </script>
-
   <!-- PWA Install Script -->
   <script src="/js/pwa-install.js"></script>
 

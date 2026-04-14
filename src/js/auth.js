@@ -209,8 +209,7 @@ if (formRegister) {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await processUser(userCredential.user);
+      await registerWithEmail(email, password, name, company);
     } catch (error) {
       console.error('Register Error:', error);
       let message = 'Error al crear la cuenta';
@@ -234,20 +233,7 @@ if (formLogin) {
     if (!email || !password) { showToast('Completa todos los campos', 'error'); return; }
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Check if this email has Google auth
-      const methods = await fetchSignInMethodsForEmail(auth, email);
-      if (methods && methods.includes('google.com')) {
-        const providers = userCredential.user.providerData.map(p => p.providerId);
-        if (!providers.includes('google.com')) {
-          console.log('[Auth] User has Google but entered with email - offer to link');
-          showLinkingModal(userCredential.user, 'email');
-          return;
-        }
-      }
-      
-      await processUser(userCredential.user);
+      await loginWithEmail(email, password);
     } catch (error) {
       console.error('Login Error:', error);
       let message = 'Error al iniciar sesión';
@@ -385,8 +371,9 @@ function promptForPassword(email) {
 let authCheckInProgress = false;
 let isLoggingOut = false;
 let isInitialized = false;
+const LOGOUT_FLAG_KEY = 'cotizapro_is_logging_out';
 
-function protectRoute(requiredAuth = true) {
+export function protectRoute(requiredAuth = true) {
   if (authCheckInProgress) {
     console.log('⏳ Auth check already in progress...');
     return;
@@ -399,23 +386,25 @@ function protectRoute(requiredAuth = true) {
   
   console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
   
-  if (isLoggingOut) {
+  if (isLoggingOut || sessionStorage.getItem(LOGOUT_FLAG_KEY) === '1') {
     authCheckInProgress = false;
     return;
   }
   
-  onAuthStateChanged(auth, (user) => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
     console.log('👤 Auth state changed:', user?.email || 'No user');
     
     if (requiredAuth && !user) {
       if (!isLoginPage && !window.location.href.includes('index.html')) {
         console.log('🔐 No auth, redirecting to login...');
         localStorage.setItem('redirectAfterLogin', window.location.href);
-        window.location.href = 'index.html';
+        window.location.replace('/index.html');
       }
     } else if (user && isLoginPage) {
       console.log('✅ Already logged in, redirecting to dashboard...');
-      window.location.href = 'app.html';
+      const redirect = localStorage.getItem('redirectAfterLogin') || '/app.html';
+      localStorage.removeItem('redirectAfterLogin');
+      window.location.replace(redirect);
     } else if (user) {
       updateUI(user);
       saveSession(user);
@@ -427,6 +416,7 @@ function protectRoute(requiredAuth = true) {
     }
     
     authCheckInProgress = false;
+    unsubscribe();
   });
 }
 
@@ -434,7 +424,7 @@ function protectRoute(requiredAuth = true) {
 // IMPROVED LOGOUT - No Cycles
 // ==========================================================
 
-window.logout = async function() {
+export async function logout() {
   if (isLoggingOut) {
     console.log('⏳ Logout already in progress...');
     return;
@@ -442,6 +432,7 @@ window.logout = async function() {
   
   try {
     isLoggingOut = true;
+    sessionStorage.setItem(LOGOUT_FLAG_KEY, '1');
     console.log('🚪 Starting logout...');
     
     // Clear local session first
@@ -457,19 +448,68 @@ window.logout = async function() {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Redirect to login
-    window.location.href = 'index.html';
+    window.location.replace('/index.html');
     
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
     
     // Force logout even on error
     clearSession();
-    window.location.href = 'index.html';
+    window.location.replace('/index.html');
     
   } finally {
-    isLoggingOut = false;
+    setTimeout(() => {
+      isLoggingOut = false;
+      sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+    }, 1200);
   }
-};
+}
+window.logout = logout;
+
+export async function loginWithEmail(email, password) {
+  const safeEmail = (email || '').trim().toLowerCase();
+  if (!safeEmail || !password) {
+    showToast('Completa todos los campos', 'error');
+    throw new Error('Credenciales incompletas');
+  }
+
+  const userCredential = await signInWithEmailAndPassword(auth, safeEmail, password);
+
+  const methods = await fetchSignInMethodsForEmail(auth, safeEmail);
+  if (methods && methods.includes('google.com')) {
+    const providers = userCredential.user.providerData.map(p => p.providerId);
+    if (!providers.includes('google.com')) {
+      console.log('[Auth] User has Google but entered with email - offer to link');
+      showLinkingModal(userCredential.user, 'email');
+      return null;
+    }
+  }
+
+  await processUser(userCredential.user);
+  return userCredential.user;
+}
+
+export async function registerWithEmail(email, password, name = '', company = '') {
+  const safeEmail = (email || '').trim().toLowerCase();
+  if (!safeEmail || !password) {
+    showToast('Completa todos los campos obligatorios', 'error');
+    throw new Error('Datos incompletos');
+  }
+  if (password.length < 6) {
+    showToast('La contraseña debe tener al menos 6 caracteres', 'error');
+    throw new Error('Contraseña débil');
+  }
+
+  const methods = await fetchSignInMethodsForEmail(auth, safeEmail);
+  if (methods && methods.includes('google.com')) {
+    showToast('Este email ya está registrado con Google. Usa "Continuar con Google".', 'error');
+    throw new Error('Cuenta ya existe con Google');
+  }
+
+  const userCredential = await createUserWithEmailAndPassword(auth, safeEmail, password);
+  await processUser(userCredential.user);
+  return userCredential.user;
+}
 
 // ==========================================================
 // SESSION UTILITIES
@@ -512,6 +552,8 @@ function onAppReady(user) {
 window.protectRoute = protectRoute;
 window.cotizaAuth = {
   loginWithGoogle: signInWithGoogle,
+  loginWithEmail,
+  registerWithEmail,
   logout: window.logout,
   getCurrentUser: () => auth.currentUser,
   protectRoute

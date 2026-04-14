@@ -1,6 +1,7 @@
 // App User Logic - SDK Modular v10+
 
 import { auth, db, PLANS, DOCUMENT_TYPES, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { protectRoute, logout } from './auth.js';
 
 let currentUser = null;
 let userData = null;
@@ -1159,9 +1160,7 @@ function showToast(message, type = 'success') {
   setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
-window.logout = function() {
-  signOut(auth).then(() => { window.location.href = 'index.html'; });
-};
+window.logout = logout;
 
 // ==========================================================
 // PWA INSTALL STATUS CHECK (UI only - install prompt handled in HTML inline script)
@@ -1238,3 +1237,5 @@ initUI = function() {
   setupHelpToggle();
   checkCompanyConfig();
 };
+
+protectRoute(true);
