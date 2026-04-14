@@ -233,21 +233,7 @@ if (formLogin) {
     const password = document.getElementById('login-password').value;
     if (!email || !password) { showToast('Completa todos los campos', 'error'); return; }
 
-    try {
-      await loginWithEmail(email, password);
-    } catch (error) {
-      console.error('Login Error:', error);
-      let message = 'Error al iniciar sesión';
-      if (error.code === 'auth/user-not-found') message = 'No existe una cuenta con este email';
-      else if (error.code === 'auth/wrong-password') message = 'Contraseña incorrecta';
-      else if (error.code === 'auth/invalid-email') message = 'Email inválido';
-      else if (error.code === 'auth/too-many-requests') message = 'Demasiados intentos. Intenta más tarde.';
-      else if (error.code === 'auth/account-exists-with-different-credential') {
-        showLinkingModal(error, 'email');
-        return;
-      }
-      showToast(message, 'error');
-    }
+    await loginWithEmail(email, password);
   });
 }
 
@@ -492,9 +478,31 @@ export async function loginWithEmail(email, password) {
     throw new Error('Credenciales incompletas');
   }
 
-  const userCredential = await signInWithEmailAndPassword(auth, safeEmail, password);
-
   const methods = await fetchSignInMethodsForEmail(auth, safeEmail);
+  if (!methods || methods.length === 0) {
+    showToast('No existe una cuenta con este email', 'error');
+    return null;
+  }
+
+  if (methods.includes('google.com') && !methods.includes('password')) {
+    showToast('Este correo está registrado con Google. Usa "Continuar con Google".', 'error');
+    return null;
+  }
+
+  let userCredential;
+  try {
+    userCredential = await signInWithEmailAndPassword(auth, safeEmail, password);
+  } catch (error) {
+    let message = 'Error al iniciar sesión';
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+      message = 'Email o contraseña incorrectos';
+    } else if (error.code === 'auth/too-many-requests') {
+      message = 'Demasiados intentos. Intenta más tarde.';
+    }
+    showToast(message, 'error');
+    return null;
+  }
+
   if (methods && methods.includes('google.com')) {
     const providers = userCredential.user.providerData.map(p => p.providerId);
     if (!providers.includes('google.com')) {
