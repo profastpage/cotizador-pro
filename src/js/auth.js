@@ -239,9 +239,45 @@ async function migrateOrphanedData(newUid, orphaned) {
 }
 
 /**
- * Muestra el modal de recuperación con opciones para el usuario.
+ * Muestra el modal de recuperación con opciones mejoradas.
+ * Ahora ofrece: reset de contraseña, login con Google, o crear cuenta nueva.
  */
-function showAccountRecoveryModal(email) {
+async function showAccountRecoveryModal(email, reason = 'no_methods') {
+  // First, check what methods exist for this email
+  let existingMethods = [];
+  try {
+    existingMethods = await fetchSignInMethodsForEmail(auth, email) || [];
+  } catch (e) {
+    console.warn('[Recovery] Could not check methods:', e);
+  }
+
+  const hasPassword = existingMethods.includes('password');
+  const hasGoogle = existingMethods.includes('google.com');
+  const accountExists = existingMethods.length > 0;
+
+  let warningMsg = '';
+  let warningBg = '#fef3c7';
+  let warningBorder = '#fbbf24';
+  let warningColor = '#92400e';
+
+  if (reason === 'wrong_password' && hasPassword) {
+    warningMsg = `🔒 La cuenta <strong>${email}</strong> existe pero la contraseña es incorrecta.<br><small>Puedes restablecer tu contraseña por email.</small>`;
+    warningBg = '#fee2e2';
+    warningBorder = '#fca5a5';
+    warningColor = '#991b1b';
+  } else if (reason === 'no_methods' && accountExists) {
+    if (hasGoogle && !hasPassword) {
+      warningMsg = `🔑 La cuenta <strong>${email}</strong> está registrada con Google.<br><small>Usa el botón "Continuar con Google" para ingresar.</small>`;
+      warningBg = '#dbeafe';
+      warningBorder = '#93c5fd';
+      warningColor = '#1e40af';
+    } else {
+      warningMsg = `⚠️ No se pudo iniciar sesión con <strong>${email}</strong>.<br><small>Intenta restablecer tu contraseña o ingresa con otro método.</small>`;
+    }
+  } else {
+    warningMsg = `⚠️ No encontramos una cuenta activa para <strong>${email}</strong>.<br><small>Es posible que la cuenta haya sido eliminada o necesite ser creada nuevamente.</small>`;
+  }
+
   const modal = document.createElement('div');
   modal.className = 'modal';
   modal.style.zIndex = '10000';
@@ -253,20 +289,28 @@ function showAccountRecoveryModal(email) {
         <button class="modal-close" onclick="this.closest('.modal').remove()">✕</button>
       </div>
       <div class="modal-body" style="text-align:left;">
-        <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:12px;padding:16px;margin-bottom:20px;">
-          <p style="margin:0;color:#92400e;font-weight:500;">⚠️ No encontramos una cuenta activa para <strong>${email}</strong>.</p>
-          <p style="margin:8px 0 0;color:#92400e;font-size:0.875rem;">Es posible que la cuenta haya sido eliminada o necesite ser creada nuevamente.</p>
+        <div style="background:${warningBg};border:1px solid ${warningBorder};border-radius:12px;padding:16px;margin-bottom:20px;">
+          <p style="margin:0;color:${warningColor};font-weight:500;">${warningMsg}</p>
         </div>
         <div style="display:flex;flex-direction:column;gap:12px;">
-          <button id="btn-recover-register" class="btn btn-primary btn-block" style="padding:14px;">
+          ${accountExists ? `
+            <button id="btn-recover-reset" class="btn btn-primary btn-block" style="padding:14px;">
+              🔑 Restablecer Contraseña
+              <small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Enviar email de recuperación a ${email}</small>
+            </button>
+          ` : ''}
+          ${hasGoogle ? `
+            <button id="btn-recover-google" class="btn btn-google btn-block" style="padding:14px;">
+              <svg viewBox="0 0 24 24" style="width:20px;height:20px;margin-right:8px;vertical-align:middle;"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+              Continuar con Google
+              <small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Tu cuenta está vinculada con Google</small>
+            </button>
+          ` : ''}
+          <button id="btn-recover-register" class="btn btn-outline btn-block" style="padding:14px;">
             🆕 Crear cuenta nueva con este email
-            <small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Se migrarán automáticamente los datos anteriores si existen</small>
+            <small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Se migrarán datos anteriores si existen</small>
           </button>
-          <button id="btn-recover-google" class="btn btn-google btn-block" style="padding:14px;">
-            <svg viewBox="0 0 24 24" style="width:20px;height:20px;margin-right:8px;vertical-align:middle;"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-            Registrarse con Google
-          </button>
-          <button class="btn btn-outline btn-block" onclick="this.closest('.modal').remove()" style="padding:12px;">
+          <button class="btn btn-outline btn-block" onclick="this.closest('.modal').remove()" style="padding:12px;color:var(--color-gray-500);">
             Cancelar
           </button>
         </div>
@@ -276,7 +320,30 @@ function showAccountRecoveryModal(email) {
 
   document.body.appendChild(modal);
 
-  // Pre-fill register form with email
+  // Password reset
+  const resetBtn = modal.querySelector('#btn-recover-reset');
+  if (resetBtn) {
+    resetBtn.onclick = async () => {
+      resetBtn.disabled = true;
+      resetBtn.textContent = 'Enviando...';
+      try {
+        await sendPasswordResetEmail(auth, email);
+        showToast('✅ Email de recuperación enviado. Revisa tu bandeja de entrada.', 'success');
+        modal.remove();
+      } catch (error) {
+        console.error('Reset error:', error);
+        if (error.code === 'auth/user-not-found') {
+          showToast('No hay cuenta Firebase para este email. Prueba crear cuenta nueva.', 'error');
+        } else {
+          showToast('Error al enviar email: ' + error.message, 'error');
+        }
+        resetBtn.disabled = false;
+        resetBtn.innerHTML = '🔑 Restablecer Contraseña<small style="display:block;font-weight:400;opacity:0.85;margin-top:4px;">Reintentar</small>';
+      }
+    };
+  }
+
+  // Register new account
   modal.querySelector('#btn-recover-register').onclick = () => {
     modal.remove();
     document.getElementById('register-email').value = email;
@@ -285,10 +352,14 @@ function showAccountRecoveryModal(email) {
     showRegister();
   };
 
-  modal.querySelector('#btn-recover-google').onclick = () => {
-    modal.remove();
-    signInWithGoogle();
-  };
+  // Google sign in
+  const googleBtn = modal.querySelector('#btn-recover-google');
+  if (googleBtn) {
+    googleBtn.onclick = () => {
+      modal.remove();
+      signInWithGoogle();
+    };
+  }
 
   modal.querySelector('.modal-backdrop').onclick = () => modal.remove();
 }
@@ -770,14 +841,8 @@ export async function loginWithEmail(email, password) {
   }
 
   const methods = await fetchSignInMethodsForEmail(auth, safeEmail);
-  if (!methods || methods.length === 0) {
-    // ✅ MEJORA: En lugar de solo mostrar error, ofrecer recuperar cuenta
-    console.log('[Auth] No auth methods found for:', safeEmail);
-    showAccountRecoveryModal(safeEmail);
-    return null;
-  }
 
-  if (methods.includes('google.com') && !methods.includes('password')) {
+  if (methods && methods.includes('google.com') && !methods.includes('password')) {
     showToast('Este correo está registrado con Google. Usa "Continuar con Google".', 'error');
     return null;
   }
@@ -786,17 +851,40 @@ export async function loginWithEmail(email, password) {
   try {
     userCredential = await signInWithEmailAndPassword(auth, safeEmail, password);
   } catch (error) {
-    let message = 'Error al iniciar sesión';
-    if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
-      message = 'Email o contraseña incorrectos';
-    } else if (error.code === 'auth/too-many-requests') {
-      message = 'Demasiados intentos. Intenta más tarde.';
-    } else if (error.code === 'auth/user-not-found') {
-      // ✅ MEJORA: Ofrecer recuperación cuando el usuario no existe
-      showAccountRecoveryModal(safeEmail);
+    console.error('[Auth] Login error:', error.code, error.message);
+
+    // Firebase v10+ merged user-not-found and wrong-password into invalid-credential
+    if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+      // Re-check methods to determine the real cause
+      const recheckMethods = await fetchSignInMethodsForEmail(auth, safeEmail).catch(() => []);
+
+      if (recheckMethods && recheckMethods.length > 0) {
+        // Account EXISTS in Firebase Auth → password is wrong
+        if (recheckMethods.includes('password')) {
+          showAccountRecoveryModal(safeEmail, 'wrong_password');
+        } else if (recheckMethods.includes('google.com')) {
+          showAccountRecoveryModal(safeEmail, 'google_only');
+        } else {
+          showAccountRecoveryModal(safeEmail, 'wrong_password');
+        }
+      } else {
+        // Account truly doesn't exist → offer full recovery
+        showAccountRecoveryModal(safeEmail, 'no_methods');
+      }
       return null;
     }
-    showToast(message, 'error');
+
+    if (error.code === 'auth/too-many-requests') {
+      showToast('Demasiados intentos. Espera unos minutos o restablece tu contraseña.', 'error');
+      return null;
+    }
+
+    if (error.code === 'auth/user-disabled') {
+      showToast('Esta cuenta ha sido deshabilitada. Contacta al administrador.', 'error');
+      return null;
+    }
+
+    showToast('Error al iniciar sesión: ' + error.message, 'error');
     return null;
   }
 
