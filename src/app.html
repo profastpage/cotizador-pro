@@ -240,14 +240,6 @@
 <body>
   <div id="toast-container" class="toast-container"></div>
 
-  <!-- Plan Limit Banner -->
-  <div id="plan-banner" class="plan-banner hidden">
-    <div class="container">
-      <span id="plan-banner-text"></span>
-      <button onclick="showUpgradeModal()" class="btn btn-sm btn-primary">Mejorar Plan</button>
-    </div>
-  </div>
-
   <!-- Sidebar (Desktop) -->
   <aside class="sidebar">
     <div class="sidebar-header">
@@ -334,12 +326,13 @@
               <h3 class="stat-value" id="stat-total-amount">S/ 0.00</h3>
             </div>
           </div>
-          <div class="stat-card">
+          <div class="stat-card" style="position:relative;">
             <div class="stat-icon">📊</div>
             <div class="stat-info">
               <p class="stat-label">Cotizaciones restantes</p>
               <h3 class="stat-value" id="stat-remaining-quotes">0</h3>
             </div>
+            <button onclick="showUpgradeModal()" class="btn btn-sm btn-upgrade-inline" title="Mejorar Plan">⚡</button>
           </div>
           <div class="stat-card">
             <div class="stat-icon">⏰</div>
@@ -608,7 +601,28 @@
             <span style="font-size:0.75rem;color:var(--color-text-muted);">Cotizaciones restantes este mes</span>
             <div id="plan-remaining-count" style="font-size:1.75rem;font-weight:800;color:var(--color-primary);">3</div>
           </div>
-          <button onclick="showUpgradeModal()" class="btn btn-primary">Mejorar Plan</button>
+          <button onclick="showUpgradeModal()" class="btn btn-primary btn-block">⚡ Mejorar Plan</button>
+        </div>
+
+        <!-- Configuración de Cláusulas del PDF -->
+        <h3 class="section-title mt-6">Cláusulas del PDF</h3>
+        <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem;">Estas cláusulas se incluirán automáticamente en cada cotización generada.</p>
+        <div class="plan-card-user">
+          <div class="form-group">
+            <label class="form-label">💰 Condiciones de Pago</label>
+            <input type="text" id="clause-payment" class="form-input" placeholder="Ej: Contado">
+          </div>
+          <div class="form-group">
+            <label class="form-label">📋 Términos y Condiciones (una por línea)</label>
+            <textarea id="clause-terms" class="form-input" rows="6" placeholder="Ej: Esta cotización tiene una validez de 30 días calendario.
+Los precios están expresados en Soles (PEN) e incluyen IGV.
+...">Esta cotización tiene una validez de 30 días calendario.
+Los precios están expresados en Soles (PEN) e incluyen IGV.
+La forma de pago y plazos están detallados en la sección de condiciones de pago.
+Esta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.
+Para consultas, comuníquese a los datos de contacto indicados en el encabezado.</textarea>
+          </div>
+          <button id="btn-save-clauses" class="btn btn-primary btn-block">💾 Guardar Cláusulas</button>
         </div>
 
         <!-- PWA Install Button -->
@@ -656,28 +670,32 @@
     <div class="modal-backdrop" data-close-modal></div>
     <div class="modal-dialog">
       <div class="modal-header">
-        <h2 class="modal-title">Mejorar Plan</h2>
+        <h2 class="modal-title">⚡ Mejorar Plan</h2>
         <button class="modal-close" data-close-modal>✕</button>
       </div>
       <div class="modal-body">
         <div class="upgrade-plans">
           <div class="upgrade-plan-card" onclick="selectPlan('basic')">
-            <h4>📋 Básico</h4>
+            <h4>📋 Plan Básico</h4>
             <p class="upgrade-price">S/ 35/mes</p>
-            <p class="upgrade-desc">60 cotizaciones • 50 clientes</p>
+            <p class="upgrade-desc">60 cotizaciones/mes • 1 empresa • Tipos de documento básicos</p>
+            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
           </div>
           <div class="upgrade-plan-card featured" onclick="selectPlan('business')">
-            <h4>💼 Business</h4>
+            <div style="position:absolute;top:-1px;right:12px;background:var(--color-primary);color:white;font-size:0.65rem;padding:2px 8px;border-radius:0 0 6px 6px;font-weight:700;">POPULAR</div>
+            <h4>💼 Plan Business</h4>
             <p class="upgrade-price">S/ 59/mes</p>
-            <p class="upgrade-desc">200 cotizaciones • 200 clientes</p>
+            <p class="upgrade-desc">200 cotizaciones/mes • 3 empresas • Todos los tipos de documento • Soporte prioritario</p>
+            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
           </div>
           <div class="upgrade-plan-card" onclick="selectPlan('pro')">
-            <h4>🚀 Pro</h4>
+            <h4>🚀 Plan Pro</h4>
             <p class="upgrade-price">S/ 99/mes</p>
-            <p class="upgrade-desc">Ilimitado • Todo incluido</p>
+            <p class="upgrade-desc">Cotizaciones ilimitadas • 5 empresas • Todos los tipos de documento • Soporte dedicado • Personalización</p>
+            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
           </div>
         </div>
-        <p class="upgrade-note">💬 Contacta al administrador para activar tu plan</p>
+        <p class="upgrade-note">💬 Al seleccionar un plan serás redirigido a WhatsApp para coordinar la activación.</p>
       </div>
     </div>
   </div>
@@ -856,9 +874,6 @@
     /* Search */
     .search-bar { background-color: var(--bg-secondary); }
     .section-header { border-bottom-color: var(--border-color); }
-
-    /* Plan Banner */
-    .plan-banner { background-color: var(--bg-tertiary); border-bottom-color: var(--border-color); color: var(--text-primary); }
 
     /* Upgrade */
     .sidebar-plan-upgrade { background-color: rgba(59, 130, 246, 0.1); border-color: var(--border-color); }

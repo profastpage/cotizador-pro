@@ -93,16 +93,6 @@ function initUI() {
     planRemainingCount.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
   }
 
-  // Show plan banner for ALL plans with remaining count
-  if (userData.plan === 'free') {
-    document.getElementById('plan-banner').classList.remove('hidden');
-    if (remaining > 0) {
-      document.getElementById('plan-banner-text').textContent = `Te quedan ${remaining} cotización${remaining !== 1 ? 'es' : ''} gratis este mes`;
-    } else {
-      document.getElementById('plan-banner-text').textContent = `¡Agotaste tus ${quota} cotizaciones gratis este mes!`;
-    }
-  }
-
   const today = new Date();
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 7);
@@ -811,6 +801,47 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.text('TOTAL:', 120, tableY);
   pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
 
+  // ==========================================
+  // CLAUSES - Condiciones de Pago + Términos
+  // ==========================================
+  let clauseY = tableY + 15;
+
+  const clausePayment = company.clausePayment || 'Contado';
+  const clauseTerms = company.clauseTerms || '';
+
+  if (clausePayment || clauseTerms) {
+    // CONDICIONES DE PAGO
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, clauseY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text('CONDICIONES DE PAGO', 25, clauseY + 5.5);
+    clauseY += 12;
+
+    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...DARK);
+    pdf.text(clausePayment || 'Contado', 25, clauseY);
+    clauseY += 8;
+
+    // TÉRMINOS Y CONDICIONES
+    if (clauseTerms) {
+      pdf.setFillColor(...BLUE);
+      pdf.roundedRect(20, clauseY, 170, 8, 2, 2, 'F');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('TÉRMINOS Y CONDICIONES', 25, clauseY + 5.5);
+      clauseY += 12;
+
+      pdf.setFontSize(7.5); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      const terms = clauseTerms.split('\n').filter(t => t.trim());
+      terms.forEach(term => {
+        if (clauseY > 268) return; // Don't overflow
+        const bulletText = `• ${term.trim()}`;
+        const splitBullet = pdf.splitTextToSize(bulletText, 160);
+        pdf.text(splitBullet, 25, clauseY);
+        clauseY += splitBullet.length * 4;
+      });
+      clauseY += 4;
+    }
+  }
+
   // Footer
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
   pdf.line(20, 278, 190, 278);
@@ -951,6 +982,9 @@ function loadSettings() {
       document.getElementById('company-address').value = data.address || '';
       document.getElementById('company-phone').value = data.phone || '';
       document.getElementById('company-email').value = data.email || '';
+      // Load clauses
+      document.getElementById('clause-payment').value = data.clausePayment || 'Contado';
+      document.getElementById('clause-terms').value = data.clauseTerms || 'Esta cotización tiene una validez de 30 días calendario.\nLos precios están expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos están detallados en la sección de condiciones de pago.\nEsta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuníquese a los datos de contacto indicados en el encabezado.';
     }
   });
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
@@ -983,6 +1017,26 @@ function setupForms() {
       }
       await setDoc(doc(db, 'companies', currentUser.uid), company, { merge: true });
       showToast('Datos guardados');
+    });
+  }
+
+  // Save Clauses Form
+  const btnSaveClauses = document.getElementById('btn-save-clauses');
+  if (btnSaveClauses) {
+    btnSaveClauses.addEventListener('click', async () => {
+      const clausePayment = document.getElementById('clause-payment').value.trim();
+      const clauseTerms = document.getElementById('clause-terms').value.trim();
+      if (!clauseTerms) {
+        showToast('Ingresa al menos un término o condición', 'error');
+        return;
+      }
+      await setDoc(doc(db, 'companies', currentUser.uid), {
+        clausePayment,
+        clauseTerms,
+        userId: currentUser.uid,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      showToast('Cláusulas guardadas correctamente');
     });
   }
 }
@@ -1073,17 +1127,6 @@ function updateRemainingQuotes() {
   if (planRemainingCount) {
     planRemainingCount.textContent = remaining === -1 ? '∞' : remaining;
     planRemainingCount.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
-  }
-  // Actualizar banner
-  if (userData.plan === 'free') {
-    const bannerText = document.getElementById('plan-banner-text');
-    if (bannerText) {
-      if (remaining > 0) {
-        bannerText.textContent = `Te quedan ${remaining} cotización${remaining !== 1 ? 'es' : ''} gratis este mes`;
-      } else {
-        bannerText.textContent = `¡Agotaste tus ${quota} cotizaciones gratis este mes!`;
-      }
-    }
   }
 }
 
@@ -1196,8 +1239,67 @@ window.showUpgradeModal = function() {
   document.getElementById('modal-upgrade').classList.remove('hidden');
 };
 
+// Plan data with full benefits for WhatsApp message
+const PLAN_WHATSAPP_DATA = {
+  basic: {
+    name: 'Plan Básico',
+    price: 'S/ 35/mes',
+    benefits: [
+      '60 cotizaciones por mes',
+      '1 empresa registrada',
+      'Tipos de documento básicos (Cotización)',
+      'Clientes guardados automáticamente',
+      'Soporte por WhatsApp'
+    ]
+  },
+  business: {
+    name: 'Plan Business',
+    price: 'S/ 59/mes',
+    benefits: [
+      '200 cotizaciones por mes',
+      '3 empresas registradas',
+      'Todos los tipos de documento (Cotización, Factura, Boleta, Nota de Venta)',
+      'Soporte prioritario',
+      'Clientes guardados automáticamente',
+      'Descarga de PDF profesional'
+    ]
+  },
+  pro: {
+    name: 'Plan Pro',
+    price: 'S/ 99/mes',
+    benefits: [
+      'Cotizaciones ilimitadas',
+      '5 empresas registradas',
+      'Todos los tipos de documento',
+      'Soporte dedicado',
+      'Personalización de cláusulas y documentos',
+      'Clientes ilimitados',
+      'Descarga de PDF profesional',
+      'Acceso anticipado a nuevas funciones'
+    ]
+  }
+};
+
 window.selectPlan = function(plan) {
-  showToast(`Plan ${getPlanName(plan)} seleccionado. Contacta al admin.`, 'success');
+  const planData = PLAN_WHATSAPP_DATA[plan];
+  if (!planData) return;
+
+  const userEmail = currentUser?.email || 'mi correo';
+  const userName = userData?.name || 'Usuario';
+
+  const benefitsText = planData.benefits.map(b => `• ${b}`).join('\n');
+  const message = encodeURIComponent(
+    `¡Hola! Me interesa activar el *${planData.name}* (${planData.price}) en CotizaPro.\n\n` +
+    `📌 Beneficios del plan:\n${benefitsText}\n\n` +
+    `👤 Mi nombre: ${userName}\n` +
+    `📧 Mi email: ${userEmail}\n\n` +
+    `Por favor confirmen la disponibilidad y los pasos para la activación. ¡Gracias!`
+  );
+
+  const whatsappUrl = `https://wa.me/51933667414?text=${message}`;
+  window.open(whatsappUrl, '_blank');
+
+  showToast(`Redirigiendo a WhatsApp para activar ${planData.name}...`, 'success');
   document.getElementById('modal-upgrade').classList.add('hidden');
 };
 
