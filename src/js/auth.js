@@ -528,11 +528,17 @@ async function processUser(user) {
     showToast('Error: ' + error.message, 'error');
     userProcessed = false;
   }
+  // Auto-reset after 10 seconds to prevent getting stuck
+  setTimeout(() => { userProcessed = false; }, 10000);
 }
 
 // ==========================================================
 // INITIALIZE - Listen for auth state changes
 // ==========================================================
+
+// Reset all locks on page load to prevent stale state
+sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+sessionStorage.removeItem(LOGOUT_FLAG_KEY);
 
 onAuthStateChanged(auth, (user) => {
   if (!isLoginPagePath() || isLoggingOut) return;
@@ -736,12 +742,13 @@ function isLoginPagePath() {
   return path.includes('index.html') || path === '/' || path === '';
 }
 
-function redirectOnce(targetPath) {
+function redirectOnce(targetPath, force = false) {
   const normalizedTarget = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
   if (window.location.pathname.endsWith(normalizedTarget)) return;
-  if (sessionStorage.getItem(REDIRECT_LOCK_KEY) === '1') return;
+  if (!force && sessionStorage.getItem(REDIRECT_LOCK_KEY) === '1') return;
   sessionStorage.setItem(REDIRECT_LOCK_KEY, '1');
-  window.location.replace(normalizedTarget);
+  console.log('[Redirect]', normalizedTarget, force ? '(forced)' : '');
+ window.location.replace(normalizedTarget);
 }
 
 export function protectRoute(requiredAuth = true) {
@@ -767,6 +774,11 @@ export function protectRoute(requiredAuth = true) {
 
   const unsubscribe = onAuthStateChanged(auth, (user) => {
     console.log('👤 Auth state changed:', user?.email || 'No user');
+
+    // Reset redirect lock on auth state change (allows fresh redirects)
+    if (!isLoggingOut) {
+      sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+    }
 
     if (requiredAuth && !user) {
       if (!isLoginPage && !window.location.href.includes('index.html')) {
@@ -806,29 +818,37 @@ export async function logout() {
 
   try {
     isLoggingOut = true;
-    sessionStorage.setItem(LOGOUT_FLAG_KEY, '1');
     console.log('🚪 Starting logout...');
 
+    // Clear ALL state FIRST before signOut
     clearSession();
+    userProcessed = false;
+    isInitialized = false;
+    authCheckInProgress = false;
+    sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+    sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+    localStorage.removeItem('redirectAfterLogin');
+
     await signOut(auth);
 
     console.log('✅ Logout successful');
     showToast('Sesión cerrada correctamente', 'info');
 
-    await new Promise(resolve => setTimeout(resolve, 300));
-    redirectOnce('/index.html');
+    // Force redirect to login (bypass lock since we just cleared it)
+    redirectOnce('/index.html', true);
 
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
     clearSession();
-    redirectOnce('/index.html');
+    userProcessed = false;
+    isInitialized = false;
+    sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+    sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+    redirectOnce('/index.html', true);
 
   } finally {
-    setTimeout(() => {
-      isLoggingOut = false;
-      sessionStorage.removeItem(LOGOUT_FLAG_KEY);
-      sessionStorage.removeItem(REDIRECT_LOCK_KEY);
-    }, 1200);
+    // Immediately reset flags (no setTimeout race condition)
+    isLoggingOut = false;
   }
 }
 window.logout = logout;
