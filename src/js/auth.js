@@ -148,7 +148,7 @@ async function processUser(user) {
       showToast('¡Bienvenido! Cuenta creada exitosamente.');
       // Auto-redirect to app after successful registration
       setTimeout(() => {
-        window.location.href = isSuperAdmin ? 'superadmin.html' : 'app.html';
+        redirectOnce(isSuperAdmin ? '/superadmin.html' : '/app.html');
       }, 800);
     } else {
       // EXISTING user - redirect based on role
@@ -156,12 +156,12 @@ async function processUser(user) {
       console.log('🔄 Existing user, role:', userData.role);
       
       if (userData.role === 'superadmin') {
-        window.location.href = 'superadmin.html';
+        redirectOnce('/superadmin.html');
       } else if (!userData.isActive) {
         showToast('Tu cuenta está desactivada. Contacta al administrador.', 'error');
         signOut(auth);
       } else {
-        window.location.href = 'app.html';
+        redirectOnce('/app.html');
       }
     }
   } catch (error) {
@@ -176,6 +176,7 @@ async function processUser(user) {
 // ==========================================================
 
 onAuthStateChanged(auth, (user) => {
+  if (!isLoginPagePath() || isLoggingOut) return;
   if (user && !userProcessed) {
     processUser(user);
   }
@@ -372,6 +373,20 @@ let authCheckInProgress = false;
 let isLoggingOut = false;
 let isInitialized = false;
 const LOGOUT_FLAG_KEY = 'cotizapro_is_logging_out';
+const REDIRECT_LOCK_KEY = 'cotizapro_redirect_lock';
+
+function isLoginPagePath() {
+  const path = window.location.pathname;
+  return path.includes('index.html') || path === '/' || path === '';
+}
+
+function redirectOnce(targetPath) {
+  const normalizedTarget = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
+  if (window.location.pathname.endsWith(normalizedTarget)) return;
+  if (sessionStorage.getItem(REDIRECT_LOCK_KEY) === '1') return;
+  sessionStorage.setItem(REDIRECT_LOCK_KEY, '1');
+  window.location.replace(normalizedTarget);
+}
 
 export function protectRoute(requiredAuth = true) {
   if (authCheckInProgress) {
@@ -385,6 +400,9 @@ export function protectRoute(requiredAuth = true) {
   const isLoginPage = path.includes('index.html') || path === '/' || path === '';
   
   console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
+  if (!isLoginPage) {
+    sessionStorage.removeItem(REDIRECT_LOCK_KEY);
+  }
   
   if (isLoggingOut || sessionStorage.getItem(LOGOUT_FLAG_KEY) === '1') {
     authCheckInProgress = false;
@@ -398,13 +416,13 @@ export function protectRoute(requiredAuth = true) {
       if (!isLoginPage && !window.location.href.includes('index.html')) {
         console.log('🔐 No auth, redirecting to login...');
         localStorage.setItem('redirectAfterLogin', window.location.href);
-        window.location.replace('/index.html');
+        redirectOnce('/index.html');
       }
     } else if (user && isLoginPage) {
       console.log('✅ Already logged in, redirecting to dashboard...');
       const redirect = localStorage.getItem('redirectAfterLogin') || '/app.html';
       localStorage.removeItem('redirectAfterLogin');
-      window.location.replace(redirect);
+      redirectOnce(redirect);
     } else if (user) {
       updateUI(user);
       saveSession(user);
@@ -448,19 +466,20 @@ export async function logout() {
     await new Promise(resolve => setTimeout(resolve, 300));
     
     // Redirect to login
-    window.location.replace('/index.html');
+    redirectOnce('/index.html');
     
   } catch (error) {
     console.error('❌ Error al cerrar sesión:', error);
     
     // Force logout even on error
     clearSession();
-    window.location.replace('/index.html');
+    redirectOnce('/index.html');
     
   } finally {
     setTimeout(() => {
       isLoggingOut = false;
       sessionStorage.removeItem(LOGOUT_FLAG_KEY);
+      sessionStorage.removeItem(REDIRECT_LOCK_KEY);
     }, 1200);
   }
 }
