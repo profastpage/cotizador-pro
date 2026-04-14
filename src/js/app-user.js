@@ -80,21 +80,8 @@ function initUI() {
     document.getElementById('stat-plan-expires').textContent = 'Gratis';
   }
 
-  // Mostrar cotizaciones restantes reales en Dashboard
-  const quota = getPlanQuota(userData.plan);
-  const used = userData.quotesUsedThisMonth || 0;
-  const remaining = quota === -1 ? -1 : quota - used;
-  const remainingEl = document.getElementById('stat-remaining-quotes');
-  if (remainingEl) {
-    remainingEl.textContent = remaining === -1 ? '∞' : remaining;
-    remainingEl.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
-  }
-
-  // Mostrar cotizaciones restantes en Configuración
-  const planRemainingCount = document.getElementById('plan-remaining-count');
-  if (planRemainingCount) {
-    planRemainingCount.textContent = remaining === -1 ? '∞' : remaining;
-    planRemainingCount.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
+  if (userData.plan === 'free') {
+    document.getElementById('sidebar-upgrade-btn').style.display = 'block';
   }
 
   const today = new Date();
@@ -238,6 +225,13 @@ async function loadDashboard() {
   
   document.getElementById('stat-quotes-month').textContent = realQuotes.length;
   document.getElementById('stat-total-amount').textContent = formatCurrency(totalAmount);
+
+  // Update remaining quotes widget
+  const quota = getPlanQuota(userData.plan);
+  const used = userData.quotesUsedThisMonth || 0;
+  const remaining = quota === -1 ? '∞' : Math.max(0, quota - used);
+  const remainingEl = document.getElementById('remaining-quotes-count');
+  if (remainingEl) remainingEl.textContent = remaining;
 
   const recent = quotes.slice(0, 5);
   const container = document.getElementById('dashboard-recent-quotes');
@@ -1363,25 +1357,68 @@ const PLAN_WHATSAPP_DATA = {
 };
 
 window.selectPlan = function(plan) {
-  const planData = PLAN_WHATSAPP_DATA[plan];
-  if (!planData) return;
+  const planDetails = {
+    basic: {
+      name: 'Básico',
+      price: 'S/ 35/mes',
+      features: [
+        '60 cotizaciones al mes',
+        '1 empresa',
+        '50 clientes',
+        'Cotización profesional',
+        'PDF profesional con logo',
+        'Historial ilimitado',
+        '3 cuentas bancarias',
+        'Soporte prioritario'
+      ]
+    },
+    business: {
+      name: 'Business',
+      price: 'S/ 59/mes',
+      features: [
+        '200 documentos al mes',
+        '3 empresas',
+        '200 clientes',
+        '4 tipos de documentos (Cotización, Propuesta, Nota de Venta, Orden de Servicio)',
+        'PDF premium con branding',
+        'Historial ilimitado',
+        '10 cuentas bancarias',
+        'Duplicar documentos',
+        'Exportar/Importar Excel',
+        'Marca personalizada',
+        'Soporte prioritario 24/7'
+      ]
+    },
+    pro: {
+      name: 'Pro',
+      price: 'S/ 99/mes',
+      features: [
+        'Documentos ILIMITADOS',
+        '5 empresas',
+        'Clientes ILIMITADOS',
+        '10 tipos de documentos + personalizados',
+        'PDF enterprise personalizado',
+        'Cuentas bancarias ilimitadas',
+        'Multi-usuario (hasta 5)',
+        'API REST access',
+        'Marca de agua personalizada',
+        'Reportes avanzados',
+        'Soporte VIP 24/7',
+        'Integraciones personalizadas'
+      ]
+    }
+  };
 
-  const userEmail = currentUser?.email || 'mi correo';
-  const userName = userData?.name || 'Usuario';
+  const selected = planDetails[plan];
+  if (!selected) return;
 
-  const benefitsText = planData.benefits.map(b => `• ${b}`).join('\n');
-  const message = encodeURIComponent(
-    `¡Hola! Me interesa activar el *${planData.name}* (${planData.price}) en CotizaPro.\n\n` +
-    `📌 Beneficios del plan:\n${benefitsText}\n\n` +
-    `👤 Mi nombre: ${userName}\n` +
-    `📧 Mi email: ${userEmail}\n\n` +
-    `Por favor confirmen la disponibilidad y los pasos para la activación. ¡Gracias!`
-  );
+  const featuresText = selected.features.map((f, i) => `${i + 1}. ${f}`).join('\n');
+  const message = `¡Hola! Me interesa activar el plan *${selected.name}* de CotizaPro (${selected.price}).\n\n📋 *Beneficios del plan ${selected.name}:*\n${featuresText}\n\nMi correo: ${currentUser?.email || 'No especificado'}\n\n¡Gracias!`;
 
-  const whatsappUrl = `https://wa.me/51933667414?text=${message}`;
+  const encodedMessage = encodeURIComponent(message);
+  const whatsappUrl = `https://wa.me/51933667414?text=${encodedMessage}`;
+
   window.open(whatsappUrl, '_blank');
-
-  showToast(`Redirigiendo a WhatsApp para activar ${planData.name}...`, 'success');
   document.getElementById('modal-upgrade').classList.add('hidden');
 };
 

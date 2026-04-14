@@ -44,12 +44,66 @@ body {
   display: block;
 }
 
-/* Upgrade inline button (next to remaining quotes stat) */
-.btn-upgrade-inline {
-  position: absolute;
-  top: 0.75rem;
-  right: 0.75rem;
-  background: linear-gradient(135deg, var(--color-warning) 0%, #ea580c 100%);
+/* Cotizaciones Restantes Widget */
+.remaining-quotes-widget {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border: 2px solid #bfdbfe;
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+.remaining-quotes-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.remaining-quotes-icon {
+  width: 48px;
+  height: 48px;
+  background: var(--color-primary);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.remaining-quotes-label {
+  font-size: 0.85rem;
+  color: var(--color-gray-500);
+  margin: 0;
+}
+.remaining-quotes-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin: 0;
+  line-height: 1.1;
+}
+.remaining-quotes-upgrade-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Sidebar plan upgrade (Desktop only) */
+.sidebar-plan-upgrade {
+  display: none;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.sidebar-plan-upgrade .upgrade-text {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.6);
+  margin-bottom: 0.5rem;
+}
+.sidebar-plan-upgrade .btn-upgrade {
+  width: 100%;
+  padding: 0.5rem;
+  background: var(--color-warning);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -59,9 +113,32 @@ body {
   transition: all 0.2s;
   box-shadow: 0 2px 6px rgba(234, 88, 12, 0.3);
 }
-.btn-upgrade-inline:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 12px rgba(234, 88, 12, 0.4);
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: var(--topbar-height);
+  }
+  .remaining-quotes-widget {
+    padding: 0.75rem 1rem;
+  }
+  .remaining-quotes-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+  .remaining-quotes-number {
+    font-size: 1.5rem;
+  }
+  .remaining-quotes-upgrade-btn {
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+  
+  /* Remove focus outline from bottom nav */
+  .bottom-nav .nav-item:focus {
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 }
 
 /* Sidebar */
@@ -383,9 +460,41 @@ body {
   transition: all 0.2s;
 }
 .upgrade-plan-card:hover { border-color: var(--color-primary); }
-.upgrade-plan-card.featured { border-color: var(--color-primary); background: #eff6ff; }
+.upgrade-plan-card.featured { border-color: var(--color-primary); background: #eff6ff; position: relative; }
+.featured-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.2rem 0.75rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
 .upgrade-price { font-size: 1.25rem; font-weight: 800; color: var(--color-primary); }
-.upgrade-desc { font-size: 0.875rem; color: var(--color-gray-500); }
+.upgrade-features {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+.upgrade-features li {
+  font-size: 0.78rem;
+  color: var(--color-gray-600);
+  padding: 0.2rem 0;
+  padding-left: 1.25rem;
+  position: relative;
+}
+.upgrade-features li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--color-success);
+  font-weight: 700;
+  font-size: 0.7rem;
+}
 .upgrade-note { text-align: center; color: var(--color-gray-500); font-size: 0.875rem; }
 
 /* Company Warning */
@@ -596,7 +705,6 @@ body {
   .container { padding: 1rem; }
   .stats-grid { grid-template-columns: 1fr; }
   .form-row { grid-template-columns: 1fr; }
-  .btn-upgrade-inline { top: 0.5rem; right: 0.5rem; }
 }
 
 @media (min-width: 769px) {

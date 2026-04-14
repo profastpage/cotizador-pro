@@ -257,7 +257,7 @@
       </div>
       <p class="plan-progress-text"><span id="quotes-used">0</span> / <span id="quotes-limit">3</span> cotizaciones</p>
     </div>
-    <!-- Desktop sidebar upgrade button (hidden on mobile) -->
+    <!-- Upgrade button in sidebar for free plan -->
     <div class="sidebar-plan-upgrade" id="sidebar-upgrade-btn" style="display:none">
       <p class="upgrade-text">Plan Gratis - 3 cotizaciones/mes</p>
       <button class="btn-upgrade" onclick="showUpgradeModal()">⚡ Mejorar Plan</button>
@@ -310,7 +310,19 @@
     <section id="screen-dashboard" class="screen active">
       <div class="container">
         <h2 class="section-title">Hola, <span id="user-name">Usuario</span> 👋</h2>
-        
+
+        <!-- Cotizaciones Restantes Widget -->
+        <div id="remaining-quotes-widget" class="remaining-quotes-widget">
+          <div class="remaining-quotes-info">
+            <div class="remaining-quotes-icon">📊</div>
+            <div class="remaining-quotes-text">
+              <p class="remaining-quotes-label">Cotizaciones restantes</p>
+              <p class="remaining-quotes-number" id="remaining-quotes-count">0</p>
+            </div>
+          </div>
+          <button onclick="showUpgradeModal()" class="btn btn-primary remaining-quotes-upgrade-btn">⚡ Mejorar Plan</button>
+        </div>
+
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-icon">📄</div>
@@ -713,24 +725,57 @@ Para consultas, comuníquese a los datos de contacto indicados en el encabezado.
           <div class="upgrade-plan-card" onclick="selectPlan('basic')">
             <h4>📋 Plan Básico</h4>
             <p class="upgrade-price">S/ 35/mes</p>
-            <p class="upgrade-desc">60 cotizaciones/mes • 1 empresa • Tipos de documento básicos</p>
-            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
+            <ul class="upgrade-features">
+              <li>60 cotizaciones al mes</li>
+              <li>1 empresa</li>
+              <li>50 clientes</li>
+              <li>Cotización profesional</li>
+              <li>PDF profesional con logo</li>
+              <li>Historial ilimitado</li>
+              <li>3 cuentas bancarias</li>
+              <li>Soporte prioritario</li>
+            </ul>
+            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Básico</button>
           </div>
           <div class="upgrade-plan-card featured" onclick="selectPlan('business')">
-            <div style="position:absolute;top:-1px;right:12px;background:var(--color-primary);color:white;font-size:0.65rem;padding:2px 8px;border-radius:0 0 6px 6px;font-weight:700;">POPULAR</div>
-            <h4>💼 Plan Business</h4>
+            <div class="featured-badge">⭐ MÁS POPULAR</div>
+            <h4>💼 Business</h4>
             <p class="upgrade-price">S/ 59/mes</p>
-            <p class="upgrade-desc">200 cotizaciones/mes • 3 empresas • Todos los tipos de documento • Soporte prioritario</p>
-            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
+            <ul class="upgrade-features">
+              <li>200 documentos al mes</li>
+              <li>3 empresas</li>
+              <li>200 clientes</li>
+              <li>4 tipos de documentos</li>
+              <li>PDF premium con branding</li>
+              <li>Historial ilimitado</li>
+              <li>10 cuentas bancarias</li>
+              <li>Duplicar documentos</li>
+              <li>Exportar/Importar Excel</li>
+              <li>Marca personalizada</li>
+              <li>Soporte 24/7</li>
+            </ul>
+            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Business</button>
           </div>
           <div class="upgrade-plan-card" onclick="selectPlan('pro')">
             <h4>🚀 Plan Pro</h4>
             <p class="upgrade-price">S/ 99/mes</p>
-            <p class="upgrade-desc">Cotizaciones ilimitadas • 5 empresas • Todos los tipos de documento • Soporte dedicado • Personalización</p>
-            <button class="btn btn-sm btn-primary" style="margin-top:0.75rem;">Solicitar Plan</button>
+            <ul class="upgrade-features">
+              <li>Documentos ILIMITADOS</li>
+              <li>5 empresas</li>
+              <li>Clientes ILIMITADOS</li>
+              <li>10 tipos de documentos</li>
+              <li>PDF enterprise personalizado</li>
+              <li>Cuentas bancarias ilimitadas</li>
+              <li>Multi-usuario (hasta 5)</li>
+              <li>API REST access</li>
+              <li>Marca de agua personalizada</li>
+              <li>Reportes avanzados</li>
+              <li>Soporte VIP 24/7</li>
+            </ul>
+            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Pro</button>
           </div>
         </div>
-        <p class="upgrade-note">💬 Al seleccionar un plan serás redirigido a WhatsApp para coordinar la activación.</p>
+        <p class="upgrade-note">💬 Al seleccionar un plan serás redirigido a WhatsApp para coordinar la activación</p>
       </div>
     </div>
   </div>
@@ -909,6 +954,16 @@ Para consultas, comuníquese a los datos de contacto indicados en el encabezado.
     /* Search */
     .search-bar { background-color: var(--bg-secondary); }
     .section-header { border-bottom-color: var(--border-color); }
+
+    /* Remaining Quotes Widget */
+    .remaining-quotes-widget { background: linear-gradient(135deg, var(--bg-tertiary) 0%, var(--border-color) 100%); border-color: var(--border-color); }
+    .remaining-quotes-icon { background-color: var(--primary-color); }
+    .remaining-quotes-label { color: var(--text-secondary); }
+    .remaining-quotes-number { color: var(--primary-color); }
+    [data-theme="dark"] .remaining-quotes-widget { background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(59, 130, 246, 0.05) 100%); border-color: rgba(59, 130, 246, 0.3); }
+    [data-theme="dark"] .upgrade-plan-card.featured { background: rgba(59, 130, 246, 0.1); }
+    [data-theme="dark"] .featured-badge { background: var(--primary-color); }
+    [data-theme="dark"] .upgrade-features li { color: var(--text-secondary); }
 
     /* Upgrade */
     .sidebar-plan-upgrade { background-color: rgba(59, 130, 246, 0.1); border-color: var(--border-color); }
