@@ -547,6 +547,41 @@
           <button type="submit" class="btn btn-primary btn-block">💾 Guardar Datos</button>
         </form>
 
+        <!-- Cláusulas de Cotización -->
+        <h3 class="section-title mt-6">Cláusulas de Cotización</h3>
+        <div class="plan-card-user">
+          <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem;">
+            Personaliza las cláusulas que aparecerán en tus cotizaciones PDF.
+          </p>
+          <div class="form-group">
+            <label class="form-label">💳 Condición de Pago</label>
+            <select id="company-payment-condition" class="form-input form-select">
+              <option value="Contado">Contado</option>
+              <option value="Crédito 15 días">Crédito 15 días</option>
+              <option value="Crédito 30 días">Crédito 30 días</option>
+              <option value="Crédito 45 días">Crédito 45 días</option>
+              <option value="Crédito 60 días">Crédito 60 días</option>
+              <option value="50% adelantado, 50% contra entrega">50% adelantado, 50% contra entrega</option>
+              <option value="custom">Personalizado...</option>
+            </select>
+          </div>
+          <div class="form-group" id="custom-payment-group" style="display:none;">
+            <label class="form-label">Condición personalizada</label>
+            <input type="text" id="company-payment-custom" class="form-input" placeholder="Ej: 30% adelantado, 70% a 30 días">
+          </div>
+          <div class="form-group">
+            <label class="form-label">📜 Términos y Condiciones</label>
+            <p style="font-size:0.75rem;color:var(--color-text-muted);margin-bottom:0.5rem;">Escribe una cláusula por línea. Se mostrarán como viñetas en el PDF.</p>
+            <textarea id="company-clauses" class="form-input" rows="6" placeholder="Esta cotización tiene una validez de 30 días calendario.&#10;Los precios están expresados en Soles (PEN) e incluyen IGV.&#10;La forma de pago y plazos están detallados en la sección de condiciones de pago.&#10;Esta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.&#10;Para consultas, comuníquese a los datos de contacto indicados en el encabezado." style="resize:vertical;min-height:120px;"></textarea>
+          </div>
+          <button type="button" id="btn-save-clauses" class="btn btn-primary btn-block" style="margin-top:0.5rem;">
+            💾 Guardar Cláusulas
+          </button>
+          <button type="button" id="btn-reset-clauses" class="btn btn-outline btn-block" style="margin-top:0.5rem;">
+            🔄 Restaurar Valores por Defecto
+          </button>
+        </div>
+
         <!-- Help Toggle -->
         <div class="help-section">
           <button id="btn-help-toggle" class="btn btn-outline btn-block">❓ Ayuda / Guía de Uso</button>

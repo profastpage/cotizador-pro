@@ -9,6 +9,10 @@ let quoteItems = [];
 let currentWizardStep = 1;
 let isGeneratingPDF = false;
 
+// Default clauses for new clients
+const DEFAULT_PAYMENT_CONDITION = 'Contado';
+const DEFAULT_CLAUSES = `Esta cotización tiene una validez de 30 días calendario.\nLos precios están expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos están detallados en la sección de condiciones de pago.\nEsta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuníquese a los datos de contacto indicados en el encabezado.`;
+
 // ==========================================================
 // AUTH CHECK - NO redirects to avoid loops
 // ==========================================================
@@ -802,53 +806,70 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
 
   // ==========================================
-  // CLAUSES - Condiciones de Pago + Términos
+  // CLAUSES SECTION - Payment + Terms
   // ==========================================
-  let clauseY = tableY + 15;
+  let clausesY = tableY + 10;
+  const paymentCondition = company.paymentCondition || DEFAULT_PAYMENT_CONDITION;
+  const clausesText = company.clauses || DEFAULT_CLAUSES;
+  const clauseLines = clausesText.split('\n').filter(line => line.trim() !== '');
 
-  const clausePayment = company.clausePayment || 'Contado';
-  const clauseTerms = company.clauseTerms || '';
+  // Calculate space needed: payment header (10) + payment text (6) + spacing (4) + terms header (10) + clauses (5.5 each) + spacing (6)
+  const spaceNeeded = 10 + 6 + 4 + 10 + (clauseLines.length * 5.5) + 6;
+  const footerStart = 275;
 
-  if (clausePayment || clauseTerms) {
-    // CONDICIONES DE PAGO
-    pdf.setFillColor(...BLUE);
-    pdf.roundedRect(20, clauseY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-    pdf.text('CONDICIONES DE PAGO', 25, clauseY + 5.5);
-    clauseY += 12;
+  // Check if we need a new page
+  if (clausesY + spaceNeeded > footerStart) {
+    pdf.addPage();
+    clausesY = 20;
+  }
 
-    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...DARK);
-    pdf.text(clausePayment || 'Contado', 25, clauseY);
-    clauseY += 8;
+  // Payment Conditions Header
+  pdf.setFillColor(...BLUE);
+  pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+  pdf.text('CONDICIONES DE PAGO', 25, clausesY + 5.5);
+  clausesY += 12;
 
-    // TÉRMINOS Y CONDICIONES
-    if (clauseTerms) {
-      pdf.setFillColor(...BLUE);
-      pdf.roundedRect(20, clauseY, 170, 8, 2, 2, 'F');
-      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-      pdf.text('TÉRMINOS Y CONDICIONES', 25, clauseY + 5.5);
-      clauseY += 12;
+  // Payment condition text
+  pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+ pdf.text(paymentCondition, 25, clausesY);
+  clausesY += 8;
 
-      pdf.setFontSize(7.5); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-      const terms = clauseTerms.split('\n').filter(t => t.trim());
-      terms.forEach(term => {
-        if (clauseY > 268) return; // Don't overflow
-        const bulletText = `• ${term.trim()}`;
-        const splitBullet = pdf.splitTextToSize(bulletText, 160);
-        pdf.text(splitBullet, 25, clauseY);
-        clauseY += splitBullet.length * 4;
-      });
-      clauseY += 4;
+  // Terms and Conditions Header
+  pdf.setFillColor(...BLUE);
+  pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+  pdf.text('TÉRMINOS Y CONDICIONES', 25, clausesY + 5.5);
+  clausesY += 11;
+
+  // Clause bullets
+  pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+  const LIGHT_BLUE_BG = [240, 244, 255];
+  for (let cIdx = 0; cIdx < clauseLines.length; cIdx++) {
+    const clause = clauseLines[cIdx].trim();
+    // Bullet background
+    if (cIdx % 2 === 0) {
+      pdf.setFillColor(...LIGHT_BLUE_BG);
+      pdf.roundedRect(20, clausesY - 3.5, 170, 6, 1, 1, 'F');
     }
+    pdf.setTextColor(...BLUE);
+    pdf.setFontSize(8);
+    pdf.text('•', 25, clausesY);
+    pdf.setTextColor(...DARK);
+    // Split long clauses across lines
+    const splitClause = pdf.splitTextToSize(clause, 140);
+    pdf.text(splitClause[0] || clause, 30, clausesY);
+    clausesY += 5.5;
   }
 
   // Footer
+  const finalFooterY = Math.max(clausesY + 6, 275);
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
-  pdf.line(20, 278, 190, 278);
+  pdf.line(20, finalFooterY, 190, finalFooterY);
   pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-  pdf.text(docTypeInfo.footerText, 105, 286, { align: 'center' });
+  pdf.text(docTypeInfo.footerText, 105, finalFooterY + 7, { align: 'center' });
   pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 292, { align: 'center' });
+  pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, finalFooterY + 13, { align: 'center' });
 
   return { pdf, docTypeInfo };
 }
@@ -982,9 +1003,33 @@ function loadSettings() {
       document.getElementById('company-address').value = data.address || '';
       document.getElementById('company-phone').value = data.phone || '';
       document.getElementById('company-email').value = data.email || '';
-      // Load clauses
-      document.getElementById('clause-payment').value = data.clausePayment || 'Contado';
-      document.getElementById('clause-terms').value = data.clauseTerms || 'Esta cotización tiene una validez de 30 días calendario.\nLos precios están expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos están detallados en la sección de condiciones de pago.\nEsta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuníquese a los datos de contacto indicados en el encabezado.';
+      // Load clauses settings
+      const paymentCond = data.paymentCondition || DEFAULT_PAYMENT_CONDITION;
+      const clausesText = data.clauses || DEFAULT_CLAUSES;
+      const paySelect = document.getElementById('company-payment-condition');
+      const customGroup = document.getElementById('custom-payment-group');
+      const customInput = document.getElementById('company-payment-custom');
+      if (paySelect) {
+        // Check if value matches any option
+        let found = false;
+        for (let opt of paySelect.options) {
+          if (opt.value === paymentCond) { found = true; break; }
+        }
+        if (found) {
+          paySelect.value = paymentCond;
+          if (customGroup) customGroup.style.display = 'none';
+        } else {
+          paySelect.value = 'custom';
+          if (customGroup) customGroup.style.display = 'block';
+          if (customInput) customInput.value = paymentCond;
+        }
+      }
+      const clausesTA = document.getElementById('company-clauses');
+      if (clausesTA) clausesTA.value = clausesText;
+    } else {
+      // New user - set defaults
+      const clausesTA = document.getElementById('company-clauses');
+      if (clausesTA) clausesTA.value = DEFAULT_CLAUSES;
     }
   });
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
@@ -1020,23 +1065,60 @@ function setupForms() {
     });
   }
 
-  // Save Clauses Form
+  // Payment condition select - show/hide custom input
+  const paySelect = document.getElementById('company-payment-condition');
+  const customGroup = document.getElementById('custom-payment-group');
+  if (paySelect) {
+    paySelect.addEventListener('change', () => {
+      if (paySelect.value === 'custom') {
+        customGroup.style.display = 'block';
+      } else {
+        customGroup.style.display = 'none';
+      }
+    });
+  }
+
+  // Save clauses button
   const btnSaveClauses = document.getElementById('btn-save-clauses');
   if (btnSaveClauses) {
     btnSaveClauses.addEventListener('click', async () => {
-      const clausePayment = document.getElementById('clause-payment').value.trim();
-      const clauseTerms = document.getElementById('clause-terms').value.trim();
-      if (!clauseTerms) {
-        showToast('Ingresa al menos un término o condición', 'error');
+      const paySelect2 = document.getElementById('company-payment-condition');
+      let paymentCondition = paySelect2.value;
+      if (paymentCondition === 'custom') {
+        paymentCondition = document.getElementById('company-payment-custom').value.trim();
+      }
+      if (!paymentCondition) {
+        showToast('Ingresa la condición de pago', 'error');
         return;
       }
+      const clausesText = document.getElementById('company-clauses').value.trim();
       await setDoc(doc(db, 'companies', currentUser.uid), {
-        clausePayment,
-        clauseTerms,
-        userId: currentUser.uid,
+        paymentCondition,
+        clauses: clausesText,
         updatedAt: new Date().toISOString()
       }, { merge: true });
       showToast('Cláusulas guardadas correctamente');
+    });
+  }
+
+  // Reset clauses to defaults
+  const btnResetClauses = document.getElementById('btn-reset-clauses');
+  if (btnResetClauses) {
+    btnResetClauses.addEventListener('click', async () => {
+      const paySelect2 = document.getElementById('company-payment-condition');
+      const customGroup2 = document.getElementById('custom-payment-group');
+      const customInput2 = document.getElementById('company-payment-custom');
+      const clausesTA2 = document.getElementById('company-clauses');
+      if (paySelect2) paySelect2.value = DEFAULT_PAYMENT_CONDITION;
+      if (customGroup2) customGroup2.style.display = 'none';
+      if (customInput2) customInput2.value = '';
+      if (clausesTA2) clausesTA2.value = DEFAULT_CLAUSES;
+      await setDoc(doc(db, 'companies', currentUser.uid), {
+        paymentCondition: DEFAULT_PAYMENT_CONDITION,
+        clauses: DEFAULT_CLAUSES,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      showToast('Cláusulas restauradas a valores por defecto');
     });
   }
 }
