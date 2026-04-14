@@ -645,6 +645,25 @@
 
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
+  
+  <!-- Route Protection -->
+  <script>
+    // Protect dashboard - redirect to login if not authenticated
+    if (typeof protectRoute === 'function') {
+      protectRoute(true);
+    } else {
+      // Fallback: check localStorage session
+      window.addEventListener('load', () => {
+        setTimeout(() => {
+          const session = localStorage.getItem('cotizapro_session');
+          if (!session && !window.location.href.includes('index.html')) {
+            console.log('🔐 No session, redirecting to login...');
+            window.location.href = 'index.html';
+          }
+        }, 1000);
+      });
+    }
+  </script>
 
   <!-- PWA Install Script -->
   <script src="/js/pwa-install.js"></script>
