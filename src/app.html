@@ -8,9 +8,8 @@
   <meta http-equiv="Expires" content="0">
   <meta name="theme-color" content="#1e40af">
 
-  <!-- PWA Install Prompt Capture - MUST BE FIRST -->
+  <!-- PWA Install Prompt Capture - FIRST THING IN HEAD -->
   <script>
-    // Capture install event immediately
     window.deferredPWAInstallPrompt = null;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -409,7 +408,7 @@
               <p style="margin:0.25rem 0 0;font-size:0.8rem;color:var(--color-gray-500);">Instala en tu dispositivo para acceso rápido</p>
             </div>
           </div>
-          <button id="btn-install-app" class="btn btn-primary" style="width:100%;margin-top:1rem;">
+          <button id="btnInstalarApp" class="btn btn-primary" style="width:100%;margin-top:1rem;">
             📲 Instalar Aplicación
           </button>
         </div>
@@ -471,40 +470,7 @@
   <!-- Firebase SDK - Vite -->
   <script type="module" src="js/app-user.js"></script>
 
-  <!-- PWA Install Button Handler -->
-  <script>
-    // Register Service Worker
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(console.error);
-    }
-
-    // Button click - uses the GLOBAL deferredPrompt captured in head
-    function installApp() {
-      const dp = window.deferredPWAInstallPrompt;
-      if (dp) {
-        dp.prompt();
-        dp.userChoice.then(r => {
-          if (r.outcome === 'accepted') {
-            document.getElementById('btn-install-app').textContent = '✅ Instalando...';
-          }
-          window.deferredPWAInstallPrompt = null;
-        });
-      } else {
-        alert('Toca ⋮ arriba → "Instalar app"');
-      }
-    }
-
-    // Attach to button
-    window.addEventListener('DOMContentLoaded', () => {
-      const btn = document.getElementById('btn-install-app');
-      if (btn) btn.addEventListener('click', installApp);
-    });
-
-    // Hide install section if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      const s = document.getElementById('install-app-section');
-      if (s) s.style.display = 'none';
-    }
-  </script>
+  <!-- PWA Install Script -->
+  <script src="/js/pwa-install.js"></script>
 </body>
 </html>
