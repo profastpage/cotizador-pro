@@ -76,9 +76,17 @@ function initUI() {
     document.getElementById('stat-plan-expires').textContent = 'Gratis';
   }
 
+  // Show plan banner for ALL plans with remaining count
   if (userData.plan === 'free') {
+    const quota = getPlanQuota(userData.plan);
+    const used = userData.quotesUsedThisMonth || 0;
+    const remaining = quota - used;
     document.getElementById('plan-banner').classList.remove('hidden');
-    document.getElementById('plan-banner-text').textContent = `¡Tienes ${getPlanQuota(userData.plan)} cotizaciones gratis este mes!`;
+    if (remaining > 0) {
+      document.getElementById('plan-banner-text').textContent = `Te quedan ${remaining} cotización${remaining !== 1 ? 'es' : ''} gratis este mes`;
+    } else {
+      document.getElementById('plan-banner-text').textContent = `¡Agotaste tus ${quota} cotizaciones gratis este mes!`;
+    }
   }
 
   const today = new Date();

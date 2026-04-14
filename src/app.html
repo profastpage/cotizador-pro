@@ -117,9 +117,8 @@
       background: var(--color-primary);
     }
 
-    /* 🔥 CERRAR SESIÓN - TEXTO BLANCO */
-    .sidebar-footer .btn-outline,
-    .topbar-mobile .btn-icon[title="Cerrar Sesión"] {
+    /* 🔥 CERRAR SESIÓN - TEXTO BLANCO (sidebar desktop) */
+    .sidebar-footer .btn-outline {
       color: #ffffff !important;
       border-color: rgba(255,255,255,0.3) !important;
     }
@@ -188,6 +187,33 @@
     .topbar-mobile {
       background: var(--color-sidebar-bg);
       color: var(--color-sidebar-text);
+    }
+
+    /* 🔥 Mobile Logout Button - visible and clear */
+    .btn-mobile-logout {
+      display: none; /* Hidden on desktop */
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(239, 68, 68, 0.2);
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      color: #fca5a5;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+      line-height: 1;
+    }
+    .btn-mobile-logout:active {
+      transform: scale(0.95);
+      background: rgba(239, 68, 68, 0.35);
+    }
+    @media (max-width: 768px) {
+      .btn-mobile-logout {
+        display: inline-flex;
+      }
     }
 
     /* Scrollbar */
@@ -276,13 +302,16 @@
     <header class="topbar-mobile">
       <span class="topbar-logo">📊 CotizaPro</span>
       <div class="topbar-actions">
+        <!-- 🔥 Botón real de Cerrar Sesión visible en mobile -->
+        <button onclick="logout()" class="btn-mobile-logout" title="Cerrar Sesión">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          <span>Salir</span>
+        </button>
         <button id="btn-install-app" class="btn-icon hidden" title="Instalar App">📲</button>
         <!-- 🌙 Toggle Theme Mobile -->
         <button class="theme-toggle" id="themeToggleMobile" title="Cambiar tema" style="margin-right: 8px;">
           <span class="theme-icon">🌙</span>
         </button>
-        <!-- 🔥 Cerrar Sesión móvil con texto blanco -->
-        <button onclick="logout()" class="btn-icon" title="Cerrar Sesión" style="color: #ffffff;">🚪</button>
       </div>
     </header>
 

@@ -340,6 +340,28 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* 🔥 Mobile Logout Button - visible and clear */
+.btn-mobile-logout {
+  display: none; /* Hidden on desktop */
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #dc2626;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  line-height: 1;
+}
+.btn-mobile-logout:active {
+  transform: scale(0.95);
+  background: rgba(239, 68, 68, 0.3);
+}
+
 /* Sidebar Footer - Close session white text */
 .sidebar-footer {
   padding: 1rem 1.5rem;
@@ -416,7 +438,15 @@ body {
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  .topbar-user { display: none; }
+  .topbar-user {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .topbar-user #admin-name { display: none; }
+  .btn-mobile-logout {
+    display: inline-flex;
+  }
   .tab-content {
     padding: 0.75rem;
     overflow-x: hidden;
