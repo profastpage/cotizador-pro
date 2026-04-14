@@ -1,6 +1,6 @@
 /* Auth & Firebase Logic - SDK Modular v10+ */
 
-import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, googleProvider, SUPER_ADMIN_EMAIL, signInWithPopup, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 
 // ==========================================================
 // UI FUNCTIONS
@@ -65,16 +65,25 @@ if (btnLoginNav) btnLoginNav.addEventListener('click', showLogin);
 if (btnRegisterNav) btnRegisterNav.addEventListener('click', showRegister);
 
 // ==========================================================
-// GOOGLE SIGN IN
+// GOOGLE SIGN IN - Using Popup (more reliable than redirect)
 // ==========================================================
 
 async function signInWithGoogle() {
   try {
     document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
-    await signInWithRedirect(auth, googleProvider);
+    console.log('[Auth] Google sign-in with popup...');
+    const result = await signInWithPopup(auth, googleProvider);
+    console.log('[Auth] Google popup success:', result.user.email);
+    await processUser(result.user);
   } catch (error) {
-    console.error('Google Sign-In Error:', error);
-    showToast('Error al conectar con Google', 'error');
+    console.error('[Auth] Google Sign-In Error:', error);
+    if (error.code === 'auth/popup-closed-by-user') {
+      console.log('[Auth] Popup closed by user');
+    } else if (error.code === 'auth/popup-blocked') {
+      showToast('Pop-up bloqueado. Permite pop-ups en este sitio.', 'error');
+    } else {
+      showToast('Error al conectar con Google', 'error');
+    }
   }
 }
 
@@ -147,34 +156,14 @@ async function processUser(user) {
 }
 
 // ==========================================================
-// INITIALIZE - Firebase Official Flow
+// INITIALIZE - Listen for auth state changes
 // ==========================================================
 
-// Step 1: Check if user is returning from Google redirect
-getRedirectResult(auth)
-  .then((result) => {
-    if (result && result.user) {
-      console.log('🔄 Google redirect detected, processing user...');
-      processUser(result.user);
-    } else {
-      console.log('ℹ️ No redirect result, setting up auth listener...');
-      // Step 2: No redirect - just listen for auth changes
-      onAuthStateChanged(auth, (user) => {
-        if (user && !userProcessed) {
-          processUser(user);
-        }
-      });
-    }
-  })
-  .catch((error) => {
-    console.error('❌ Redirect result error:', error);
-    // Fallback: still set up auth listener
-    onAuthStateChanged(auth, (user) => {
-      if (user && !userProcessed) {
-        processUser(user);
-      }
-    });
-  });
+onAuthStateChanged(auth, (user) => {
+  if (user && !userProcessed) {
+    processUser(user);
+  }
+});
 
 // ==========================================================
 // EMAIL/PASSWORD REGISTER
