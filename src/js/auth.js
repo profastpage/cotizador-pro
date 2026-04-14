@@ -379,21 +379,133 @@ function promptForPassword(email) {
 }
 
 // ==========================================================
-// ROUTE PROTECTION (for app.html/dashboard)
+// ROUTE PROTECTION - Improved, No Infinite Loops
 // ==========================================================
 
+let authCheckInProgress = false;
+let isLoggingOut = false;
+let isInitialized = false;
+
 function protectRoute(requiredAuth = true) {
+  if (authCheckInProgress) {
+    console.log('⏳ Auth check already in progress...');
+    return;
+  }
+  
+  authCheckInProgress = true;
+  
+  const path = window.location.pathname;
+  const isLoginPage = path.includes('index.html') || path === '/' || path === '';
+  
+  console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
+  
+  if (isLoggingOut) {
+    authCheckInProgress = false;
+    return;
+  }
+  
   onAuthStateChanged(auth, (user) => {
+    console.log('👤 Auth state changed:', user?.email || 'No user');
+    
     if (requiredAuth && !user) {
-      console.log('🔐 No authenticated, redirecting to login...');
-      localStorage.setItem('redirectAfterLogin', window.location.href);
-      window.location.href = 'index.html';
-      return;
+      if (!isLoginPage && !window.location.href.includes('index.html')) {
+        console.log('🔐 No auth, redirecting to login...');
+        localStorage.setItem('redirectAfterLogin', window.location.href);
+        window.location.href = 'index.html';
+      }
+    } else if (user && isLoginPage) {
+      console.log('✅ Already logged in, redirecting to dashboard...');
+      window.location.href = 'app.html';
+    } else if (user) {
+      updateUI(user);
+      saveSession(user);
+      
+      if (!isInitialized) {
+        isInitialized = true;
+        onAppReady(user);
+      }
     }
-    if (user) {
-      console.log('✅ Route protected, user authenticated:', user.email);
-    }
+    
+    authCheckInProgress = false;
   });
+}
+
+// ==========================================================
+// IMPROVED LOGOUT - No Cycles
+// ==========================================================
+
+window.logout = async function() {
+  if (isLoggingOut) {
+    console.log('⏳ Logout already in progress...');
+    return;
+  }
+  
+  try {
+    isLoggingOut = true;
+    console.log('🚪 Starting logout...');
+    
+    // Clear local session first
+    clearSession();
+    
+    // Sign out from Firebase
+    await signOut(auth);
+    
+    console.log('✅ Logout successful');
+    showToast('Sesión cerrada correctamente', 'info');
+    
+    // Small delay to ensure Firebase processed logout
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Redirect to login
+    window.location.href = 'index.html';
+    
+  } catch (error) {
+    console.error('❌ Error al cerrar sesión:', error);
+    
+    // Force logout even on error
+    clearSession();
+    window.location.href = 'index.html';
+    
+  } finally {
+    isLoggingOut = false;
+  }
+};
+
+// ==========================================================
+// SESSION UTILITIES
+// ==========================================================
+
+function clearSession() {
+  localStorage.removeItem('cotizapro_session');
+  localStorage.removeItem('redirectAfterLogin');
+  window.currentUser = null;
+  isInitialized = false;
+}
+
+function saveSession(user) {
+  const sessionData = {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    photoURL: user.photoURL,
+    loginTime: new Date().toISOString(),
+    lastActive: new Date().toISOString()
+  };
+  localStorage.setItem('cotizapro_session', JSON.stringify(sessionData));
+}
+
+function updateUI(user) {
+  const nameEls = document.querySelectorAll('.user-name');
+  const emailEls = document.querySelectorAll('.user-email');
+  const photoEls = document.querySelectorAll('.user-photo');
+  
+  nameEls.forEach(el => el.textContent = user.displayName || 'Usuario');
+  emailEls.forEach(el => el.textContent = user.email || '');
+  photoEls.forEach(el => { if (user.photoURL) el.src = user.photoURL; });
+}
+
+function onAppReady(user) {
+  console.log('🚀 App ready for user:', user.email);
 }
 
 // Expose globally

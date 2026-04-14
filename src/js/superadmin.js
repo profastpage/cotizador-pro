@@ -424,6 +424,23 @@ function showToast(message, type = 'success') {
   setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
-window.logout = function() {
-  signOut(auth).then(() => { window.location.href = 'index.html'; });
+// Logout - improved, prevents cycles
+let adminIsLoggingOut = false;
+
+window.logout = async function() {
+  if (adminIsLoggingOut) return;
+  adminIsLoggingOut = true;
+  
+  try {
+    localStorage.removeItem('cotizapro_session');
+    await signOut(auth);
+    showToast('Sesión cerrada correctamente', 'info');
+    await new Promise(r => setTimeout(r, 300));
+    window.location.href = 'index.html';
+  } catch (err) {
+    console.error('Logout error:', err);
+    window.location.href = 'index.html';
+  } finally {
+    adminIsLoggingOut = false;
+  }
 };

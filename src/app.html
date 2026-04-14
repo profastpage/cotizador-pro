@@ -886,5 +886,23 @@
     window.toggleCotizaTheme = toggleTheme;
   })();
   </script>
+
+  <!-- 🛡️ BACK-BUTTON PROTECTION - Prevents navigating to protected pages after logout -->
+  <script>
+  (function() {
+    'use strict';
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) {
+        const session = localStorage.getItem('cotizapro_session');
+        const path = window.location.pathname;
+        if (!session && !path.includes('index.html')) {
+          console.log('🔐 Back button detected after logout, redirecting...');
+          window.location.href = 'index.html';
+        }
+      }
+    });
+    console.log('🛡️ Back-button protection active');
+  })();
+  </script>
 </body>
 </html>
