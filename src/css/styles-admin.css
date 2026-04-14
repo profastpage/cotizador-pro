@@ -340,15 +340,15 @@ body {
   to { opacity: 1; transform: translateX(0); }
 }
 
-/* 🔥 Mobile Logout Button - visible and clear */
+/* 🔥 Mobile Logout Button - visible y claro */
 .btn-mobile-logout {
   display: none; /* Hidden on desktop */
   align-items: center;
   gap: 0.3rem;
-  padding: 0.35rem 0.7rem;
+  padding: 0.3rem 0.65rem;
   border-radius: 999px;
-  background: rgba(239, 68, 68, 0.15);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
   color: #dc2626;
   font-size: 0.7rem;
   font-weight: 600;
@@ -359,7 +359,7 @@ body {
 }
 .btn-mobile-logout:active {
   transform: scale(0.95);
-  background: rgba(239, 68, 68, 0.3);
+  background: rgba(220, 38, 38, 0.18);
 }
 
 /* Sidebar Footer - Close session white text */
