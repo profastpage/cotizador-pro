@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>CotizaPro - Vista de Cotización</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f1f5f9;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .header {
+      background: #1e40af;
+      color: white;
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .header-logo {
+      font-size: 1.25rem;
+      font-weight: 800;
+    }
+    .header-subtitle {
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+    .header-btn {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: background 0.2s;
+    }
+    .header-btn:hover {
+      background: rgba(255,255,255,0.25);
+    }
+    .container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 2rem 1rem;
+    }
+    .pdf-frame {
+      width: 100%;
+      max-width: 900px;
+      height: calc(100vh - 100px);
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+      overflow: hidden;
+    }
+    .pdf-frame iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+    .loading-spinner {
+      width: 48px;
+      height: 48px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #1e40af;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 1.5rem;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading h3 {
+      font-size: 1.1rem;
+      color: #334155;
+      margin-bottom: 0.5rem;
+    }
+    .loading p {
+      font-size: 0.85rem;
+      color: #64748b;
+    }
+    .error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem 2rem;
+      text-align: center;
+    }
+    .error-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+    .error h3 {
+      font-size: 1.2rem;
+      color: #dc2626;
+      margin-bottom: 0.5rem;
+    }
+    .error p {
+      font-size: 0.9rem;
+      color: #64748b;
+      max-width: 400px;
+    }
+    .error a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1.5rem;
+      padding: 0.75rem 1.5rem;
+      background: #1e40af;
+      color: white;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+    }
+    .error a:hover {
+      background: #1e3a8a;
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <span>📊</span>
+      <div>
+        <div class="header-logo">CotizaPro</div>
+        <div class="header-subtitle" id="quote-info">Cargando cotización...</div>
+      </div>
+    </div>
+    <div id="header-actions" class="hidden">
+      <button class="header-btn" id="btn-download-pdf" onclick="downloadPDF()">📄 Descargar PDF</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="pdf-frame">
+      <!-- Loading State -->
+      <div id="state-loading" class="loading">
+        <div class="loading-spinner"></div>
+        <h3>Cargando cotización...</h3>
+        <p>Esto tomará unos segundos</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="state-error" class="error hidden">
+        <div class="error-icon">📄</div>
+        <h3 id="error-title">Cotización no encontrada</h3>
+        <p id="error-message">El enlace que seguiste puede haber expirado o ser inválido.</p>
+        <a href="/">← Ir a CotizaPro</a>
+      </div>
+
+      <!-- PDF Display -->
+      <iframe id="pdf-display" class="hidden" title="Cotización PDF"></iframe>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db, doc, getDoc } from './firebase-config.js';
+
+    let currentPdfDataUrl = null;
+
+    async function loadSharedQuote() {
+      const params = new URLSearchParams(window.location.search);
+      const shareId = params.get('id');
+
+      if (!shareId) {
+        showError('Enlace inválido', 'No se encontró el ID de la cotización en el enlace.');
+        return;
+      }
+
+      try {
+        const docSnap = await getDoc(doc(db, 'shared_quotes', shareId));
+
+        if (!docSnap.exists()) {
+          showError('Cotización no encontrada', 'El enlace que seguiste puede haber expirado o ser inválido.');
+          return;
+        }
+
+        const data = docSnap.data();
+
+        // Check expiration
+        if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
+          showError('Enlace expirado', 'Este enlace de cotización ha expirado (vigencia de 30 días).');
+          return;
+        }
+
+        // Update header info
+        const docTypes = {
+          cotizacion: 'Cotización', propuesta: 'Propuesta', nota_venta: 'Nota de Venta',
+          orden_servicio: 'Orden de Servicio', factura: 'Factura', boleta: 'Boleta',
+          recibo: 'Recibo', contrato: 'Contrato', garantia: 'Garantía', personalizado: 'Documento'
+        };
+        const docType = docTypes[data.documentType] || 'Cotización';
+        const num = String(data.quoteNumber || 0).padStart(3, '0');
+        document.getElementById('quote-info').textContent = `${docType} #${num} - ${data.clientName || 'Sin cliente'}`;
+
+        // Display PDF
+        if (data.pdfBase64) {
+          currentPdfDataUrl = `data:application/pdf;base64,${data.pdfBase64}`;
+          const iframe = document.getElementById('pdf-display');
+          iframe.src = currentPdfDataUrl;
+          iframe.classList.remove('hidden');
+          document.getElementById('state-loading').classList.add('hidden');
+          document.getElementById('header-actions').classList.remove('hidden');
+        } else {
+          showError('PDF no disponible', 'No se encontró el archivo PDF asociado a esta cotización.');
+        }
+      } catch (error) {
+        console.error('Error loading shared quote:', error);
+        showError('Error de conexión', 'No se pudo cargar la cotización. Intenta nuevamente.');
+      }
+    }
+
+    function showError(title, message) {
+      document.getElementById('state-loading').classList.add('hidden');
+      document.getElementById('error-title').textContent = title;
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('state-error').classList.remove('hidden');
+    }
+
+    window.downloadPDF = function() {
+      if (!currentPdfDataUrl) return;
+      const a = document.createElement('a');
+      a.href = currentPdfDataUrl;
+      a.download = `Cotizacion-${String(Date.now()).padStart(3, '0')}.pdf`;
+      a.click();
+    };
+
+    // Load on page ready
+    loadSharedQuote();
+  </script>
+</body>
+</html>

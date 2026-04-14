@@ -103,6 +103,20 @@ service cloud.firestore {
     }
     
     // ==========================================================
+    // SHARED_QUOTES - Lectura pública, escritura solo autenticados
+    // ==========================================================
+    match /shared_quotes/{shareId} {
+      allow read: if true;
+      
+      allow create: if isAuthenticated() && isActiveUser();
+      
+      allow update: if isAuthenticated() && 
+                       (isOwner(resource.data.userId) || isAdmin());
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================================
     // DENY ALL por defecto
     // ==========================================================
     match /{document=**} {

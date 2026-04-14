@@ -13,6 +13,19 @@ let isGeneratingPDF = false;
 const DEFAULT_PAYMENT_CONDITION = 'Contado';
 const DEFAULT_CLAUSES = `Esta cotización tiene una validez de 30 días calendario.\nLos precios están expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos están detallados en la sección de condiciones de pago.\nEsta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuníquese a los datos de contacto indicados en el encabezado.`;
 
+// Bank account types
+const BANK_TYPES = [
+  { id: 'bcp', name: 'BCP', label: 'BCP', logo: 'BCP', placeholder: '193-1234567-0-42' },
+  { id: 'bbva', name: 'BBVA', label: 'BBVA', logo: 'BBVA', placeholder: '0011-0020-0123456789' },
+  { id: 'interbank', name: 'Interbank', label: 'Interbank', logo: 'IBK', placeholder: '2001-1234567890' },
+  { id: 'yape', name: 'Yape', label: 'Yape', logo: 'Y', placeholder: '987654321' },
+  { id: 'plin', name: 'Plin', label: 'Plin', logo: 'PL', placeholder: '987654321' },
+  { id: 'other', name: 'Otro', label: 'Otro Banco', logo: '...', placeholder: 'Número de cuenta' }
+];
+
+let currentPreviewQuoteId = null;
+let currentPreviewBlob = null;
+
 // ==========================================================
 // AUTH CHECK - NO redirects to avoid loops
 // ==========================================================
@@ -267,7 +280,7 @@ function createQuoteCard(quote, showActions = false, position = null) {
   const typeIcon = `<span style="margin-right:0.25rem;">${docType.icon}</span>`;
 
   return `
-    <div class="quote-card">
+    <div class="quote-card" ${showActions ? '' : `onclick="window.downloadQuote('${quote.id}')" style="cursor:pointer;"`}>
       <div class="quote-card-header">
         <span class="quote-number">${typeIcon}#${displayNum}${demoBadge}</span>
         <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
@@ -275,8 +288,10 @@ function createQuoteCard(quote, showActions = false, position = null) {
       <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
       <div class="quote-amount">${formatCurrency(quote.total)}</div>
       ${showActions ? `<div class="quote-actions">
-        <button class="btn btn-sm btn-primary" onclick="window.downloadQuote('${quote.id}')">📄 PDF</button>
-        <button class="btn btn-sm btn-danger" onclick="window.deleteQuote('${quote.id}')">🗑️</button>
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.previewQuote('${quote.id}')">👁️ Ver</button>
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.downloadQuote('${quote.id}')">📄 PDF</button>
+        <button class="btn-link-share" onclick="event.stopPropagation();window.generateShareLink('${quote.id}')">🔗 Enlace</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();window.deleteQuote('${quote.id}')">🗑️</button>
       </div>` : ''}
     </div>
   `;
@@ -856,6 +871,53 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
     clausesY += 5.5;
   }
 
+  // ==========================================
+  // BANK ACCOUNTS SECTION - Optional
+  // ==========================================
+  const bankAccounts = company.bankAccounts || [];
+  if (bankAccounts.length > 0) {
+    clausesY += 4;
+    
+    // Calculate space needed for bank accounts
+    const bankSpaceNeeded = 10 + (bankAccounts.length * 7) + 6;
+    if (clausesY + bankSpaceNeeded > 280) {
+      pdf.addPage();
+      clausesY = 20;
+    }
+
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text('DATOS BANCARIOS PARA PAGO', 25, clausesY + 5.5);
+    clausesY += 12;
+
+    for (let bIdx = 0; bIdx < bankAccounts.length; bIdx++) {
+      const bank = bankAccounts[bIdx];
+      if (!bank || !bank.number) continue;
+
+      if (bIdx % 2 === 0) {
+        pdf.setFillColor(...LIGHT_BLUE_BG);
+        pdf.roundedRect(20, clausesY - 3.5, 170, 7, 1, 1, 'F');
+      }
+
+      const bankLabel = bank.name || 'Cuenta Bancaria';
+      const accountType = bank.accountType || '';
+      const holder = bank.holder || '';
+      
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      let bankText = `${bankLabel}`;
+      if (accountType) bankText += ` - ${accountType}`;
+      pdf.text(bankText, 25, clausesY);
+      
+      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      let detailText = `N° ${bank.number}`;
+      if (holder) detailText += ` | Titular: ${holder}`;
+      pdf.text(detailText, 25, clausesY + 4);
+      
+      clausesY += 8;
+    }
+  }
+
   // Footer
   const finalFooterY = Math.max(clausesY + 6, 275);
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
@@ -1020,10 +1082,13 @@ function loadSettings() {
       }
       const clausesTA = document.getElementById('company-clauses');
       if (clausesTA) clausesTA.value = clausesText;
+      // Load bank accounts
+      renderBankAccounts(data.bankAccounts || []);
     } else {
       // New user - set defaults
       const clausesTA = document.getElementById('company-clauses');
       if (clausesTA) clausesTA.value = DEFAULT_CLAUSES;
+      renderBankAccounts([]);
     }
   });
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
@@ -1115,7 +1180,324 @@ function setupForms() {
       showToast('Cláusulas restauradas a valores por defecto');
     });
   }
+
+  // Bank accounts setup
+  setupBankAccounts();
 }
+
+// ==========================================================
+// BANK ACCOUNTS - Settings UI + PDF
+// ==========================================================
+
+function renderBankAccounts(accounts) {
+  const container = document.getElementById('bank-accounts-container');
+  if (!container) return;
+  
+  if (!accounts || accounts.length === 0) {
+    container.innerHTML = '<p style="text-align:center;color:var(--color-text-muted);font-size:0.85rem;padding:1rem;">No hay cuentas bancarias configuradas</p>';
+    return;
+  }
+  
+  container.innerHTML = accounts.map((acc, idx) => {
+    const bankType = BANK_TYPES.find(b => b.id === acc.bankId) || BANK_TYPES[5];
+    const accountTypeOptions = ['Cuenta Corriente', 'Cuenta de Ahorros', 'Cuenta Interbank', 'Cuenta DNI', 'Cuenta Celular'];
+    const isDigital = acc.bankId === 'yape' || acc.bankId === 'plin';
+    const typeLabel = isDigital ? '' : acc.accountType || '';
+    
+    return `
+      <div class="bank-account-entry bank-${acc.bankId || 'other'}" data-bank-idx="${idx}">
+        <div class="bank-header">
+          <h4><span class="bank-logo">${bankType.logo}</span> ${bankType.label}${typeLabel ? ' - ' + typeLabel : ''}</h4>
+          <button class="btn-remove-bank" onclick="removeBankAccount(${idx})" title="Eliminar cuenta">✕</button>
+        </div>
+        <div class="bank-fields">
+          <div class="form-group">
+            <label class="form-label">Banco</label>
+            <select class="form-input form-select bank-type-select" data-idx="${idx}">
+              ${BANK_TYPES.map(bt => `<option value="${bt.id}" ${bt.id === acc.bankId ? 'selected' : ''}>${bt.label}</option>`).join('')}
+            </select>
+          </div>
+          ${!isDigital ? `
+          <div class="form-group">
+            <label class="form-label">Tipo de Cuenta</label>
+            <select class="form-input form-select bank-account-type" data-idx="${idx}">
+              <option value="">Seleccionar...</option>
+              ${accountTypeOptions.map(t => `<option value="${t}" ${t === acc.accountType ? 'selected' : ''}>${t}</option>`).join('')}
+            </select>
+          </div>` : ''}
+          <div class="form-group">
+            <label class="form-label">${isDigital ? 'Número de ${bankType.label}' : 'Número de Cuenta'}</label>
+            <input type="text" class="form-input bank-number" data-idx="${idx}" value="${acc.number || ''}" placeholder="${bankType.placeholder}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Titular (opcional)</label>
+            <input type="text" class="form-input bank-holder" data-idx="${idx}" value="${acc.holder || ''}" placeholder="Nombre del titular">
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  // Add change listeners for bank type select
+  container.querySelectorAll('.bank-type-select').forEach(sel => {
+    sel.addEventListener('change', () => {
+      // Re-render with updated bank type
+      collectAndSaveBankAccounts(false);
+    });
+  });
+}
+
+window.removeBankAccount = function(idx) {
+  const container = document.getElementById('bank-accounts-container');
+  const entries = container.querySelectorAll('.bank-account-entry');
+  if (entries[idx]) {
+    entries[idx].remove();
+  }
+};
+
+function setupBankAccounts() {
+  const btnAddBank = document.getElementById('btn-add-bank');
+  if (btnAddBank) {
+    btnAddBank.addEventListener('click', () => {
+      const accounts = collectBankAccountsFromUI();
+      accounts.push({ bankId: 'bcp', name: 'BCP', accountType: '', number: '', holder: '' });
+      renderBankAccounts(accounts);
+    });
+  }
+  
+  const btnSaveBanks = document.getElementById('btn-save-banks');
+  if (btnSaveBanks) {
+    btnSaveBanks.addEventListener('click', () => {
+      collectAndSaveBankAccounts(true);
+    });
+  }
+}
+
+function collectBankAccountsFromUI() {
+  const container = document.getElementById('bank-accounts-container');
+  if (!container) return [];
+  
+  const accounts = [];
+  container.querySelectorAll('.bank-account-entry').forEach(entry => {
+    const bankId = entry.querySelector('.bank-type-select')?.value || 'other';
+    const bankType = BANK_TYPES.find(b => b.id === bankId) || BANK_TYPES[5];
+    const accountType = entry.querySelector('.bank-account-type')?.value || '';
+    const number = entry.querySelector('.bank-number')?.value?.trim() || '';
+    const holder = entry.querySelector('.bank-holder')?.value?.trim() || '';
+    
+    if (number) {
+      accounts.push({
+        bankId,
+        name: bankType.name,
+        label: bankType.label,
+        accountType,
+        number,
+        holder
+      });
+    }
+  });
+  
+  return accounts;
+}
+
+async function collectAndSaveBankAccounts(showToastMsg) {
+  const accounts = collectBankAccountsFromUI();
+  try {
+    await setDoc(doc(db, 'companies', currentUser.uid), {
+      bankAccounts: accounts,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    if (showToastMsg) showToast('Cuentas bancarias guardadas');
+  } catch (error) {
+    console.error('Error saving bank accounts:', error);
+    if (showToastMsg) showToast('Error al guardar cuentas bancarias', 'error');
+  }
+}
+
+// ==========================================================
+// PDF PREVIEW + SHAREABLE LINK
+// ==========================================================
+
+window.previewQuote = async function(id) {
+  try {
+    showToast('Generando vista previa...', 'info');
+
+    const quoteDoc = await getDoc(doc(db, 'quotes', id));
+    if (!quoteDoc.exists()) {
+      showToast('Cotización no encontrada', 'error');
+      return;
+    }
+
+    const quote = quoteDoc.data();
+    if (quote.userId !== currentUser.uid) {
+      showToast('No tienes permiso', 'error');
+      return;
+    }
+
+    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+    if (!companySnap.exists()) {
+      showToast('Configura tu empresa primero', 'error');
+      return;
+    }
+
+    const company = companySnap.data();
+    const clientName = quote.client?.name || 'Sin nombre';
+
+    const { pdf } = await renderPDF(
+      company, clientName, quote.items || [],
+      quote.number || 0, quote.issueDate, quote.dueDate,
+      quote.subtotal || 0, quote.igv || 0, quote.total || 0,
+      quote.igvEnabled, quote.igvType || 'apart',
+      quote.documentType || 'cotizacion'
+    );
+
+    currentPreviewQuoteId = id;
+    currentPreviewBlob = pdf.output('blob');
+    
+    const blobUrl = URL.createObjectURL(currentPreviewBlob);
+    const iframe = document.getElementById('pdf-preview-iframe');
+    if (iframe) {
+      iframe.src = blobUrl;
+    }
+    
+    document.getElementById('modal-pdf-preview').classList.remove('hidden');
+  } catch (error) {
+    console.error('Preview error:', error);
+    showToast('Error al generar vista previa', 'error');
+  }
+};
+
+window.downloadQuote = async function(id) {
+  try {
+    showToast('Generando PDF...', 'info');
+
+    const quoteDoc = await getDoc(doc(db, 'quotes', id));
+    if (!quoteDoc.exists()) {
+      showToast('Cotización no encontrada', 'error');
+      return;
+    }
+
+    const quote = quoteDoc.data();
+
+    // Verify ownership
+    if (quote.userId !== currentUser.uid) {
+      showToast('No tienes permiso para esta cotización', 'error');
+      return;
+    }
+
+    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+    if (!companySnap.exists()) {
+      showToast('Configura los datos de tu empresa primero', 'error');
+      return;
+    }
+
+    const company = companySnap.data();
+    const clientName = quote.client?.name || 'Sin nombre';
+
+    // Use centralized PDF renderer
+    const { pdf } = await renderPDF(
+      company,
+      clientName,
+      quote.items || [],
+      quote.number || 0,
+      quote.issueDate,
+      quote.dueDate,
+      quote.subtotal || 0,
+      quote.igv || 0,
+      quote.total || 0,
+      quote.igvEnabled,
+      quote.igvType || 'apart',
+      quote.documentType || 'cotizacion'
+    );
+
+    pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
+    showToast('¡PDF descargado!');
+  } catch (error) {
+    console.error('Download error:', error);
+    showToast('Error al generar PDF', 'error');
+  }
+};
+
+// Generate shareable link for a quote
+window.generateShareLink = async function(id) {
+  try {
+    showToast('Generando enlace compartible...', 'info');
+
+    const quoteDoc = await getDoc(doc(db, 'quotes', id));
+    if (!quoteDoc.exists()) {
+      showToast('Cotización no encontrada', 'error');
+      return;
+    }
+
+    const quote = quoteDoc.data();
+    if (quote.userId !== currentUser.uid) {
+      showToast('No tienes permiso', 'error');
+      return;
+    }
+
+    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+    if (!companySnap.exists()) {
+      showToast('Configura tu empresa primero', 'error');
+      return;
+    }
+
+    const company = companySnap.data();
+    const clientName = quote.client?.name || 'Sin nombre';
+
+    // Generate PDF
+    const { pdf } = await renderPDF(
+      company, clientName, quote.items || [],
+      quote.number || 0, quote.issueDate, quote.dueDate,
+      quote.subtotal || 0, quote.igv || 0, quote.total || 0,
+      quote.igvEnabled, quote.igvType || 'apart',
+      quote.documentType || 'cotizacion'
+    );
+
+    // Convert to base64
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+    
+    // Generate short share ID
+    const shareId = 'q_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+    
+    // Store in shared_quotes collection
+    const sharedData = {
+      shareId,
+      quoteId: id,
+      userId: currentUser.uid,
+      pdfBase64,
+      clientName,
+      quoteNumber: quote.number || 0,
+      documentType: quote.documentType || 'cotizacion',
+      total: quote.total || 0,
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    };
+    
+    await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
+    
+    const shareUrl = `${window.location.origin}/view.html?id=${shareId}`;
+    
+    // Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      showToast('✅ Enlace copiado al portapapeles');
+    } catch (e) {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea');
+      textarea.value = shareUrl;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showToast('✅ Enlace copiado al portapapeles');
+    }
+  } catch (error) {
+    console.error('Share error:', error);
+    showToast('Error al generar enlace', 'error');
+  }
+};
 
 // ==========================================================
 // HELPERS
@@ -1257,57 +1639,6 @@ window.deleteQuote = async function(id) {
     await deleteDoc(doc(db, 'quotes', id));
     showToast('Cotización eliminada');
     loadHistory();
-  }
-};
-
-window.downloadQuote = async function(id) {
-  try {
-    showToast('Generando PDF...', 'info');
-
-    const quoteDoc = await getDoc(doc(db, 'quotes', id));
-    if (!quoteDoc.exists()) {
-      showToast('Cotización no encontrada', 'error');
-      return;
-    }
-
-    const quote = quoteDoc.data();
-
-    // Verify ownership
-    if (quote.userId !== currentUser.uid) {
-      showToast('No tienes permiso para esta cotización', 'error');
-      return;
-    }
-
-    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
-    if (!companySnap.exists()) {
-      showToast('Configura los datos de tu empresa primero', 'error');
-      return;
-    }
-
-    const company = companySnap.data();
-    const clientName = quote.client?.name || 'Sin nombre';
-
-    // Use centralized PDF renderer
-    const { pdf } = await renderPDF(
-      company,
-      clientName,
-      quote.items || [],
-      quote.number || 0,
-      quote.issueDate,
-      quote.dueDate,
-      quote.subtotal || 0,
-      quote.igv || 0,
-      quote.total || 0,
-      quote.igvEnabled,
-      quote.igvType || 'apart',
-      quote.documentType || 'cotizacion'
-    );
-
-    pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
-    showToast('¡PDF descargado!');
-  } catch (error) {
-    console.error('Download error:', error);
-    showToast('Error al generar PDF', 'error');
   }
 };
 
@@ -1508,6 +1839,32 @@ initUI = function() {
   setupPWAInstall();
   setupHelpToggle();
   checkCompanyConfig();
+  
+  // PDF Preview modal handlers
+  const btnDownloadFromPreview = document.getElementById('btn-download-from-preview');
+  if (btnDownloadFromPreview) {
+    btnDownloadFromPreview.addEventListener('click', () => {
+      if (currentPreviewBlob) {
+        const url = URL.createObjectURL(currentPreviewBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Cotizacion-${String(Date.now()).padStart(3, '0')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (currentPreviewQuoteId) {
+        window.downloadQuote(currentPreviewQuoteId);
+      }
+    });
+  }
+  
+  const btnCopyLink = document.getElementById('btn-copy-link');
+  if (btnCopyLink) {
+    btnCopyLink.addEventListener('click', () => {
+      if (currentPreviewQuoteId) {
+        window.generateShareLink(currentPreviewQuoteId);
+      }
+    });
+  }
 };
 
 protectRoute(true);

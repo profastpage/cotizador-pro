@@ -312,7 +312,7 @@
         <h2 class="section-title">Hola, <span id="user-name">Usuario</span> 👋</h2>
 
         <!-- Cotizaciones Restantes Widget -->
-        <div id="remaining-quotes-widget" class="remaining-quotes-widget">
+        <div id="remaining-quotes-widget" class="remaining-quotes-widget" onclick="showUpgradeModal()" style="cursor:pointer;">
           <div class="remaining-quotes-info">
             <div class="remaining-quotes-icon">📊</div>
             <div class="remaining-quotes-text">
@@ -320,7 +320,10 @@
               <p class="remaining-quotes-number" id="remaining-quotes-count">0</p>
             </div>
           </div>
-          <button onclick="showUpgradeModal()" class="btn btn-primary remaining-quotes-upgrade-btn">⚡ Mejorar Plan</button>
+          <div class="remaining-quotes-upgrade-btn-wrapper">
+            <span class="remaining-quotes-upgrade-text">Mejorar Plan</span>
+            <span class="remaining-quotes-upgrade-icon">⚡</span>
+          </div>
         </div>
 
         <div class="stats-grid">
@@ -594,6 +597,23 @@
           </button>
         </div>
 
+        <!-- Cuentas Bancarias -->
+        <h3 class="section-title mt-6">💳 Cuentas Bancarias</h3>
+        <div class="plan-card-user">
+          <p style="font-size:0.85rem;color:var(--color-text-muted);margin-bottom:1rem;">
+            Agrega tus cuentas bancarias. Aparecerán en tus cotizaciones PDF. Son opcionales.
+          </p>
+          <div id="bank-accounts-container">
+            <!-- Bank entries will be populated by JS -->
+          </div>
+          <button type="button" id="btn-add-bank" class="btn btn-outline btn-block" style="margin-top:0.75rem;">
+            ➕ Agregar Cuenta Bancaria
+          </button>
+          <button type="button" id="btn-save-banks" class="btn btn-primary btn-block" style="margin-top:0.5rem;">
+            💾 Guardar Cuentas Bancarias
+          </button>
+        </div>
+
         <!-- Help Toggle -->
         <div class="help-section">
           <button id="btn-help-toggle" class="btn btn-outline btn-block">❓ Ayuda / Guía de Uso</button>
@@ -776,6 +796,25 @@ Para consultas, comuníquese a los datos de contacto indicados en el encabezado.
           </div>
         </div>
         <p class="upgrade-note">💬 Al seleccionar un plan serás redirigido a WhatsApp para coordinar la activación</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF Preview Modal -->
+  <div id="modal-pdf-preview" class="pdf-preview-modal hidden">
+    <div class="pdf-preview-backdrop" data-close-modal></div>
+    <div class="pdf-preview-dialog">
+      <div class="pdf-preview-header">
+        <span class="pdf-preview-title">Vista previa de Cotización</span>
+        <button class="pdf-preview-close" data-close-modal>✕</button>
+      </div>
+      <div class="pdf-preview-body">
+        <iframe id="pdf-preview-iframe" title="PDF Preview"></iframe>
+      </div>
+      <div class="pdf-preview-actions">
+        <button id="btn-download-from-preview" class="btn btn-primary">📄 Descargar PDF</button>
+        <button id="btn-copy-link" class="btn btn-secondary">🔗 Copiar Enlace</button>
+        <button class="btn btn-outline" data-close-modal>Cerrar</button>
       </div>
     </div>
   </div>
