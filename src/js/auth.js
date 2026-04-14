@@ -379,93 +379,85 @@ function promptForPassword(email) {
 }
 
 // ==========================================================
-// ROUTE PROTECTION - Improved, No Infinite Loops
+// ROUTE PROTECTION - VERSIÓN CORREGIDA SIN BUCLES
 // ==========================================================
 
 let authCheckInProgress = false;
 let isLoggingOut = false;
 let isInitialized = false;
 
-function protectRoute(requiredAuth = true) {
-  if (authCheckInProgress) {
-    console.log('⏳ Auth check already in progress...');
-    return;
-  }
-  
+export function protectRoute(requiredAuth = true) {
+  if (authCheckInProgress) return;
   authCheckInProgress = true;
-  
+
   const path = window.location.pathname;
-  const isLoginPage = path.includes('index.html') || path === '/' || path === '';
+  // Definimos explícitamente qué es la página de login
+  const isLoginPage = path.includes('index.html') || path.endsWith('/') || path === '';
   
-  console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
-  
-  if (isLoggingOut) {
-    authCheckInProgress = false;
-    return;
-  }
-  
+  console.log('🛡️ ProtectRoute:', path, 'IsLogin?', isLoginPage);
+
   onAuthStateChanged(auth, (user) => {
-    console.log('👤 Auth state changed:', user?.email || 'No user');
-    
+    if (isLoggingOut) {
+      authCheckInProgress = false;
+      return;
+    }
+
     if (requiredAuth && !user) {
-      if (!isLoginPage && !window.location.href.includes('index.html')) {
-        console.log('🔐 No auth, redirecting to login...');
+      // CASO 1: NO hay usuario
+      if (!isLoginPage) {
+        console.log('🔐 Sin usuario. Redirigiendo a index.html...');
         localStorage.setItem('redirectAfterLogin', window.location.href);
-        window.location.href = 'index.html';
+        window.location.href = '/index.html'; // Usa ruta absoluta
       }
-    } else if (user && isLoginPage) {
-      console.log('✅ Already logged in, redirecting to dashboard...');
-      window.location.href = 'app.html';
     } else if (user) {
-      updateUI(user);
-      saveSession(user);
-      
-      if (!isInitialized) {
-        isInitialized = true;
-        onAppReady(user);
+      // CASO 2: SÍ hay usuario
+      if (isLoginPage) {
+        // Si está en login pero ya tiene sesión, mandar al dashboard
+        console.log('✅ Usuario logueado en login. Redirigiendo a app.html...');
+        const redirect = localStorage.getItem('redirectAfterLogin') || '/app.html';
+        localStorage.removeItem('redirectAfterLogin');
+        window.location.href = redirect;
+      } else {
+        // Está en dashboard y tiene sesión: Todo OK
+        console.log('✅ Acceso concedido a:', path);
+        updateUI(user);
+        saveSession(user);
+        
+        if (!isInitialized) {
+          isInitialized = true;
+          onAppReady(user);
+        }
       }
     }
-    
     authCheckInProgress = false;
   });
 }
 
 // ==========================================================
-// IMPROVED LOGOUT - No Cycles
+// LOGOUT SEGURO - VERSIÓN CORREGIDA
 // ==========================================================
 
 window.logout = async function() {
-  if (isLoggingOut) {
-    console.log('⏳ Logout already in progress...');
-    return;
-  }
-  
+  if (isLoggingOut) return;
+  isLoggingOut = true;
+
   try {
-    isLoggingOut = true;
-    console.log('🚪 Starting logout...');
-    
-    // Clear local session first
+    console.log('🚪 Iniciando logout...');
     clearSession();
-    
-    // Sign out from Firebase
     await signOut(auth);
     
-    console.log('✅ Logout successful');
     showToast('Sesión cerrada correctamente', 'info');
     
-    // Small delay to ensure Firebase processed logout
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // Pausa crítica para evitar que el guard detecte "no user" antes de tiempo
+    await new Promise(resolve => setTimeout(resolve, 500));
     
-    // Redirect to login
-    window.location.href = 'index.html';
+    // Forzar redirección explícita
+    window.location.href = '/index.html';
     
   } catch (error) {
-    console.error('❌ Error al cerrar sesión:', error);
-    
-    // Force logout even on error
+    console.error('Error logout:', error);
     clearSession();
-    window.location.href = 'index.html';
-    
+    window.location.href = '/index.html';
   } finally {
     isLoggingOut = false;
   }
