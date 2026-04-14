@@ -76,11 +76,25 @@ function initUI() {
     document.getElementById('stat-plan-expires').textContent = 'Gratis';
   }
 
+  // Mostrar cotizaciones restantes reales en Dashboard
+  const quota = getPlanQuota(userData.plan);
+  const used = userData.quotesUsedThisMonth || 0;
+  const remaining = quota === -1 ? -1 : quota - used;
+  const remainingEl = document.getElementById('stat-remaining-quotes');
+  if (remainingEl) {
+    remainingEl.textContent = remaining === -1 ? '∞' : remaining;
+    remainingEl.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
+  }
+
+  // Mostrar cotizaciones restantes en Configuración
+  const planRemainingCount = document.getElementById('plan-remaining-count');
+  if (planRemainingCount) {
+    planRemainingCount.textContent = remaining === -1 ? '∞' : remaining;
+    planRemainingCount.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
+  }
+
   // Show plan banner for ALL plans with remaining count
   if (userData.plan === 'free') {
-    const quota = getPlanQuota(userData.plan);
-    const used = userData.quotesUsedThisMonth || 0;
-    const remaining = quota - used;
     document.getElementById('plan-banner').classList.remove('hidden');
     if (remaining > 0) {
       document.getElementById('plan-banner-text').textContent = `Te quedan ${remaining} cotización${remaining !== 1 ? 'es' : ''} gratis este mes`;
@@ -914,6 +928,7 @@ async function generatePDF() {
     navigateTo('dashboard');
     userData.quotesUsedThisMonth++;
     updatePlanProgress();
+    updateRemainingQuotes();
 
   } catch (error) {
     console.error('PDF Error:', error);
@@ -941,6 +956,7 @@ function loadSettings() {
   document.getElementById('current-plan-name').textContent = getPlanName(userData.plan);
   document.getElementById('current-plan-price').textContent = getPlanPrice(userData.plan);
   document.getElementById('current-plan-desc').textContent = getPlanDesc(userData.plan);
+  updateRemainingQuotes();
 }
 
 function setupForms() {
@@ -1042,6 +1058,33 @@ function numberToWords(n) {
   }
   
   return result.trim();
+}
+
+function updateRemainingQuotes() {
+  const quota = getPlanQuota(userData.plan);
+  const used = userData.quotesUsedThisMonth || 0;
+  const remaining = quota === -1 ? -1 : quota - used;
+  const remainingEl = document.getElementById('stat-remaining-quotes');
+  if (remainingEl) {
+    remainingEl.textContent = remaining === -1 ? '∞' : remaining;
+    remainingEl.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
+  }
+  const planRemainingCount = document.getElementById('plan-remaining-count');
+  if (planRemainingCount) {
+    planRemainingCount.textContent = remaining === -1 ? '∞' : remaining;
+    planRemainingCount.style.color = (remaining >= 0 && remaining <= 1) ? 'var(--color-error, #ef4444)' : 'var(--color-primary)';
+  }
+  // Actualizar banner
+  if (userData.plan === 'free') {
+    const bannerText = document.getElementById('plan-banner-text');
+    if (bannerText) {
+      if (remaining > 0) {
+        bannerText.textContent = `Te quedan ${remaining} cotización${remaining !== 1 ? 'es' : ''} gratis este mes`;
+      } else {
+        bannerText.textContent = `¡Agotaste tus ${quota} cotizaciones gratis este mes!`;
+      }
+    }
+  }
 }
 
 function getPlanQuota(plan) {
