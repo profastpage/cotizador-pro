@@ -739,16 +739,19 @@ const REDIRECT_LOCK_KEY = 'cotizapro_redirect_lock';
 
 function isLoginPagePath() {
   const path = window.location.pathname;
-  return path.includes('index.html') || path === '/' || path === '';
+  return path === '/' || path === '' || path === '/index.html';
 }
 
 function redirectOnce(targetPath, force = false) {
   const normalizedTarget = targetPath.startsWith('/') ? targetPath : `/${targetPath}`;
-  if (window.location.pathname.endsWith(normalizedTarget)) return;
+  const currentPath = window.location.pathname;
+  const cleanCurrent = currentPath.replace(/\.html$/, '');
+  const cleanTarget = normalizedTarget.replace(/\.html$/, '');
+  if (cleanCurrent === cleanTarget || currentPath === cleanTarget) return;
   if (!force && sessionStorage.getItem(REDIRECT_LOCK_KEY) === '1') return;
   sessionStorage.setItem(REDIRECT_LOCK_KEY, '1');
   console.log('[Redirect]', normalizedTarget, force ? '(forced)' : '');
- window.location.replace(normalizedTarget);
+  window.location.href = normalizedTarget;
 }
 
 export function protectRoute(requiredAuth = true) {
@@ -760,7 +763,7 @@ export function protectRoute(requiredAuth = true) {
   authCheckInProgress = true;
 
   const path = window.location.pathname;
-  const isLoginPage = path.includes('index.html') || path === '/' || path === '';
+  const isLoginPage = path === '/' || path === '' || path === '/index.html';
 
   console.log('🔍 protectRoute:', { path, requiredAuth, isLoginPage, isLoggingOut });
   if (!isLoginPage) {
@@ -781,9 +784,9 @@ export function protectRoute(requiredAuth = true) {
     }
 
     if (requiredAuth && !user) {
-      if (!isLoginPage && !window.location.href.includes('index.html')) {
+      if (!isLoginPage) {
         console.log('🔐 No auth, redirecting to login...');
-        localStorage.setItem('redirectAfterLogin', window.location.href);
+        localStorage.setItem('redirectAfterLogin', window.location.pathname);
         redirectOnce('/index.html');
       }
     } else if (user && isLoginPage) {

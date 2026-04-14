@@ -1,0 +1,5 @@
+# Cloudflare Pages redirects
+# Clean URL -> .html mapping
+/app /app.html 200
+/superadmin /superadmin.html 200
+/index /index.html 200

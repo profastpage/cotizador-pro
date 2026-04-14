@@ -433,13 +433,16 @@ window.logout = async function() {
   
   try {
     localStorage.removeItem('cotizapro_session');
+    localStorage.removeItem('redirectAfterLogin');
+    sessionStorage.clear();
     await signOut(auth);
     showToast('Sesión cerrada correctamente', 'info');
     await new Promise(r => setTimeout(r, 300));
-    window.location.href = 'index.html';
+    window.location.href = '/index.html';
   } catch (err) {
     console.error('Logout error:', err);
-    window.location.href = 'index.html';
+    sessionStorage.clear();
+    window.location.href = '/index.html';
   } finally {
     adminIsLoggingOut = false;
   }
