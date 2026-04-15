@@ -654,9 +654,19 @@ async function loadJsPDF() {
 }
 
 // Centralized PDF renderer - used by both generatePDF and downloadQuote
-async function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType = 'cotizacion') {
+async function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType = 'cotizacion', clientDocument = '') {
   const { jsPDF } = await loadJsPDF();
   const pdf = new jsPDF();
+
+  // Set PDF metadata for sharing preview (WhatsApp, etc.)
+  const paddedNum = String(quoteNumber).padStart(3, '0');
+  const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
+  pdf.setProperties({
+    title: `${company.name || 'Cotización'} - ${paddedNum}`,
+    author: company.name || 'CotizaPro',
+    subject: `${docTypeInfo.headerTitle} #${paddedNum} - ${clientName}`,
+    creator: 'CotizaPro - Sistema de Cotizaciones Profesionales'
+  });
 
   // Dynamic color theme from user config
   const colorId = company.templateColor || 'blue';
@@ -667,8 +677,6 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   const GRAY_TEXT = [100, 116, 139];
   const DARK = [15, 23, 42];
   const GREEN = [5, 150, 105];
-
-  const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
 
   // ==========================================
   // HEADER - Company Info + Title
@@ -731,40 +739,47 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.text('PEN (Soles)', 155, barY + 10);
 
   // ==========================================
-  // CLIENT DATA SECTION
+  // CLIENT DATA SECTION - Compact
   // ==========================================
   const clientY = 68;
   pdf.setFillColor(...BLUE);
-  pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
-  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
+  pdf.roundedRect(20, clientY, 170, 7, 2, 2, 'F');
+  pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+  pdf.text('DATOS DEL CLIENTE', 25, clientY + 5);
 
-  const boxY = clientY + 11;
+  const boxY = clientY + 9;
   pdf.setFillColor(...GRAY_BG);
-  pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
+  pdf.roundedRect(20, boxY, 170, 12, 2, 2, 'F');
 
-  pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+  pdf.setFontSize(8); pdf.setTextColor(...DARK);
+  // Left side: RUC/DNI
   pdf.setFont(undefined, 'bold'); pdf.text('RUC/DNI:', 25, boxY + 7);
-  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 55, boxY + 7);
-
-  pdf.setFont(undefined, 'bold'); pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
-  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 145, boxY + 7);
+  pdf.setFont(undefined, 'normal');
+  const docText = clientDocument || '-';
+  const splitDoc = pdf.splitTextToSize(docText, 40);
+  pdf.text(splitDoc[0] || docText, 48, boxY + 7);
+  // Right side: Razón Social
+  pdf.setFont(undefined, 'bold'); pdf.text('RAZÓN SOCIAL:', 100, boxY + 7);
+  pdf.setFont(undefined, 'normal');
+  const nameText = clientName || '-';
+  const splitName = pdf.splitTextToSize(nameText, 65);
+  pdf.text(splitName[0] || nameText, 122, boxY + 7);
 
   // ==========================================
   // ITEMS TABLE
   // ==========================================
-  let tableY = boxY + 35;
+  let tableY = boxY + 16;
   pdf.setFillColor(...BLUE);
   pdf.rect(20, tableY, 170, 9, 'F');
 
   pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('CANT.', 25, tableY + 6);
-  pdf.text('DESCRIPCIÓN', 45, tableY + 6);
-  pdf.text('P. UNIT.', 130, tableY + 6);
-  pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+  pdf.text('CANT.', 25, tableY + 5);
+  pdf.text('DESCRIPCIÓN', 45, tableY + 5);
+  pdf.text('P. UNIT.', 130, tableY + 5);
+  pdf.text('TOTAL', 170, tableY + 5, { align: 'right' });
 
   pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
-  tableY += 9;
+  tableY += 7;
 
   for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
     const item = items[rowIdx];
@@ -772,28 +787,28 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
     const price = item.unitPrice || 0;
     const lineTotal = qty * price;
 
-    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
+    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 7, 'F'); }
 
     pdf.setTextColor(...DARK);
-    pdf.text(String(qty), 25, tableY + 5.5);
+    pdf.text(String(qty), 25, tableY + 4.5);
     const desc = item.description || '';
     const splitDesc = pdf.splitTextToSize(desc, 80);
-    pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
-    pdf.text(`S/ ${formatNumberWithCommas(price)}`, 130, tableY + 5.5);
-    pdf.text(`S/ ${formatNumberWithCommas(lineTotal)}`, 188, tableY + 5.5, { align: 'right' });
-    tableY += 8;
+    pdf.text(splitDesc[0] || '', 45, tableY + 4.5);
+    pdf.text(`S/ ${formatNumberWithCommas(price)}`, 130, tableY + 4.5);
+    pdf.text(`S/ ${formatNumberWithCommas(lineTotal)}`, 188, tableY + 4.5, { align: 'right' });
+    tableY += 7;
   }
 
-  // Totals
-  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
-  pdf.line(20, tableY + 2, 190, tableY + 2);
-  tableY += 8;
+  // Totals - Compact
+  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
+  pdf.line(20, tableY + 1, 190, tableY + 1);
+  tableY += 6;
 
-  pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
+  pdf.setFontSize(9); pdf.setTextColor(...GRAY_TEXT);
   pdf.text('SUBTOTAL:', 120, tableY);
   pdf.setTextColor(...DARK);
   pdf.text(`S/ ${formatNumberWithCommas(subtotal)}`, 188, tableY, { align: 'right' });
-  tableY += 6;
+  tableY += 5;
 
   if (igvEnabled) {
     pdf.setTextColor(...GRAY_TEXT);
@@ -805,24 +820,24 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
       pdf.setFontSize(7); pdf.setTextColor(...GREEN);
       pdf.text('(Incluido en el precio)', 120, tableY);
       pdf.setTextColor(...DARK); pdf.setFontSize(9);
-      tableY += 5;
-    } else { tableY += 2; }
+      tableY += 4;
+    } else { tableY += 1; }
   }
 
-  tableY += 2;
+  tableY += 1;
   pdf.line(120, tableY, 190, tableY);
-  tableY += 7;
-  pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+  tableY += 6;
+  pdf.setFontSize(13); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
   pdf.text('TOTAL:', 120, tableY);
   pdf.text(`S/ ${formatNumberWithCommas(total)}`, 188, tableY, { align: 'right' });
 
   // Written total text (Son: Tres Mil Noventa y Un Soles con 60/100)
-  tableY += 6;
+  tableY += 5;
   const writtenText = totalToWrittenText(total);
-  pdf.setFontSize(8); pdf.setFont(undefined, 'italic'); pdf.setTextColor(...GRAY_TEXT);
+  pdf.setFontSize(7); pdf.setFont(undefined, 'italic'); pdf.setTextColor(...GRAY_TEXT);
   const splitWritten = pdf.splitTextToSize(writtenText, 160);
   pdf.text(splitWritten, 25, tableY);
-  tableY += splitWritten.length * 4 + 2;
+  tableY += splitWritten.length * 3.5 + 1;
 
   // ==========================================
   // DOCUMENT-TYPE SPECIFIC SECTIONS + FOOTER
@@ -1281,9 +1296,9 @@ async function generatePDF() {
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
     // Use centralized PDF renderer
-    const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType);
+    const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType, clientDoc);
 
-    const fileName = `Cotizacion-${String(quoteNumber).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+    const fileName = `${(company.name || 'Cotizacion').replace(/[^a-zA-Z0-9\s]/g, '').trim()}-${String(quoteNumber).padStart(3, '0')}.pdf`;
     pdf.save(fileName);
 
     showToast('¡PDF generado exitosamente!');
@@ -1676,13 +1691,14 @@ window.previewQuote = async function(id) {
 
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
+    const clientDoc = quote.client?.document || '';
 
     const { pdf } = await renderPDF(
       company, clientName, quote.items || [],
       quote.number || 0, quote.issueDate, quote.dueDate,
       quote.subtotal || 0, quote.igv || 0, quote.total || 0,
       quote.igvEnabled, quote.igvType || 'apart',
-      quote.documentType || 'cotizacion'
+      quote.documentType || 'cotizacion', clientDoc
     );
 
     currentPreviewQuoteId = id;
@@ -1728,24 +1744,18 @@ window.downloadQuote = async function(id) {
 
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
+    const clientDoc = quote.client?.document || '';
 
     // Use centralized PDF renderer
     const { pdf } = await renderPDF(
-      company,
-      clientName,
-      quote.items || [],
-      quote.number || 0,
-      quote.issueDate,
-      quote.dueDate,
-      quote.subtotal || 0,
-      quote.igv || 0,
-      quote.total || 0,
-      quote.igvEnabled,
-      quote.igvType || 'apart',
-      quote.documentType || 'cotizacion'
+      company, clientName, quote.items || [],
+      quote.number || 0, quote.issueDate, quote.dueDate,
+      quote.subtotal || 0, quote.igv || 0, quote.total || 0,
+      quote.igvEnabled, quote.igvType || 'apart',
+      quote.documentType || 'cotizacion', clientDoc
     );
 
-    pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
+    pdf.save(`${(company.name || 'Cotizacion').replace(/[^a-zA-Z0-9\s]/g, '').trim()}-${String(quote.number || 0).padStart(3, '0')}.pdf`);
     showToast('¡PDF descargado!');
   } catch (error) {
     console.error('Download error:', error);
