@@ -211,11 +211,64 @@
     const DEFAULT_PAYMENT_CONDITION = 'Contado';
     const DEFAULT_CLAUSES = `Esta cotizacion tiene una validez de 30 dias calendario.\nLos precios estan expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos estan detallados en la seccion de condiciones de pago.\nEsta cotizacion esta sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuniquese a los datos de contacto indicados en el encabezado.`;
 
+    function formatNumberWithCommas(n) {
+      var parts = (n || 0).toFixed(2).split('.');
+      parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      return parts.join('.');
+    }
+
+    function numberToWords(n) {
+      if (n === 0) return 'Cero';
+      var units = ['', 'Uno', 'Dos', 'Tres', 'Cuatro', 'Cinco', 'Seis', 'Siete', 'Ocho', 'Nueve'];
+      var teens = ['Diez', 'Once', 'Doce', 'Trece', 'Catorce', 'Quince', 'Dieciseis', 'Diecisiete', 'Dieciocho', 'Diecinueve'];
+      var tens = ['', 'Diez', 'Veinte', 'Treinta', 'Cuarenta', 'Cincuenta', 'Sesenta', 'Setenta', 'Ochenta', 'Noventa'];
+      var hundreds = ['', 'Ciento', 'Doscientos', 'Trescientos', 'Cuatrocientos', 'Quinientos', 'Seiscientos', 'Setecientos', 'Ochocientos', 'Novecientos'];
+      if (n === 100) return 'Cien';
+      var result = '';
+      if (n >= 1000) {
+        var thousands = Math.floor(n / 1000);
+        if (thousands === 1) result += 'Mil '; else result += numberToWords(thousands) + ' Mil ';
+        n %= 1000;
+      }
+      if (n >= 100) { result += hundreds[Math.floor(n / 100)] + ' '; n %= 100; }
+      if (n >= 20) {
+        result += tens[Math.floor(n / 10)];
+        if (n % 10 > 0) { if (n >= 30) result += ' y ' + units[n % 10]; else result = result.slice(0, -1) + 'i' + units[n % 10]; }
+        result += ' ';
+      } else if (n >= 10) { result += teens[n - 10] + ' '; } else if (n > 0) { result += units[n] + ' '; }
+      return result.trim();
+    }
+
+    function totalToWrittenText(amount) {
+      var integerPart = Math.floor(amount);
+      var decimalPart = Math.round((amount - integerPart) * 100);
+      var text = 'Son: ' + numberToWords(integerPart);
+      text += integerPart === 1 ? ' Sol' : ' Soles';
+      if (decimalPart > 0) text += ' con ' + decimalPart.toString().padStart(2, '0') + '/100';
+      return text;
+    }
+
+    const TEMPLATE_COLORS = {
+      blue:   { primary: [30, 64, 175],    light: [240, 244, 255] },
+      red:    { primary: [185, 28, 28],    light: [254, 242, 242] },
+      black:  { primary: [24, 24, 27],     light: [244, 244, 245] },
+      green:  { primary: [21, 128, 61],    light: [240, 253, 244] },
+      purple: { primary: [109, 40, 217],   light: [245, 243, 255] },
+      orange: { primary: [194, 65, 12],    light: [255, 247, 237] }
+    };
+
+    function getTemplateColor(colorId) {
+      return TEMPLATE_COLORS[colorId] || TEMPLATE_COLORS.blue;
+    }
+
     function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType) {
       const pdf = new jspdf.jsPDF();
 
-      const BLUE = [30, 64, 175];
-      const LIGHT_BLUE = [240, 244, 255];
+      // Dynamic color theme
+      const colorId = company.templateColor || 'blue';
+      const COLOR = getTemplateColor(colorId);
+      const BLUE = COLOR.primary;
+      const LIGHT_BLUE = COLOR.light;
       const GRAY_BG = [245, 247, 250];
       const GRAY_TEXT = [100, 116, 139];
       const DARK = [15, 23, 42];
@@ -323,8 +376,8 @@
         pdf.text(String(qty), 25, tableY + 5.5);
         const desc = item.description || '';
         pdf.text(desc, 45, tableY + 5.5);
-        pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
-        pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+        pdf.text(`S/ ${formatNumberWithCommas(price)}`, 130, tableY + 5.5);
+        pdf.text(`S/ ${formatNumberWithCommas(lineTotal)}`, 188, tableY + 5.5, { align: 'right' });
         tableY += 8;
       }
 
@@ -336,14 +389,14 @@
       pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
       pdf.text('SUBTOTAL:', 120, tableY);
       pdf.setTextColor(...DARK);
-      pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+      pdf.text(`S/ ${formatNumberWithCommas(subtotal)}`, 188, tableY, { align: 'right' });
       tableY += 6;
 
       if (igvEnabled) {
         pdf.setTextColor(...GRAY_TEXT);
         pdf.text('IGV (18%):', 120, tableY);
         pdf.setTextColor(...DARK);
-        pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
+        pdf.text(`S/ ${formatNumberWithCommas(igvAmount)}`, 188, tableY, { align: 'right' });
         tableY += 4;
         if (igvType === 'included') {
           pdf.setFontSize(7); pdf.setTextColor(...GREEN);
@@ -358,7 +411,15 @@
       tableY += 7;
       pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
       pdf.text('TOTAL:', 120, tableY);
-      pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
+      pdf.text(`S/ ${formatNumberWithCommas(total)}`, 188, tableY, { align: 'right' });
+
+      // Written total text
+      tableY += 6;
+      const writtenText = totalToWrittenText(total);
+      pdf.setFontSize(8); pdf.setFont(undefined, 'italic'); pdf.setTextColor(...GRAY_TEXT);
+      const splitWritten = pdf.splitTextToSize(writtenText, 160);
+      pdf.text(splitWritten, 25, tableY);
+      tableY += splitWritten.length * 4 + 2;
 
       // ==========================================
       // DOCUMENT-TYPE SPECIFIC SECTIONS + FOOTER
@@ -367,17 +428,19 @@
       const clausesText = company.clauses || DEFAULT_CLAUSES;
       const clauseLines = clausesText.split('\n').filter(function(l) { return l.trim() !== ''; });
       const bankAccounts = company.bankAccounts || [];
-      let docY = tableY + 10;
-      docY = renderDocTypeSections(pdf, documentType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, docY, igvEnabled);
+      let docY = tableY + 6;
+      docY = renderDocTypeSections(pdf, documentType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, docY, igvEnabled, colorId);
 
-      // Footer
+      // Footer with clickable link
       const finalFooterY = Math.max(docY + 6, 275);
       pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
       pdf.line(20, finalFooterY, 190, finalFooterY);
       pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
       pdf.text(docTypeInfo.footerText, 105, finalFooterY + 7, { align: 'center' });
-      pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-      pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, finalFooterY + 13, { align: 'center' });
+
+      // Clickable hyperlink to CotizaPro website
+      pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...BLUE);
+      pdf.textWithLink('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, finalFooterY + 13, { align: 'center', url: 'https://cotizador-pro.pages.dev/' });
 
       return pdf;
     }
@@ -385,9 +448,10 @@
   // ==========================================================
   // DOCUMENT TYPE SPECIFIC RENDERER
   // ==========================================================
-  function renderDocTypeSections(pdf, docType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, startY, igvEnabled) {
-    var BLUE = [30, 64, 175];
-    var LIGHT_BLUE = [240, 244, 255];
+  function renderDocTypeSections(pdf, docType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, startY, igvEnabled, colorId) {
+    var COLOR = getTemplateColor(colorId || 'blue');
+    var BLUE = COLOR.primary;
+    var LIGHT_BLUE = COLOR.light;
     var GRAY_BG = [245, 247, 250];
     var DARK = [15, 23, 42];
     var GRAY_TEXT = [100, 116, 139];
@@ -439,20 +503,24 @@
       drawSectionHeader('DATOS BANCARIOS PARA PAGO');
       bankAccounts.forEach(function(bank, i) {
         if (!bank || !bank.number) return;
-        newPageIfNeeded(10);
+        newPageIfNeeded(16);
+        var boxHeight = 12;
         if (i % 2 === 0) {
           pdf.setFillColor(...LIGHT_BLUE);
-          pdf.roundedRect(20, y - 3.5, 170, 7, 1, 1, 'F');
+          pdf.roundedRect(20, y - 1, 170, boxHeight, 2, 2, 'F');
+        } else {
+          pdf.setFillColor(...GRAY_BG);
+          pdf.roundedRect(20, y - 1, 170, boxHeight, 2, 2, 'F');
         }
         var label = bank.name || 'Cuenta Bancaria';
         if (bank.accountType) label += ' - ' + bank.accountType;
-        pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-        pdf.text(label, 25, y);
-        var detail = 'N\u00B0 ' + bank.number;
-        if (bank.holder) detail += ' | Titular: ' + bank.holder;
-        pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-        pdf.text(detail, 25, y + 4);
-        y += 8;
+        pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+        pdf.text(label, 25, y + 3);
+        var detail = 'N\u00B0 Cuenta: ' + bank.number;
+        if (bank.holder) detail += '  |  Titular: ' + bank.holder;
+        pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(detail, 25, y + 8);
+        y += boxHeight + 4;
       });
     }
 
@@ -741,7 +809,8 @@
             clauses: urlEncodedData.co?.cl || DEFAULT_CLAUSES,
             bankAccounts: (urlEncodedData.co?.ba || []).map(b => ({
               name: b.n, accountType: b.t, holder: b.h, number: b.num
-            }))
+            })),
+            templateColor: urlEncodedData.co?.tc || 'blue'
           };
 
           const items = (urlEncodedData.items || []).map(i => ({
