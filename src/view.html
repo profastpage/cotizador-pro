@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <title>CotizaPro - Vista de Cotización</title>
+  <title>CotizaPro - Vista de Cotizacion</title>
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
@@ -156,7 +156,7 @@
       <span>📊</span>
       <div>
         <div class="header-logo">CotizaPro</div>
-        <div class="header-subtitle" id="quote-info">Cargando cotización...</div>
+        <div class="header-subtitle" id="quote-info">Cargando cotizacion...</div>
       </div>
     </div>
     <div id="header-actions" class="hidden">
@@ -169,34 +169,320 @@
       <!-- Loading State -->
       <div id="state-loading" class="loading">
         <div class="loading-spinner"></div>
-        <h3>Cargando cotización...</h3>
-        <p>Esto tomará unos segundos</p>
+        <h3>Cargando cotizacion...</h3>
+        <p>Esto tomara unos segundos</p>
       </div>
 
       <!-- Error State -->
       <div id="state-error" class="error hidden">
         <div class="error-icon">📄</div>
-        <h3 id="error-title">Cotización no encontrada</h3>
-        <p id="error-message">El enlace que seguiste puede haber expirado o ser inválido.</p>
+        <h3 id="error-title">Cotizacion no encontrada</h3>
+        <p id="error-message">El enlace que seguiste puede haber expirado o ser invalido.</p>
         <a href="/">← Ir a CotizaPro</a>
       </div>
 
       <!-- PDF Display -->
-      <iframe id="pdf-display" class="hidden" title="Cotización PDF"></iframe>
+      <iframe id="pdf-display" class="hidden" title="Cotizacion PDF"></iframe>
     </div>
   </div>
 
   <script type="module">
     import { db, doc, getDoc } from './firebase-config.js';
 
-    let currentPdfDataUrl = null;
+    let currentPdfBlob = null;
+
+    // ==========================================================
+    // PDF RENDERER - Standalone version for shared quotes
+    // ==========================================================
+
+    const DOCUMENT_TYPES = {
+      cotizacion: { name: 'Cotizacion', icon: '📋', headerTitle: 'COTIZACION', footerText: 'Cotizacion' },
+      propuesta: { name: 'Propuesta', icon: '💡', headerTitle: 'PROPUESTA', footerText: 'Propuesta' },
+      nota_venta: { name: 'Nota de Venta', icon: '🧾', headerTitle: 'NOTA DE VENTA', footerText: 'Nota de Venta' },
+      orden_servicio: { name: 'Orden de Servicio', icon: '🔧', headerTitle: 'ORDEN DE SERVICIO', footerText: 'Orden de Servicio' },
+      factura: { name: 'Factura', icon: '🧾', headerTitle: 'FACTURA', footerText: 'Factura' },
+      boleta: { name: 'Boleta', icon: '🎫', headerTitle: 'BOLETA', footerText: 'Boleta' },
+      recibo: { name: 'Recibo', icon: '🧾', headerTitle: 'RECIBO', footerText: 'Recibo' },
+      contrato: { name: 'Contrato', icon: '📝', headerTitle: 'CONTRATO', footerText: 'Contrato' },
+      garantia: { name: 'Garantia', icon: '🛡️', headerTitle: 'GARANTIA', footerText: 'Garantia' },
+      personalizado: { name: 'Documento', icon: '📄', headerTitle: 'DOCUMENTO', footerText: 'Documento' }
+    };
+
+    const DEFAULT_PAYMENT_CONDITION = 'Contado';
+    const DEFAULT_CLAUSES = `Esta cotizacion tiene una validez de 30 dias calendario.\nLos precios estan expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos estan detallados en la seccion de condiciones de pago.\nEsta cotizacion esta sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuniquese a los datos de contacto indicados en el encabezado.`;
+
+    function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType) {
+      const pdf = new jspdf.jsPDF();
+
+      const BLUE = [30, 64, 175];
+      const LIGHT_BLUE = [240, 244, 255];
+      const GRAY_BG = [245, 247, 250];
+      const GRAY_TEXT = [100, 116, 139];
+      const DARK = [15, 23, 42];
+      const GREEN = [5, 150, 105];
+
+      const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
+
+      // HEADER
+      pdf.setFontSize(11);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(...DARK);
+      pdf.text(company.name || 'Mi Empresa', 20, 20);
+
+      pdf.setFontSize(8);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(...GRAY_TEXT);
+
+      let companyY = 27;
+      if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
+      if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
+      if (company.phone) { pdf.text(company.phone, 20, companyY); companyY += 5; }
+
+      pdf.setFontSize(22);
+      pdf.setFont(undefined, 'bold');
+      pdf.setTextColor(...BLUE);
+      pdf.text(docTypeInfo.headerTitle, 190, 20, { align: 'right' });
+
+      pdf.setFontSize(8);
+      pdf.setFont(undefined, 'normal');
+      pdf.setTextColor(...GRAY_TEXT);
+      pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
+      if (company.phone) pdf.text(`Tel: ${company.phone}`, 190, 32, { align: 'right' });
+      if (company.email) pdf.text(company.email, 190, 37, { align: 'right' });
+
+      pdf.setDrawColor(...BLUE);
+      pdf.setLineWidth(1);
+      pdf.line(20, 42, 190, 42);
+
+      // QUOTE INFO BAR
+      const barY = 47;
+      pdf.setFillColor(...LIGHT_BLUE);
+      pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
+
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('NUMERO:', 25, barY + 5);
+      pdf.setFontSize(9); pdf.setTextColor(...DARK);
+      pdf.text(`#${String(quoteNumber).padStart(3, '0')}`, 25, barY + 10);
+
+      pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('FECHA EMISION:', 65, barY + 5);
+      pdf.setFontSize(9); pdf.setTextColor(...DARK);
+      pdf.text(issueDate || '-', 65, barY + 10);
+
+      pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
+      pdf.setFontSize(9); pdf.setTextColor(...DARK);
+      pdf.text(dueDate || '-', 105, barY + 10);
+
+      pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('MONEDA:', 155, barY + 5);
+      pdf.setFontSize(9); pdf.setTextColor(...DARK);
+      pdf.text('PEN (Soles)', 155, barY + 10);
+
+      // CLIENT DATA
+      const clientY = 68;
+      pdf.setFillColor(...BLUE);
+      pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
+
+      const boxY = clientY + 11;
+      pdf.setFillColor(...GRAY_BG);
+      pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
+
+      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.setFont(undefined, 'bold'); pdf.text('RUC/DNI:', 25, boxY + 7);
+      pdf.setFont(undefined, 'normal'); pdf.text(clientName, 55, boxY + 7);
+
+      pdf.setFont(undefined, 'bold'); pdf.text('RAZON SOCIAL:', 110, boxY + 7);
+      pdf.setFont(undefined, 'normal'); pdf.text(clientName, 145, boxY + 7);
+
+      // ITEMS TABLE
+      let tableY = boxY + 35;
+      pdf.setFillColor(...BLUE);
+      pdf.rect(20, tableY, 170, 9, 'F');
+
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('CANT.', 25, tableY + 6);
+      pdf.text('DESCRIPCION', 45, tableY + 6);
+      pdf.text('P. UNIT.', 130, tableY + 6);
+      pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+
+      pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+      tableY += 9;
+
+      for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
+        const item = items[rowIdx];
+        const qty = item.quantity || 0;
+        const price = item.unitPrice || 0;
+        const lineTotal = qty * price;
+
+        if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
+
+        pdf.setTextColor(...DARK);
+        pdf.text(String(qty), 25, tableY + 5.5);
+        const desc = item.description || '';
+        pdf.text(desc, 45, tableY + 5.5);
+        pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
+        pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+        tableY += 8;
+      }
+
+      // Totals
+      pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
+      pdf.line(20, tableY + 2, 190, tableY + 2);
+      tableY += 8;
+
+      pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('SUBTOTAL:', 120, tableY);
+      pdf.setTextColor(...DARK);
+      pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
+      tableY += 6;
+
+      if (igvEnabled) {
+        pdf.setTextColor(...GRAY_TEXT);
+        pdf.text('IGV (18%):', 120, tableY);
+        pdf.setTextColor(...DARK);
+        pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
+        tableY += 4;
+        if (igvType === 'included') {
+          pdf.setFontSize(7); pdf.setTextColor(...GREEN);
+          pdf.text('(Incluido en el precio)', 120, tableY);
+          pdf.setTextColor(...DARK); pdf.setFontSize(9);
+          tableY += 5;
+        } else { tableY += 2; }
+      }
+
+      tableY += 2;
+      pdf.line(120, tableY, 190, tableY);
+      tableY += 7;
+      pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      pdf.text('TOTAL:', 120, tableY);
+      pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
+
+      // CLAUSES
+      let clausesY = tableY + 10;
+      const paymentCondition = company.paymentCondition || DEFAULT_PAYMENT_CONDITION;
+      const clausesText = company.clauses || DEFAULT_CLAUSES;
+      const clauseLines = clausesText.split('\n').filter(line => line.trim() !== '');
+
+      const spaceNeeded = 10 + 6 + 4 + 10 + (clauseLines.length * 5.5) + 6;
+      if (clausesY + spaceNeeded > 275) {
+        pdf.addPage();
+        clausesY = 20;
+      }
+
+      pdf.setFillColor(...BLUE);
+      pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('CONDICIONES DE PAGO', 25, clausesY + 5.5);
+      clausesY += 12;
+
+      pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(paymentCondition, 25, clausesY);
+      clausesY += 8;
+
+      pdf.setFillColor(...BLUE);
+      pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('TERMINOS Y CONDICIONES', 25, clausesY + 5.5);
+      clausesY += 11;
+
+      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      const LIGHT_BLUE_BG = [240, 244, 255];
+      for (let cIdx = 0; cIdx < clauseLines.length; cIdx++) {
+        const clause = clauseLines[cIdx].trim();
+        if (cIdx % 2 === 0) {
+          pdf.setFillColor(...LIGHT_BLUE_BG);
+          pdf.roundedRect(20, clausesY - 3.5, 170, 6, 1, 1, 'F');
+        }
+        pdf.setTextColor(...BLUE);
+        pdf.setFontSize(8);
+        pdf.text('•', 25, clausesY);
+        pdf.setTextColor(...DARK);
+        pdf.text(clause, 30, clausesY);
+        clausesY += 5.5;
+      }
+
+      // BANK ACCOUNTS
+      const bankAccounts = company.bankAccounts || [];
+      if (bankAccounts.length > 0) {
+        clausesY += 4;
+        const bankSpaceNeeded = 10 + (bankAccounts.length * 7) + 6;
+        if (clausesY + bankSpaceNeeded > 280) {
+          pdf.addPage();
+          clausesY = 20;
+        }
+
+        pdf.setFillColor(...BLUE);
+        pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
+        pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+        pdf.text('DATOS BANCARIOS PARA PAGO', 25, clausesY + 5.5);
+        clausesY += 12;
+
+        for (let bIdx = 0; bIdx < bankAccounts.length; bIdx++) {
+          const bank = bankAccounts[bIdx];
+          if (!bank || !bank.number) continue;
+
+          if (bIdx % 2 === 0) {
+            pdf.setFillColor(...LIGHT_BLUE_BG);
+            pdf.roundedRect(20, clausesY - 3.5, 170, 7, 1, 1, 'F');
+          }
+
+          const bankLabel = bank.name || 'Cuenta Bancaria';
+          const accountType = bank.accountType || '';
+          const holder = bank.holder || '';
+
+          pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+          let bankText = `${bankLabel}`;
+          if (accountType) bankText += ` - ${accountType}`;
+          pdf.text(bankText, 25, clausesY);
+
+          pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+          let detailText = `N° ${bank.number}`;
+          if (holder) detailText += ` | Titular: ${holder}`;
+          pdf.text(detailText, 25, clausesY + 4);
+
+          clausesY += 8;
+        }
+      }
+
+      // Footer
+      const finalFooterY = Math.max(clausesY + 6, 275);
+      pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
+      pdf.line(20, finalFooterY, 190, finalFooterY);
+      pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      pdf.text(docTypeInfo.footerText, 105, finalFooterY + 7, { align: 'center' });
+      pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, finalFooterY + 13, { align: 'center' });
+
+      return pdf;
+    }
+
+    // ==========================================================
+    // LOAD jsPDF dynamically
+    // ==========================================================
+
+    function loadJsPDF() {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+        script.onload = () => resolve(window.jspdf);
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    // ==========================================================
+    // MAIN: Load shared quote and render PDF
+    // ==========================================================
 
     async function loadSharedQuote() {
       const params = new URLSearchParams(window.location.search);
       const shareId = params.get('id');
 
       if (!shareId) {
-        showError('Enlace inválido', 'No se encontró el ID de la cotización en el enlace.');
+        showError('Enlace invalido', 'No se encontro el ID de la cotizacion en el enlace.');
         return;
       }
 
@@ -204,7 +490,7 @@
         const docSnap = await getDoc(doc(db, 'shared_quotes', shareId));
 
         if (!docSnap.exists()) {
-          showError('Cotización no encontrada', 'El enlace que seguiste puede haber expirado o ser inválido.');
+          showError('Cotizacion no encontrada', 'El enlace que seguiste puede haber expirado o ser invalido.');
           return;
         }
 
@@ -212,34 +498,57 @@
 
         // Check expiration
         if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
-          showError('Enlace expirado', 'Este enlace de cotización ha expirado (vigencia de 30 días).');
+          showError('Enlace expirado', 'Este enlace de cotizacion ha expirado (vigencia de 30 dias).');
           return;
         }
 
         // Update header info
-        const docTypes = {
-          cotizacion: 'Cotización', propuesta: 'Propuesta', nota_venta: 'Nota de Venta',
-          orden_servicio: 'Orden de Servicio', factura: 'Factura', boleta: 'Boleta',
-          recibo: 'Recibo', contrato: 'Contrato', garantia: 'Garantía', personalizado: 'Documento'
-        };
-        const docType = docTypes[data.documentType] || 'Cotización';
+        const docType = DOCUMENT_TYPES[data.documentType] || DOCUMENT_TYPES.cotizacion;
         const num = String(data.quoteNumber || 0).padStart(3, '0');
-        document.getElementById('quote-info').textContent = `${docType} #${num} - ${data.clientName || 'Sin cliente'}`;
+        document.getElementById('quote-info').textContent = `${docType.name} #${num} - ${data.clientName || 'Sin cliente'}`;
 
-        // Display PDF
+        // Check if this is a NEW format (data-based) or OLD format (pdfBase64-based)
         if (data.pdfBase64) {
-          currentPdfDataUrl = `data:application/pdf;base64,${data.pdfBase64}`;
+          // OLD format - direct base64 display
+          const dataUrl = `data:application/pdf;base64,${data.pdfBase64}`;
           const iframe = document.getElementById('pdf-display');
-          iframe.src = currentPdfDataUrl;
+          iframe.src = dataUrl;
+          iframe.classList.remove('hidden');
+          document.getElementById('state-loading').classList.add('hidden');
+          document.getElementById('header-actions').classList.remove('hidden');
+        } else if (data.items && data.company) {
+          // NEW format - render PDF from stored data
+          const jspdf = await loadJsPDF();
+          window.jspdf = jspdf; // Store globally for download
+
+          const pdf = renderPDF(
+            data.company,
+            data.clientName || 'Sin cliente',
+            data.items || [],
+            data.quoteNumber || 0,
+            data.issueDate || '',
+            data.dueDate || '',
+            data.subtotal || 0,
+            data.igv || 0,
+            data.total || 0,
+            data.igvEnabled || false,
+            data.igvType || 'apart',
+            data.documentType || 'cotizacion'
+          );
+
+          currentPdfBlob = pdf.output('blob');
+          const dataUrl = pdf.output('datauristring');
+          const iframe = document.getElementById('pdf-display');
+          iframe.src = dataUrl;
           iframe.classList.remove('hidden');
           document.getElementById('state-loading').classList.add('hidden');
           document.getElementById('header-actions').classList.remove('hidden');
         } else {
-          showError('PDF no disponible', 'No se encontró el archivo PDF asociado a esta cotización.');
+          showError('Datos incompletos', 'No se encontraron los datos necesarios para generar la cotizacion.');
         }
       } catch (error) {
         console.error('Error loading shared quote:', error);
-        showError('Error de conexión', 'No se pudo cargar la cotización. Intenta nuevamente.');
+        showError('Error de conexion', 'No se pudo cargar la cotizacion. Intenta nuevamente.');
       }
     }
 
@@ -251,11 +560,23 @@
     }
 
     window.downloadPDF = function() {
-      if (!currentPdfDataUrl) return;
-      const a = document.createElement('a');
-      a.href = currentPdfDataUrl;
-      a.download = `Cotizacion-${String(Date.now()).padStart(3, '0')}.pdf`;
-      a.click();
+      if (currentPdfBlob) {
+        const url = URL.createObjectURL(currentPdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Cotizacion-${String(Date.now()).padStart(3, '0')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else {
+        // Fallback: try to get from iframe
+        const iframe = document.getElementById('pdf-display');
+        if (iframe && iframe.src) {
+          const a = document.createElement('a');
+          a.href = iframe.src;
+          a.download = `Cotizacion.pdf`;
+          a.click();
+        }
+      }
     };
 
     // Load on page ready

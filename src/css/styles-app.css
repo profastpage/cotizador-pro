@@ -483,19 +483,20 @@ body {
 .modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .modal.hidden { display: none; }
 .modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); }
-.modal-dialog { position: relative; background: white; border-radius: var(--radius-lg); max-width: 500px; width: 100%; }
+.modal-dialog { position: relative; background: white; border-radius: var(--radius-lg); max-width: 560px; width: 100%; max-height: 95vh; }
 .modal-header { padding: 1.5rem; border-bottom: 1px solid var(--color-gray-200); display: flex; justify-content: space-between; }
 .modal-title { font-size: 1.25rem; font-weight: 700; }
 .modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
-.modal-body { padding: 1.5rem; max-height: 70vh; overflow-y: auto; }
+.modal-body { padding: 1.5rem; max-height: 85vh; overflow-y: auto; }
 .upgrade-plans { display: grid; gap: 1rem; margin-bottom: 1rem; }
 .upgrade-plan-card {
   border: 2px solid var(--color-gray-200);
   border-radius: var(--radius-lg);
-  padding: 1rem;
+  padding: 1.25rem;
   cursor: pointer;
   transition: all 0.2s;
-  overflow: hidden;
+  overflow: visible;
+  position: relative;
 }
 .upgrade-plan-card:hover { border-color: var(--color-primary); }
 .upgrade-plan-card.featured { border-color: var(--color-primary); background: #eff6ff; position: relative; }
@@ -519,11 +520,12 @@ body {
   margin: 0.5rem 0 0;
 }
 .upgrade-features li {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--color-gray-600);
-  padding: 0.2rem 0;
+  padding: 0.25rem 0;
   padding-left: 1.25rem;
   position: relative;
+  line-height: 1.4;
 }
 .upgrade-features li::before {
   content: '✓';

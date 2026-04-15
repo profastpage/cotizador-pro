@@ -177,10 +177,10 @@ function updatePlanProgress() {
   const used = userData.quotesUsedThisMonth || 0;
   const percent = quota === -1 ? 0 : Math.min((used / quota) * 100, 100);
 
-  document.getElementById('quotes-used').textContent = used;
-  document.getElementById('quotes-limit').textContent = quota === -1 ? '∞' : quota;
-  document.getElementById('plan-progress-bar').style.width = `${percent}%`;
-  document.getElementById('plan-progress-bar').style.background = percent >= 90 ? 'var(--color-danger)' : percent >= 70 ? 'var(--color-warning)' : 'var(--color-success)';
+  // Update sidebar progress bar (visual only)
+  const progressBar = document.getElementById('plan-progress-bar');
+  if (progressBar) progressBar.style.width = `${percent}%`;
+  if (progressBar) progressBar.style.background = percent >= 90 ? 'var(--color-danger)' : percent >= 70 ? 'var(--color-warning)' : 'var(--color-success)';
 }
 
 // ==========================================================
@@ -199,7 +199,7 @@ function setupNavigation() {
   
   document.querySelectorAll('[data-close-modal]').forEach(btn => {
     btn.onclick = () => {
-      document.querySelectorAll('.modal').forEach(m => m.classList.add('hidden'));
+      document.querySelectorAll('.modal, .pdf-preview-modal').forEach(m => m.classList.add('hidden'));
     };
   });
 }
@@ -1354,10 +1354,11 @@ window.previewQuote = async function(id) {
     currentPreviewQuoteId = id;
     currentPreviewBlob = pdf.output('blob');
     
-    const blobUrl = URL.createObjectURL(currentPreviewBlob);
+    // Use data URL for better browser compatibility
+    const dataUrl = pdf.output('datauristring');
     const iframe = document.getElementById('pdf-preview-iframe');
     if (iframe) {
-      iframe.src = blobUrl;
+      iframe.src = dataUrl;
     }
     
     document.getElementById('modal-pdf-preview').classList.remove('hidden');
@@ -1444,31 +1445,40 @@ window.generateShareLink = async function(id) {
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
 
-    // Generate PDF
-    const { pdf } = await renderPDF(
-      company, clientName, quote.items || [],
-      quote.number || 0, quote.issueDate, quote.dueDate,
-      quote.subtotal || 0, quote.igv || 0, quote.total || 0,
-      quote.igvEnabled, quote.igvType || 'apart',
-      quote.documentType || 'cotizacion'
-    );
-
-    // Convert to base64
-    const pdfBase64 = pdf.output('datauristring').split(',')[1];
-    
     // Generate short share ID
     const shareId = 'q_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
     
-    // Store in shared_quotes collection
+    // Store quote DATA (not PDF) in shared_quotes collection to avoid Firestore 1MB limit
     const sharedData = {
       shareId,
       quoteId: id,
       userId: currentUser.uid,
-      pdfBase64,
       clientName,
+      clientDocument: quote.client?.document || '',
+      clientEmail: quote.client?.email || '',
+      clientPhone: quote.client?.phone || '',
+      clientAddress: quote.client?.address || '',
       quoteNumber: quote.number || 0,
       documentType: quote.documentType || 'cotizacion',
+      items: quote.items || [],
+      issueDate: quote.issueDate || '',
+      dueDate: quote.dueDate || '',
+      subtotal: quote.subtotal || 0,
+      igv: quote.igv || 0,
       total: quote.total || 0,
+      igvEnabled: quote.igvEnabled || false,
+      igvType: quote.igvType || 'apart',
+      // Company data for PDF rendering
+      company: {
+        name: company.name || '',
+        ruc: company.ruc || '',
+        address: company.address || '',
+        phone: company.phone || '',
+        email: company.email || '',
+        paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
+        clauses: company.clauses || DEFAULT_CLAUSES,
+        bankAccounts: company.bankAccounts || []
+      },
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
     };
@@ -1495,7 +1505,7 @@ window.generateShareLink = async function(id) {
     }
   } catch (error) {
     console.error('Share error:', error);
-    showToast('Error al generar enlace', 'error');
+    showToast('Error al generar enlace: ' + error.message, 'error');
   }
 };
 

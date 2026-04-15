@@ -107,12 +107,12 @@
     </div>
   </section>
 
-  <!-- PWA Install Section -->
-  <section class="install-section" id="pwa-install-banner" style="display:none;">
+  <!-- PWA Install Section - Always visible -->
+  <section class="install-section" id="pwa-install-banner">
     <div class="container" style="text-align:center;">
-      <div style="display:inline-flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#fef3c7,#fde68a);padding:1.25rem 2rem;border-radius:16px;border:2px solid #f59e0b;box-shadow:0 4px 15px rgba(245,158,11,0.2);">
+      <div style="display:inline-flex;align-items:center;gap:1rem;background:linear-gradient(135deg,#fef3c7,#fde68a);padding:1.25rem 2rem;border-radius:16px;border:2px solid #f59e0b;box-shadow:0 4px 15px rgba(245,158,11,0.2);flex-wrap:wrap;justify-content:center;">
         <span style="font-size:2.5rem;">📲</span>
-        <div style="text-align:left;">
+        <div style="text-align:left;min-width:200px;">
           <h3 style="margin:0;font-size:1rem;font-weight:700;color:#92400e;">Instala CotizaPro en tu dispositivo</h3>
           <p style="margin:0.25rem 0 0;font-size:0.85rem;color:#78350f;">Acceso rápido sin navegador, funciona sin internet</p>
         </div>
@@ -417,9 +417,6 @@
       e.preventDefault();
       pwaDeferredPrompt = e;
       console.log('[PWA] Install prompt captured on landing');
-      // Show install banner if exists
-      const banner = document.getElementById('pwa-install-banner');
-      if (banner) banner.style.display = '';
     });
 
     // Global install handler
@@ -429,18 +426,41 @@
         const { outcome } = await pwaDeferredPrompt.userChoice;
         if (outcome === 'accepted') {
           console.log('[PWA] User accepted install');
+          document.getElementById('pwa-install-banner').style.display = 'none';
         }
         pwaDeferredPrompt = null;
       } else {
         // Manual instructions
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-        if (isIOS) {
-          alert('Para instalar: toca Compartir (↑) → "Añadir a pantalla de inicio"');
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+                             window.matchMedia('(display-mode: fullscreen)').matches ||
+                             navigator.standalone;
+        if (isStandalone) {
+          alert('CotizaPro ya está instalada en tu dispositivo.');
+        } else if (isIOS) {
+          alert('Para instalar: toca el botón Compartir (↑) → "Añadir a pantalla de inicio"');
+        } else if (/Android/i.test(navigator.userAgent)) {
+          alert('Para instalar: toca el menú ⋮ (tres puntos) → "Instalar app" o "Añadir a pantalla de inicio"');
         } else {
-          alert('Para instalar: toca ⋮ → "Instalar app" o "Añadir a pantalla de inicio"');
+          alert('Para instalar: usa el menú del navegador (⋮) → "Instalar app" o "Añadir a pantalla de inicio"\n\nNota: La instalación solo está disponible en Chrome, Edge o Samsung Internet.');
         }
       }
     };
+
+    // Hide install banner if already in standalone mode (app already installed)
+    if (window.matchMedia('(display-mode: standalone)').matches ||
+        window.matchMedia('(display-mode: fullscreen)').matches ||
+        navigator.standalone) {
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+    }
+
+    // Also hide after appinstalled event
+    window.addEventListener('appinstalled', () => {
+      console.log('[PWA] App installed');
+      const banner = document.getElementById('pwa-install-banner');
+      if (banner) banner.style.display = 'none';
+    });
 
     // Detect PWA mode and auto-show login
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
