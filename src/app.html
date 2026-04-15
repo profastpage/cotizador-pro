@@ -437,6 +437,19 @@
         <!-- Step 2: Items -->
         <div id="quote-step-2" class="wizard-step-content">
           <h3 class="form-section-title">Items</h3>
+
+          <!-- Item Catalog Toggle -->
+          <div class="item-catalog-wrapper" id="item-catalog-wrapper" style="display:none; margin-bottom: 1rem;">
+            <button type="button" class="btn btn-outline btn-block item-catalog-toggle" id="btn-toggle-item-catalog" style="margin-bottom: 0;">
+              📦 Items guardados <span class="item-catalog-arrow" id="item-catalog-arrow">▶</span>
+            </button>
+            <div class="item-catalog-panel" id="item-catalog-panel" style="display: none;">
+              <div class="item-catalog-list" id="item-catalog-list">
+                <p class="item-catalog-empty">No hay items guardados aún.</p>
+              </div>
+            </div>
+          </div>
+
           <div id="items-container" class="items-container"></div>
           <button id="btn-add-item" class="btn btn-outline btn-block">➕ Agregar Item</button>
           

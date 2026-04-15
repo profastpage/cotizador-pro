@@ -350,6 +350,12 @@ function resetWizard() {
   
   // Load and populate document type selector
   loadDocumentTypeSelector();
+
+  // Load and populate item catalog
+  renderItemCatalog();
+
+  // Initialize item catalog toggle
+  initItemCatalogToggle();
 }
 
 // Load document types based on user plan
@@ -635,6 +641,156 @@ async function loadClients() {
     console.error('Error loading clients:', error);
     return [];
   }
+}
+
+// ==========================================================
+// ITEM CATALOG - Save/load previously used items
+// ==========================================================
+
+async function saveItemCatalog(items) {
+  try {
+    if (!items || items.length === 0) return;
+    const catalogRef = collection(db, 'itemCatalog');
+    for (const item of items) {
+      if (!item.description || !item.description.trim()) continue;
+      const desc = item.description.trim();
+      const q = query(catalogRef, where('userId', '==', currentUser.uid), where('description', '==', desc));
+      const existing = await getDocs(q);
+      if (!existing.empty) {
+        await updateDoc(existing.docs[0].ref, {
+          unitPrice: item.unitPrice || 0,
+          lastUsedAt: new Date().toISOString()
+        });
+      } else {
+        await addDoc(catalogRef, {
+          userId: currentUser.uid,
+          description: desc,
+          unitPrice: item.unitPrice || 0,
+          createdAt: new Date().toISOString(),
+          lastUsedAt: new Date().toISOString()
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error saving item catalog:', error);
+  }
+}
+
+async function loadItemCatalog() {
+  try {
+    const catalogRef = collection(db, 'itemCatalog');
+    const q = query(catalogRef, where('userId', '==', currentUser.uid), orderBy('lastUsedAt', 'desc'));
+    const snapshot = await getDocs(q);
+    const items = [];
+    snapshot.forEach(docSnap => items.push({ id: docSnap.id, ...docSnap.data() }));
+    return items;
+  } catch (error) {
+    console.error('Error loading item catalog:', error);
+    return [];
+  }
+}
+
+async function renderItemCatalog() {
+  const wrapper = document.getElementById('item-catalog-wrapper');
+  const list = document.getElementById('item-catalog-list');
+  if (!wrapper || !list) return;
+
+  const items = await loadItemCatalog();
+  if (items.length === 0) {
+    wrapper.style.display = 'none';
+    return;
+  }
+
+  wrapper.style.display = 'block';
+  list.innerHTML = '';
+
+  items.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'item-catalog-item';
+    el.innerHTML = `
+      <div class="item-catalog-item-info">
+        <div class="item-catalog-item-name">${escapeHtml(item.description)}</div>
+        <div class="item-catalog-item-price">S/ ${(item.unitPrice || 0).toFixed(2)}</div>
+      </div>
+      <button class="item-catalog-item-add" type="button">+ Agregar</button>
+    `;
+    el.querySelector('.item-catalog-item-add').addEventListener('click', (e) => {
+      e.stopPropagation();
+      addItemWithDefaults(item.description, item.unitPrice || 0);
+    });
+    el.addEventListener('click', () => {
+      addItemWithDefaults(item.description, item.unitPrice || 0);
+    });
+    list.appendChild(el);
+  });
+}
+
+function addItemWithDefaults(description, unitPrice) {
+  const itemId = Date.now().toString();
+  quoteItems.push({ id: itemId, quantity: 1, unitPrice: unitPrice, description: description });
+  const container = document.getElementById('items-container');
+  const html = `
+    <div class="item-card" data-item-id="${itemId}">
+      <div class="item-header">
+        <span class="item-number">Item ${quoteItems.length}</span>
+        <button class="btn-remove-item" onclick="window.removeItem('${itemId}')">✕</button>
+      </div>
+      <div class="item-fields">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Cantidad</label>
+            <input type="number" class="form-input item-qty" value="1" min="1" inputmode="numeric">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Precio Unitario</label>
+            <input type="number" class="form-input item-price" value="${unitPrice}" min="0" step="0.01" inputmode="decimal">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <input type="text" class="form-input item-desc" value="${escapeAttr(description)}" placeholder="Descripción del producto/servicio">
+        </div>
+        <div class="item-subtotal">S/ ${unitPrice.toFixed(2)}</div>
+      </div>
+    </div>
+  `;
+  container.insertAdjacentHTML('beforeend', html);
+
+  const card = container.querySelector(`[data-item-id="${itemId}"]`);
+  card.querySelector('.item-qty').addEventListener('input', (e) => updateItem(itemId, 'quantity', parseFloat(e.target.value) || 0));
+  card.querySelector('.item-price').addEventListener('input', (e) => updateItem(itemId, 'unitPrice', parseFloat(e.target.value) || 0));
+  card.querySelector('.item-desc').addEventListener('input', (e) => updateItem(itemId, 'description', e.target.value));
+  updateSummary();
+
+  // Scroll to the new item
+  card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  card.querySelector('.item-qty').focus();
+  card.style.borderColor = 'var(--color-primary)';
+  setTimeout(() => { card.style.borderColor = ''; }, 1500);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function escapeAttr(str) {
+  return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function initItemCatalogToggle() {
+  const btn = document.getElementById('btn-toggle-item-catalog');
+  const panel = document.getElementById('item-catalog-panel');
+  const arrow = document.getElementById('item-catalog-arrow');
+  if (!btn || !panel) return;
+
+  btn.addEventListener('click', () => {
+    const isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (arrow) arrow.classList.toggle('open', !isOpen);
+    btn.style.borderRadius = isOpen ? '' : 'var(--radius-lg) var(--radius-lg) 0 0';
+  });
 }
 
 // ==========================================================
@@ -1293,6 +1449,8 @@ async function generatePDF() {
       isGeneratingPDF = false;
       return;
     }
+    // Save items to catalog for quick reuse
+    await saveItemCatalog(quoteItems);
     await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
 
     // Use centralized PDF renderer
