@@ -85,8 +85,11 @@
           <button class="btn btn-primary btn-lg" onclick="showRegister()">
             🚀 Comenzar Gratis
           </button>
-          <button class="btn btn-outline btn-lg" onclick="scrollToPlans()">
+          <button class="btn btn-primary btn-lg" onclick="scrollToPlans()">
             Ver Planes
+          </button>
+          <button class="btn btn-outline btn-lg" onclick="document.getElementById('faq').scrollIntoView({behavior:'smooth'})">
+            FAQ
           </button>
         </div>
         <div class="hero-stats">
@@ -258,6 +261,100 @@
           </ul>
           <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Pro</button>
         </div>
+
+        <!-- Credit Plan -->
+        <div class="plan-card credit-plan-card">
+          <div class="plan-badge credit-badge">Por Créditos</div>
+          <div class="plan-header">
+            <h3 class="plan-name">🪙 Créditos</h3>
+            <div class="plan-price">
+              <span class="price-currency">S/ 1</span>
+            </div>
+            <p class="plan-period">por crédito (1 PDF)</p>
+          </div>
+          <div class="credit-tiers">
+            <div class="credit-tier">
+              <span class="credit-tier-label">30-59 créditos</span>
+              <span class="credit-tier-price">S/ 30 - 59</span>
+              <span class="credit-tier-desc">Cotizaciones normales</span>
+            </div>
+            <div class="credit-tier featured-tier">
+              <span class="credit-tier-label">60+ créditos</span>
+              <span class="credit-tier-price">S/ 60+</span>
+              <span class="credit-tier-desc">✨ Todos los beneficios Pro</span>
+            </div>
+          </div>
+          <ul class="plan-features">
+            <li>✓ Paga solo por lo que usas</li>
+            <li>✓ Mínimo 30 créditos (S/ 30)</li>
+            <li>✓ 1 crédito = 1 PDF de cotización</li>
+            <li>✓ Sin vencimiento mensual</li>
+            <li>✓ 60+ créditos: todas las plantillas</li>
+            <li>✓ 60+ créditos: todos los tipos de docs</li>
+            <li>✓ 60+ créditos: PDF premium</li>
+          </ul>
+          <button class="btn btn-primary btn-block" onclick="selectCreditPlan()">Solicitar Créditos</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <h2 class="section-title">Preguntas Frecuentes</h2>
+      <div class="faq-grid">
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            <span>¿Qué es CotizaPro y para quién es?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">
+            <p>CotizaPro es un sistema online para crear cotizaciones profesionales en PDF, diseñado especialmente para negocios y emprendedores peruanos. Te permite generar documentos con tu logo, datos de empresa, IGV al 18%, cuentas bancarias y cláusulas personalizadas. Es ideal para empresas, freelancers, comerciantes y profesionales independientes que necesitan emitir cotizaciones de forma rápida y profesional.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            <span>¿Cómo creo una cotización en CotizaPro?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">
+            <p>Es muy sencillo y rápido: <strong>1)</strong> Regístrate gratis con tu email o Google. <strong>2)</strong> Configura los datos de tu empresa (RUC, nombre, logo, cuentas bancarias). <strong>3)</strong> Haz clic en "Nueva Cotización" y sigue el asistente de 3 pasos: ingresa los datos del cliente, agrega los productos o servicios con precios, y revisa antes de generar. <strong>4)</strong> Descarga tu PDF profesional listo para enviar. ¡Todo en menos de 30 segundos!</p>
+          </div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            <span>¿Puedo personalizar el diseño de mis cotizaciones?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">
+            <p>¡Sí! Con los planes Business y Pro puedes personalizar tus cotizaciones con tu marca (branding), elegir entre múltiples plantillas premium, y agregar elementos personalizados como marca de agua. Además, todos los planes te permiten configurar tus cuentas bancarias (BCP, BBVA, Interbank, Yape, Plin), condiciones de pago y cláusulas legales que aparecerán en cada PDF generado.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            <span>¿Cómo funciona el plan por créditos?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">
+            <p>El plan por créditos es ideal si no necesitas cotizaciones mensuales fijas. <strong>Cada crédito = 1 PDF de cotización al costo de S/ 1.</strong> El mínimo de compra es 30 créditos (S/ 30). Si compras <strong>60 o más créditos (S/ 60+)</strong>, obtienes todos los beneficios del plan Pro: acceso a las 10 plantillas, todos los tipos de documentos (factura, boleta, contrato, etc.), y calidad de PDF premium. Los créditos no vencen por mes, se consumen según los uses.</p>
+          </div>
+        </div>
+
+        <div class="faq-item" onclick="toggleFaq(this)">
+          <div class="faq-question">
+            <span>¿Mis datos y los de mis clientes están seguros?</span>
+            <span class="faq-icon">+</span>
+          </div>
+          <div class="faq-answer">
+            <p>Absolutamente. CotizaPro utiliza la infraestructura de <strong>Google Firebase</strong> con encriptación de nivel bancario y autenticación segura (email/contraseña y Google). Tus datos y los de tus clientes se almacenan de forma encriptada en servidores seguros. Además, puedes generar enlaces compartibles para tus cotizaciones que expiran automáticamente a los 30 días. No compartimos ni vendemos información de ningún tipo con terceros.</p>
+          </div>
+        </div>
+
       </div>
     </div>
   </section>
@@ -461,6 +558,48 @@
       const banner = document.getElementById('pwa-install-banner');
       if (banner) banner.style.display = 'none';
     });
+
+    // Credit plan handler
+    window.selectCreditPlan = function() {
+      const message = encodeURIComponent(
+        '¡Hola! Me interesa el plan por *créditos* de CotizaPro 🪙\n\n' +
+        '📋 Detalles del plan:\n' +
+        '• 1 crédito = S/ 1 (1 PDF de cotización)\n' +
+        '• Mínimo de compra: 30 créditos (S/ 30)\n' +
+        '• 60+ créditos: Todos los beneficios Pro incluidos\n\n' +
+        'Por favor indicar la cantidad de créditos que desea solicitar.'
+      );
+      window.open(`https://wa.me/51933667414?text=${message}`, '_blank');
+    };
+
+    // FAQ toggle
+    window.toggleFaq = function(el) {
+      const answer = el.querySelector('.faq-answer');
+      const icon = el.querySelector('.faq-icon');
+      const isOpen = answer.style.maxHeight && answer.style.maxHeight !== '0px';
+      
+      // Close all others
+      document.querySelectorAll('.faq-item').forEach(item => {
+        const a = item.querySelector('.faq-answer');
+        const i = item.querySelector('.faq-icon');
+        a.style.maxHeight = '0px';
+        a.style.padding = '0 1.5rem';
+        i.textContent = '+';
+        item.classList.remove('active');
+      });
+
+      if (!isOpen) {
+        answer.style.maxHeight = answer.scrollHeight + 'px';
+        answer.style.padding = '0 1.5rem 1.25rem';
+        icon.textContent = '−';
+        el.classList.add('active');
+      }
+    };
+
+    // Scroll to plans
+    window.scrollToPlans = function() {
+      document.getElementById('plans').scrollIntoView({ behavior: 'smooth' });
+    };
 
     // Detect PWA mode and auto-show login
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||

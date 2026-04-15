@@ -418,3 +418,134 @@ body {
 .btn-gold:hover {
   background: linear-gradient(135deg, #d97706, #b45309);
 }
+
+/* Credit Plan */
+.credit-badge {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+.credit-plan-card {
+  border-color: #059669;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+.credit-plan-card:hover {
+  border-color: #047857;
+}
+.credit-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.credit-tier {
+  background: white;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.25rem;
+  border: 1px solid #d1fae5;
+}
+.credit-tier.featured-tier {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: white;
+  border-color: #059669;
+}
+.credit-tier-label {
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.credit-tier-price {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+.credit-tier-desc {
+  width: 100%;
+  font-size: 0.75rem;
+  opacity: 0.8;
+  margin-top: 0.25rem;
+}
+
+/* FAQ Section */
+.faq {
+  padding: 4rem 0;
+  background: var(--color-gray-50);
+}
+.faq-grid {
+  max-width: 800px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.faq-item {
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+  cursor: pointer;
+}
+.faq-item:hover {
+  box-shadow: var(--shadow-lg);
+}
+.faq-item.active {
+  box-shadow: var(--shadow-lg);
+}
+.faq-question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-gray-800);
+  gap: 1rem;
+}
+.faq-icon {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: var(--color-primary);
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+.faq-answer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+  padding: 0 1.5rem;
+}
+.faq-answer p {
+  color: var(--color-gray-600);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+.faq-answer p strong {
+  color: var(--color-gray-700);
+}
+
+@media (max-width: 768px) {
+  .faq-question {
+    padding: 1rem 1.25rem;
+    font-size: 0.875rem;
+  }
+  .faq-answer p {
+    font-size: 0.8rem;
+  }
+  .credit-tier {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.125rem;
+  }
+  .credit-tier-price {
+    font-size: 0.8rem;
+  }
+  .plans-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+}

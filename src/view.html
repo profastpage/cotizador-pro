@@ -360,95 +360,18 @@
       pdf.text('TOTAL:', 120, tableY);
       pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
 
-      // CLAUSES
-      let clausesY = tableY + 10;
+      // ==========================================
+      // DOCUMENT-TYPE SPECIFIC SECTIONS + FOOTER
+      // ==========================================
       const paymentCondition = company.paymentCondition || DEFAULT_PAYMENT_CONDITION;
       const clausesText = company.clauses || DEFAULT_CLAUSES;
-      const clauseLines = clausesText.split('\n').filter(line => line.trim() !== '');
-
-      const spaceNeeded = 10 + 6 + 4 + 10 + (clauseLines.length * 5.5) + 6;
-      if (clausesY + spaceNeeded > 275) {
-        pdf.addPage();
-        clausesY = 20;
-      }
-
-      pdf.setFillColor(...BLUE);
-      pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-      pdf.text('CONDICIONES DE PAGO', 25, clausesY + 5.5);
-      clausesY += 12;
-
-      pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-      pdf.text(paymentCondition, 25, clausesY);
-      clausesY += 8;
-
-      pdf.setFillColor(...BLUE);
-      pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-      pdf.text('TERMINOS Y CONDICIONES', 25, clausesY + 5.5);
-      clausesY += 11;
-
-      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-      const LIGHT_BLUE_BG = [240, 244, 255];
-      for (let cIdx = 0; cIdx < clauseLines.length; cIdx++) {
-        const clause = clauseLines[cIdx].trim();
-        if (cIdx % 2 === 0) {
-          pdf.setFillColor(...LIGHT_BLUE_BG);
-          pdf.roundedRect(20, clausesY - 3.5, 170, 6, 1, 1, 'F');
-        }
-        pdf.setTextColor(...BLUE);
-        pdf.setFontSize(8);
-        pdf.text('•', 25, clausesY);
-        pdf.setTextColor(...DARK);
-        pdf.text(clause, 30, clausesY);
-        clausesY += 5.5;
-      }
-
-      // BANK ACCOUNTS
+      const clauseLines = clausesText.split('\n').filter(function(l) { return l.trim() !== ''; });
       const bankAccounts = company.bankAccounts || [];
-      if (bankAccounts.length > 0) {
-        clausesY += 4;
-        const bankSpaceNeeded = 10 + (bankAccounts.length * 7) + 6;
-        if (clausesY + bankSpaceNeeded > 280) {
-          pdf.addPage();
-          clausesY = 20;
-        }
-
-        pdf.setFillColor(...BLUE);
-        pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-        pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-        pdf.text('DATOS BANCARIOS PARA PAGO', 25, clausesY + 5.5);
-        clausesY += 12;
-
-        for (let bIdx = 0; bIdx < bankAccounts.length; bIdx++) {
-          const bank = bankAccounts[bIdx];
-          if (!bank || !bank.number) continue;
-
-          if (bIdx % 2 === 0) {
-            pdf.setFillColor(...LIGHT_BLUE_BG);
-            pdf.roundedRect(20, clausesY - 3.5, 170, 7, 1, 1, 'F');
-          }
-
-          const bankLabel = bank.name || 'Cuenta Bancaria';
-          const accountType = bank.accountType || '';
-          const holder = bank.holder || '';
-
-          pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-          let bankText = `${bankLabel}`;
-          if (accountType) bankText += ` - ${accountType}`;
-          pdf.text(bankText, 25, clausesY);
-
-          pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-          let detailText = `N° ${bank.number}`;
-          if (holder) detailText += ` | Titular: ${holder}`;
-          pdf.text(detailText, 25, clausesY + 4);
-
-          clausesY += 8;
-        }
-      }
+      let docY = tableY + 10;
+      docY = renderDocTypeSections(pdf, documentType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, docY, igvEnabled);
 
       // Footer
-      const finalFooterY = Math.max(clausesY + 6, 275);
+      const finalFooterY = Math.max(docY + 6, 275);
       pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
       pdf.line(20, finalFooterY, 190, finalFooterY);
       pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
@@ -458,6 +381,310 @@
 
       return pdf;
     }
+
+  // ==========================================================
+  // DOCUMENT TYPE SPECIFIC RENDERER
+  // ==========================================================
+  function renderDocTypeSections(pdf, docType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, startY, igvEnabled) {
+    var BLUE = [30, 64, 175];
+    var LIGHT_BLUE = [240, 244, 255];
+    var GRAY_BG = [245, 247, 250];
+    var DARK = [15, 23, 42];
+    var GRAY_TEXT = [100, 116, 139];
+    var y = startY;
+
+    function newPageIfNeeded(needed) { if (y + needed > 275) { pdf.addPage(); y = 20; } }
+
+    function drawSectionHeader(title) {
+      newPageIfNeeded(20);
+      pdf.setFillColor(...BLUE);
+      pdf.roundedRect(20, y, 170, 8, 2, 2, 'F');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text(title, 25, y + 5.5);
+      y += 12;
+    }
+
+    function drawInfoBox(rows, h) {
+      newPageIfNeeded(h + 4);
+      pdf.setFillColor(...GRAY_BG);
+      pdf.roundedRect(20, y, 170, h, 2, 2, 'F');
+      rows.forEach(function(r) {
+        pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+        pdf.text(r[0], 25, y + r[2]);
+        pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(r[1] || '-', r[3] || 85, y + r[2]);
+      });
+      y += h + 4;
+    }
+
+    function drawBulletList(lines) {
+      lines.forEach(function(line, i) {
+        newPageIfNeeded(6);
+        if (i % 2 === 0) {
+          pdf.setFillColor(...LIGHT_BLUE);
+          pdf.roundedRect(20, y - 3.5, 170, 6, 1, 1, 'F');
+        }
+        pdf.setTextColor(...BLUE); pdf.setFontSize(8); pdf.text('\u2022', 25, y);
+        pdf.setTextColor(...DARK);
+        var split = pdf.splitTextToSize(line, 140);
+        pdf.text(split[0] || line, 30, y);
+        y += 5.5;
+      });
+    }
+
+    function drawBankAccounts() {
+      if (bankAccounts.length === 0) return;
+      y += 4;
+      newPageIfNeeded(20);
+      drawSectionHeader('DATOS BANCARIOS PARA PAGO');
+      bankAccounts.forEach(function(bank, i) {
+        if (!bank || !bank.number) return;
+        newPageIfNeeded(10);
+        if (i % 2 === 0) {
+          pdf.setFillColor(...LIGHT_BLUE);
+          pdf.roundedRect(20, y - 3.5, 170, 7, 1, 1, 'F');
+        }
+        var label = bank.name || 'Cuenta Bancaria';
+        if (bank.accountType) label += ' - ' + bank.accountType;
+        pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+        pdf.text(label, 25, y);
+        var detail = 'N\u00B0 ' + bank.number;
+        if (bank.holder) detail += ' | Titular: ' + bank.holder;
+        pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(detail, 25, y + 4);
+        y += 8;
+      });
+    }
+
+    switch (docType) {
+      case 'cotizacion':
+      case 'personalizado':
+      default: {
+        drawSectionHeader('CONDICIONES DE PAGO');
+        pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(paymentCondition, 25, y); y += 8;
+        drawSectionHeader('T\u00C9RMINOS Y CONDICIONES');
+        drawBulletList(clauseLines);
+        drawBankAccounts();
+        break;
+      }
+      case 'propuesta': {
+        drawSectionHeader('OBJETIVO DE LA PROPUESTA');
+        newPageIfNeeded(16);
+        pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        var obj = 'La presente propuesta tiene por objeto ofrecer los servicios/productos detallados en el cuadro anterior, cumpliendo con los est\u00E1ndares de calidad y plazos establecidos.';
+        var splitObj = pdf.splitTextToSize(obj, 160);
+        pdf.text(splitObj, 25, y); y += splitObj.length * 4 + 6;
+        drawSectionHeader('PLAZO DE ENTREGA / EJECUCI\u00D3N');
+        drawInfoBox([
+          ['Fecha Inicio:', issueDate || 'Por acordar', 5, 75],
+          ['Fecha Entrega:', dueDate || 'Por acordar', 5, 150],
+          ['Vigencia:', '30 d\u00EDas calendario', 11, 75]
+        ], 18);
+        drawSectionHeader('ALCANCE DEL PROYECTO');
+        newPageIfNeeded(12);
+        if (items.length > 0) {
+          pdf.setFontSize(8); pdf.setTextColor(...DARK);
+          items.forEach(function(item, i) {
+            newPageIfNeeded(6);
+            var desc = (i+1) + '. ' + (item.description||'Servicio') + ' - Cant: ' + item.quantity + ' - P.Unit: S/ ' + (item.unitPrice||0).toFixed(2);
+            var splitDesc = pdf.splitTextToSize(desc, 160);
+            pdf.text(splitDesc, 25, y); y += splitDesc.length * 4 + 2;
+          });
+          y += 2;
+        }
+        drawSectionHeader('CONDICIONES DE LA PROPUESTA');
+        drawBulletList(clauseLines);
+        drawBankAccounts();
+        break;
+      }
+      case 'nota_venta': {
+        drawSectionHeader('CONDICIONES DE LA VENTA');
+        drawInfoBox([
+          ['Forma de Pago:', paymentCondition, 5, 75],
+          ['Fecha Emisi\u00F3n:', issueDate || '-', 5, 150],
+          ['Vigencia:', '5 d\u00EDas calendario', 11, 75]
+        ], 18);
+        newPageIfNeeded(12); y += 2;
+        pdf.setFillColor(255, 243, 205);
+        pdf.roundedRect(20, y, 170, 10, 2, 2, 'F');
+        pdf.setFontSize(7); pdf.setFont(undefined, 'bold'); pdf.setTextColor(146, 64, 14);
+        pdf.text('\u26A0 NOTA: Este documento no tiene valor tributario. Para efectos fiscales solicite Factura o Boleta electr\u00F3nica.', 105, y + 6, { align: 'center' });
+        y += 16;
+        drawBankAccounts();
+        break;
+      }
+      case 'orden_servicio': {
+        drawSectionHeader('DATOS DEL SERVICIO');
+        drawInfoBox([
+          ['Fecha Inicio:', issueDate || '-', 5, 75],
+          ['Fecha Fin:', dueDate || '-', 5, 150],
+          ['Lugar:', 'Sitio del cliente', 11, 75],
+          ['Responsable:', company.name || '-', 11, 150],
+          ['Estado:', 'PENDIENTE', 17, 75],
+          ['IGV:', igvEnabled ? 'Incluido (18%)' : 'No aplicable', 17, 150]
+        ], 25);
+        drawSectionHeader('DESCRIPCI\u00D3N DEL TRABAJO');
+        newPageIfNeeded(12);
+        if (items.length > 0) {
+          pdf.setFontSize(8); pdf.setTextColor(...DARK);
+          items.forEach(function(item, i) {
+            newPageIfNeeded(8);
+            var desc = (i+1) + '. ' + (item.description||'Servicio') + ' (Cant: ' + item.quantity + ')';
+            var splitDesc = pdf.splitTextToSize(desc, 160);
+            pdf.text(splitDesc, 25, y); y += splitDesc.length * 4 + 2;
+          });
+        } else {
+          pdf.setFontSize(8); pdf.setTextColor(...DARK);
+          pdf.text('Ver detalle de servicios en el cuadro superior.', 25, y); y += 6;
+        }
+        y += 2;
+        drawSectionHeader('CONDICIONES DEL SERVICIO');
+        drawBulletList(clauseLines);
+        drawBankAccounts();
+        break;
+      }
+      case 'factura': {
+        drawSectionHeader('INFORMACI\u00D3N TRIBUTARIA');
+        drawInfoBox([
+          ['RUC Emisor:', company.ruc || '-', 5, 80],
+          ['Raz\u00F3n Social:', company.name || '-', 5, 110],
+          ['Direcci\u00F3n:', company.address || '-', 11, 80],
+          ['RUC Cliente:', '-', 17, 80],
+          ['Cliente:', clientName, 17, 110]
+        ], 25);
+        drawSectionHeader('CONDICIONES DE PAGO');
+        pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(paymentCondition, 25, y); y += 8;
+        drawSectionHeader('T\u00C9RMINOS Y CONDICIONES');
+        drawBulletList(clauseLines);
+        drawBankAccounts();
+        newPageIfNeeded(10); y += 4;
+        pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+        pdf.text('Representaci\u00F3n impresa de la FACTURA ELECTR\u00D3NICA. Consulte en: https://www.sunat.gob.pe', 105, y, { align: 'center' });
+        y += 6;
+        break;
+      }
+      case 'boleta': {
+        drawSectionHeader('DATOS DEL COMPRADOR');
+        drawInfoBox([
+          ['Cliente:', clientName, 5, 80],
+          ['DNI / RUC:', 'Consumidor Final', 5, 150],
+          ['Direcci\u00F3n:', '-', 11, 80]
+        ], 18);
+        drawSectionHeader('CONDICIONES DE PAGO');
+        pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(paymentCondition, 25, y); y += 8;
+        drawBankAccounts();
+        newPageIfNeeded(10); y += 4;
+        pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+        pdf.text('Representaci\u00F3n impresa de la BOLETA DE VENTA ELECTR\u00D3NICA. Consumidor final.', 105, y, { align: 'center' });
+        y += 6;
+        break;
+      }
+      case 'recibo': {
+        var totalAmount = items.reduce(function(s, i) { return s + ((i.quantity||0) * (i.unitPrice||0)); }, 0);
+        drawSectionHeader('DATOS DEL PAGO');
+        drawInfoBox([
+          ['Concepto:', 'Pago por servicios/productos', 5, 90],
+          ['Forma de Pago:', paymentCondition, 5, 105],
+          ['Fecha de Pago:', issueDate || new Date().toISOString().split('T')[0], 11, 90],
+          ['Moneda:', 'PEN (Soles)', 11, 105],
+          ['Recib\u00ED de:', clientName, 17, 90],
+          ['Monto Total:', 'S/ ' + totalAmount.toFixed(2), 17, 105]
+        ], 25);
+        drawSectionHeader('CERTIFICACI\u00D3N');
+        newPageIfNeeded(12);
+        pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text('Por medio de la presente se certifica que se ha recibido el pago arriba indicado en su totalidad.', 25, y);
+        y += 12;
+        newPageIfNeeded(28); y += 4;
+        pdf.setDrawColor(...GRAY_TEXT); pdf.setLineWidth(0.5);
+        pdf.line(25, y + 16, 95, y + 16);
+        pdf.line(115, y + 16, 185, y + 16);
+        pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+        pdf.text('Firma del Recibido', 60, y + 20, { align: 'center' });
+        pdf.text('Firma del Entregado', 150, y + 20, { align: 'center' });
+        y += 28;
+        break;
+      }
+      case 'contrato': {
+        drawSectionHeader('PARTES CONTRATANTES');
+        newPageIfNeeded(28);
+        pdf.setFillColor(...GRAY_BG);
+        pdf.roundedRect(20, y, 170, 26, 2, 2, 'F');
+        pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+        pdf.text('EL PRESTADOR:', 25, y + 5);
+        pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(company.name || '-', 25, y + 10);
+        pdf.text('RUC: ' + (company.ruc||'-') + ' | ' + (company.address||''), 25, y + 16);
+        pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+        pdf.text('EL CLIENTE:', 105, y + 5);
+        pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text(clientName, 105, y + 10);
+        pdf.text('Fecha: ' + (issueDate||'-'), 105, y + 16);
+        y += 32;
+        drawSectionHeader('CL\u00C1USULAS CONTRACTUALES');
+        drawBulletList([
+          'PRIMERA: OBJETO - El Prestador se compromete a proveer los servicios/productos detallados.',
+          'SEGUNDA: PLAZO - Desde ' + (issueDate||'---') + ' hasta ' + (dueDate||'---') + '.',
+          'TERCERA: MONTO - Indicado en el cuadro de detalle, ' + (igvEnabled ? 'incluye IGV 18%.' : 'sin IGV.'),
+          'CUARTA: FORMA DE PAGO - ' + paymentCondition + '.',
+          'QUINTA: CONFIDENCIALIDAD - Ambas partes mantendr\u00E1n la confidencialidad.',
+          'SEXTA: GARANT\u00CDA - Calidad garantizada por 90 d\u00EDas calendario.',
+          'S\u00C9PTIMA: RESOLUCI\u00D3N - Resoluci\u00F3n con 15 d\u00EDas de aviso en caso de incumplimiento.',
+          'OCTAVA: JURISDICCI\u00D3N - Juzgados de Lima, legislaci\u00F3n peruana vigente.'
+        ]);
+        y += 4;
+        drawSectionHeader('VIGENCIA DEL CONTRATO');
+        newPageIfNeeded(12);
+        pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+        pdf.text('Vigencia desde el ' + (issueDate||'---') + ' hasta el ' + (dueDate||'---') + '.', 25, y);
+        y += 14;
+        newPageIfNeeded(32); y += 4;
+        pdf.setDrawColor(...GRAY_TEXT); pdf.setLineWidth(0.5);
+        pdf.line(25, y + 20, 95, y + 20);
+        pdf.line(115, y + 20, 185, y + 20);
+        pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+        pdf.text('________________________', 60, y + 10, { align: 'center' });
+        pdf.text(company.name || 'EL PRESTADOR', 60, y + 24, { align: 'center' });
+        pdf.text('DNI/RUC: ' + (company.ruc||'-'), 60, y + 28, { align: 'center' });
+        pdf.text('________________________', 150, y + 10, { align: 'center' });
+        pdf.text(clientName, 150, y + 24, { align: 'center' });
+        y += 36;
+        break;
+      }
+      case 'garantia': {
+        var mainItem = items.length > 0 ? items[0] : null;
+        drawSectionHeader('DATOS DEL PRODUCTO / SERVICIO');
+        drawInfoBox([
+          ['Producto/Servicio:', mainItem ? mainItem.description : '-', 5, 90],
+          ['Fecha Compra:', issueDate || '-', 5, 150],
+          ['Cliente:', clientName, 11, 90],
+          ['Cantidad:', mainItem ? String(mainItem.quantity) : '-', 11, 150],
+          ['Vendedor:', company.name || '-', 17, 90],
+          ['RUC Vendedor:', company.ruc || '-', 17, 150]
+        ], 25);
+        drawSectionHeader('COBERTURA DE GARANT\u00CDA');
+        drawInfoBox([
+          ['Per\u00EDodo:', 'Desde ' + (issueDate||'---') + ' hasta ' + (dueDate||'---'), 5, 80],
+          ['Tipo:', 'Garant\u00EDa por defectos de fabricaci\u00F3n y funcionamiento', 11, 80],
+          ['Alcance:', 'Reparaci\u00F3n o reemplazo del producto/servicio', 17, 80]
+        ], 25);
+        drawSectionHeader('CONDICIONES DE LA GARANT\u00CDA');
+        drawBulletList(clauseLines.length > 0 ? clauseLines : [
+          'Cubre defectos de fabricaci\u00F3n y funcionamiento normal.',
+          'NO cubre da\u00F1os por mal uso o desgaste natural.',
+          'Presente este certificado junto con el comprobante de compra.',
+          'Reparaci\u00F3n o reemplazo en m\u00E1ximo 30 d\u00EDas calendario.',
+          'Transferible al nuevo propietario dentro del per\u00EDodo de vigencia.',
+          'Rige C\u00F3digo de Protecci\u00F3n al Consumidor (Ley N\u00B0 29571).'
+        ]);
+        break;
+      }
+    }
+    return y;
+  }
 
     // ==========================================================
     // LOAD jsPDF dynamically
@@ -480,6 +707,75 @@
     async function loadSharedQuote() {
       const params = new URLSearchParams(window.location.search);
       const shareId = params.get('id');
+      
+      // Check for URL-encoded data fallback (hash fragment)
+      const hashData = window.location.hash;
+      let urlEncodedData = null;
+      if (hashData.startsWith('#data=')) {
+        try {
+          const encoded = hashData.substring(6);
+          const jsonStr = decodeURIComponent(escape(atob(encoded)));
+          urlEncodedData = JSON.parse(jsonStr);
+        } catch (e) {
+          console.error('Failed to decode URL data:', e);
+        }
+      }
+
+      if (urlEncodedData) {
+        // URL-encoded fallback mode - render directly from URL data
+        try {
+          const jspdf = await loadJsPDF();
+          window.jspdf = jspdf;
+
+          const docType = DOCUMENT_TYPES[urlEncodedData.dt] || DOCUMENT_TYPES.cotizacion;
+          const num = String(urlEncodedData.n || 0).padStart(3, '0');
+          document.getElementById('quote-info').textContent = `${docType.name} #${num} - ${urlEncodedData.cn || 'Sin cliente'}`;
+
+          const companyData = {
+            name: urlEncodedData.co?.n || '',
+            ruc: urlEncodedData.co?.r || '',
+            address: urlEncodedData.co?.a || '',
+            phone: urlEncodedData.co?.ph || '',
+            email: urlEncodedData.co?.e || '',
+            paymentCondition: urlEncodedData.co?.pc || DEFAULT_PAYMENT_CONDITION,
+            clauses: urlEncodedData.co?.cl || DEFAULT_CLAUSES,
+            bankAccounts: (urlEncodedData.co?.ba || []).map(b => ({
+              name: b.n, accountType: b.t, holder: b.h, number: b.num
+            }))
+          };
+
+          const items = (urlEncodedData.items || []).map(i => ({
+            quantity: i.q, unitPrice: i.p, description: i.d
+          }));
+
+          const pdf = renderPDF(
+            companyData,
+            urlEncodedData.cn || 'Sin cliente',
+            items,
+            urlEncodedData.n || 0,
+            urlEncodedData.id || '',
+            urlEncodedData.dd || '',
+            urlEncodedData.s || 0,
+            urlEncodedData.i || 0,
+            urlEncodedData.t || 0,
+            urlEncodedData.ie || false,
+            urlEncodedData.it || 'apart',
+            urlEncodedData.dt || 'cotizacion'
+          );
+
+          currentPdfBlob = pdf.output('blob');
+          const dataUrl = pdf.output('datauristring');
+          const iframe = document.getElementById('pdf-display');
+          iframe.src = dataUrl;
+          iframe.classList.remove('hidden');
+          document.getElementById('state-loading').classList.add('hidden');
+          document.getElementById('header-actions').classList.remove('hidden');
+        } catch (error) {
+          console.error('Error rendering URL-encoded quote:', error);
+          showError('Error al generar', 'No se pudo generar la cotizacion desde el enlace.');
+        }
+        return;
+      }
 
       if (!shareId) {
         showError('Enlace invalido', 'No se encontro el ID de la cotizacion en el enlace.');

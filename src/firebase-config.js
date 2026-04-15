@@ -272,6 +272,44 @@ export const LICENSE_DURATIONS = {
   0: { label: 'Ilimitado', multiplier: 0, discount: 0 }
 };
 
+// Plan por Créditos
+export const CREDIT_PLAN = {
+  id: 'credits',
+  name: 'Por Créditos',
+  pricePerCredit: 1,       // S/ 1 por crédito
+  minCredits: 30,           // Mínimo 30 créditos
+  proThreshold: 60,         // 60+ créditos = beneficios Pro
+  oneCreditEquals: '1 PDF de cotización',
+  description: 'Paga solo por lo que usas. Sin vencimiento mensual.',
+  // Beneficios con < 60 créditos (plan normal)
+  basicCredits: {
+    documentTypes: ['cotizacion'],
+    pdfQuality: 'profesional',
+    features: [
+      'Cotizaciones normales (solo tipo Cotización)',
+      'PDF profesional con logo',
+      'Historial ilimitado',
+      '3 cuentas bancarias'
+    ]
+  },
+  // Beneficios con 60+ créditos (plan Pro completo)
+  proCredits: {
+    documentTypes: ['cotizacion', 'propuesta', 'nota_venta', 'orden_servicio', 'factura', 'boleta', 'recibo', 'contrato', 'garantia', 'personalizado'],
+    pdfQuality: 'enterprise',
+    features: [
+      'TODOS los tipos de documentos (10 tipos)',
+      'PDF enterprise personalizado',
+      'Todas las plantillas premium',
+      'Marca personalizada',
+      'Duplicar documentos',
+      'Exportar/Importar Excel y CSV',
+      'Historial ilimitado',
+      'Cuentas bancarias ilimitadas',
+      'Soporte prioritario 24/7'
+    ]
+  }
+};
+
 // Export Firebase instances and methods
 export { auth, db, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail, linkWithCredential, fetchSignInMethodsForEmail, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue };
 export default app;

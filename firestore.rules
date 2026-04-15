@@ -108,7 +108,7 @@ service cloud.firestore {
     match /shared_quotes/{shareId} {
       allow read: if true;
       
-      allow create: if isAuthenticated() && isActiveUser();
+      allow create: if isAuthenticated();
       
       allow update: if isAuthenticated() && 
                        (isOwner(resource.data.userId) || isAdmin());

@@ -815,111 +815,17 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
 
   // ==========================================
-  // CLAUSES SECTION - Payment + Terms
+  // DOCUMENT-TYPE SPECIFIC SECTIONS + FOOTER
   // ==========================================
-  let clausesY = tableY + 10;
   const paymentCondition = company.paymentCondition || DEFAULT_PAYMENT_CONDITION;
   const clausesText = company.clauses || DEFAULT_CLAUSES;
-  const clauseLines = clausesText.split('\n').filter(line => line.trim() !== '');
-
-  // Calculate space needed: payment header (10) + payment text (6) + spacing (4) + terms header (10) + clauses (5.5 each) + spacing (6)
-  const spaceNeeded = 10 + 6 + 4 + 10 + (clauseLines.length * 5.5) + 6;
-  const footerStart = 275;
-
-  // Check if we need a new page
-  if (clausesY + spaceNeeded > footerStart) {
-    pdf.addPage();
-    clausesY = 20;
-  }
-
-  // Payment Conditions Header
-  pdf.setFillColor(...BLUE);
-  pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('CONDICIONES DE PAGO', 25, clausesY + 5.5);
-  clausesY += 12;
-
-  // Payment condition text
-  pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
- pdf.text(paymentCondition, 25, clausesY);
-  clausesY += 8;
-
-  // Terms and Conditions Header
-  pdf.setFillColor(...BLUE);
-  pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('TÉRMINOS Y CONDICIONES', 25, clausesY + 5.5);
-  clausesY += 11;
-
-  // Clause bullets
-  pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-  const LIGHT_BLUE_BG = [240, 244, 255];
-  for (let cIdx = 0; cIdx < clauseLines.length; cIdx++) {
-    const clause = clauseLines[cIdx].trim();
-    // Bullet background
-    if (cIdx % 2 === 0) {
-      pdf.setFillColor(...LIGHT_BLUE_BG);
-      pdf.roundedRect(20, clausesY - 3.5, 170, 6, 1, 1, 'F');
-    }
-    pdf.setTextColor(...BLUE);
-    pdf.setFontSize(8);
-    pdf.text('•', 25, clausesY);
-    pdf.setTextColor(...DARK);
-    // Split long clauses across lines
-    const splitClause = pdf.splitTextToSize(clause, 140);
-    pdf.text(splitClause[0] || clause, 30, clausesY);
-    clausesY += 5.5;
-  }
-
-  // ==========================================
-  // BANK ACCOUNTS SECTION - Optional
-  // ==========================================
+  const clauseLines = clausesText.split('\n').filter(l => l.trim() !== '');
   const bankAccounts = company.bankAccounts || [];
-  if (bankAccounts.length > 0) {
-    clausesY += 4;
-    
-    // Calculate space needed for bank accounts
-    const bankSpaceNeeded = 10 + (bankAccounts.length * 7) + 6;
-    if (clausesY + bankSpaceNeeded > 280) {
-      pdf.addPage();
-      clausesY = 20;
-    }
-
-    pdf.setFillColor(...BLUE);
-    pdf.roundedRect(20, clausesY, 170, 8, 2, 2, 'F');
-    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-    pdf.text('DATOS BANCARIOS PARA PAGO', 25, clausesY + 5.5);
-    clausesY += 12;
-
-    for (let bIdx = 0; bIdx < bankAccounts.length; bIdx++) {
-      const bank = bankAccounts[bIdx];
-      if (!bank || !bank.number) continue;
-
-      if (bIdx % 2 === 0) {
-        pdf.setFillColor(...LIGHT_BLUE_BG);
-        pdf.roundedRect(20, clausesY - 3.5, 170, 7, 1, 1, 'F');
-      }
-
-      const bankLabel = bank.name || 'Cuenta Bancaria';
-      const accountType = bank.accountType || '';
-      const holder = bank.holder || '';
-      
-      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-      let bankText = `${bankLabel}`;
-      if (accountType) bankText += ` - ${accountType}`;
-      pdf.text(bankText, 25, clausesY);
-      
-      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-      let detailText = `N° ${bank.number}`;
-      if (holder) detailText += ` | Titular: ${holder}`;
-      pdf.text(detailText, 25, clausesY + 4);
-      
-      clausesY += 8;
-    }
-  }
+  let docY = tableY + 10;
+  docY = renderDocTypeSections(pdf, documentType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, docY, igvEnabled);
 
   // Footer
-  const finalFooterY = Math.max(clausesY + 6, 275);
+  const finalFooterY = Math.max(docY + 6, 275);
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
   pdf.line(20, finalFooterY, 190, finalFooterY);
   pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
@@ -928,6 +834,334 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, finalFooterY + 13, { align: 'center' });
 
   return { pdf, docTypeInfo };
+}
+
+// ==========================================================
+// DOCUMENT TYPE SPECIFIC RENDERER - Differentiated templates
+// ==========================================================
+function renderDocTypeSections(pdf, docType, company, clientName, issueDate, dueDate, paymentCondition, clauseLines, bankAccounts, items, startY, igvEnabled) {
+  const BLUE = [30, 64, 175];
+  const LIGHT_BLUE = [240, 244, 255];
+  const GRAY_BG = [245, 247, 250];
+  const DARK = [15, 23, 42];
+  const GRAY_TEXT = [100, 116, 139];
+  const GREEN = [5, 150, 105];
+  let y = startY;
+
+  function newPageIfNeeded(needed) { if (y + needed > 275) { pdf.addPage(); y = 20; } }
+
+  function drawSectionHeader(title) {
+    newPageIfNeeded(20);
+    pdf.setFillColor(...BLUE);
+    pdf.roundedRect(20, y, 170, 8, 2, 2, 'F');
+    pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+    pdf.text(title, 25, y + 5.5);
+    y += 12;
+  }
+
+  function drawInfoBox(rows, h) {
+    newPageIfNeeded(h + 4);
+    pdf.setFillColor(...GRAY_BG);
+    pdf.roundedRect(20, y, 170, h, 2, 2, 'F');
+    rows.forEach(function(r) {
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text(r[0], 25, y + r[2]);
+      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(r[1] || '-', r[3] || 85, y + r[2]);
+    });
+    y += h + 4;
+  }
+
+  function drawBulletList(lines) {
+    lines.forEach(function(line, i) {
+      newPageIfNeeded(6);
+      if (i % 2 === 0) {
+        pdf.setFillColor(...LIGHT_BLUE);
+        pdf.roundedRect(20, y - 3.5, 170, 6, 1, 1, 'F');
+      }
+      pdf.setTextColor(...BLUE); pdf.setFontSize(8); pdf.text('\u2022', 25, y);
+      pdf.setTextColor(...DARK);
+      var split = pdf.splitTextToSize(line, 140);
+      pdf.text(split[0] || line, 30, y);
+      y += 5.5;
+    });
+  }
+
+  function drawBankAccounts() {
+    if (bankAccounts.length === 0) return;
+    y += 4;
+    newPageIfNeeded(20);
+    drawSectionHeader('DATOS BANCARIOS PARA PAGO');
+    bankAccounts.forEach(function(bank, i) {
+      if (!bank || !bank.number) return;
+      newPageIfNeeded(10);
+      if (i % 2 === 0) {
+        pdf.setFillColor(...LIGHT_BLUE);
+        pdf.roundedRect(20, y - 3.5, 170, 7, 1, 1, 'F');
+      }
+      var label = bank.name || 'Cuenta Bancaria';
+      if (bank.accountType) label += ' - ' + bank.accountType;
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      pdf.text(label, 25, y);
+      var detail = 'N\u00B0 ' + bank.number;
+      if (bank.holder) detail += ' | Titular: ' + bank.holder;
+      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(detail, 25, y + 4);
+      y += 8;
+    });
+  }
+
+  switch (docType) {
+    case 'cotizacion':
+    case 'personalizado':
+    default: {
+      drawSectionHeader('CONDICIONES DE PAGO');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(paymentCondition, 25, y); y += 8;
+      drawSectionHeader('T\u00C9RMINOS Y CONDICIONES');
+      drawBulletList(clauseLines);
+      drawBankAccounts();
+      break;
+    }
+
+    case 'propuesta': {
+      drawSectionHeader('OBJETIVO DE LA PROPUESTA');
+      newPageIfNeeded(16);
+      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      var obj = 'La presente propuesta tiene por objeto ofrecer los servicios y/o productos detallados en el cuadro anterior, cumpliendo con los est\u00E1ndares de calidad y plazos establecidos.';
+      var splitObj = pdf.splitTextToSize(obj, 160);
+      pdf.text(splitObj, 25, y); y += splitObj.length * 4 + 6;
+      drawSectionHeader('PLAZO DE ENTREGA / EJECUCI\u00D3N');
+      drawInfoBox([
+        ['Fecha Inicio:', issueDate || 'Por acordar', 5, 75],
+        ['Fecha Entrega:', dueDate || 'Por acordar', 5, 150],
+        ['Vigencia:', '30 d\u00EDas calendario', 11, 75]
+      ], 18);
+      drawSectionHeader('ALCANCE DEL PROYECTO');
+      newPageIfNeeded(12);
+      if (items.length > 0) {
+        pdf.setFontSize(8); pdf.setTextColor(...DARK);
+        items.forEach(function(item, i) {
+          newPageIfNeeded(6);
+          var desc = (i+1) + '. ' + (item.description || 'Servicio') + ' - Cant: ' + item.quantity + ' - P.Unit: S/ ' + (item.unitPrice||0).toFixed(2);
+          var splitDesc = pdf.splitTextToSize(desc, 160);
+          pdf.text(splitDesc, 25, y); y += splitDesc.length * 4 + 2;
+        });
+        y += 2;
+      }
+      drawSectionHeader('CONDICIONES DE LA PROPUESTA');
+      drawBulletList(clauseLines);
+      drawBankAccounts();
+      break;
+    }
+
+    case 'nota_venta': {
+      drawSectionHeader('CONDICIONES DE LA VENTA');
+      drawInfoBox([
+        ['Forma de Pago:', paymentCondition, 5, 75],
+        ['Fecha Emisi\u00F3n:', issueDate || '-', 5, 150],
+        ['Vigencia:', '5 d\u00EDas calendario', 11, 75]
+      ], 18);
+      newPageIfNeeded(12);
+      y += 2;
+      pdf.setFillColor(255, 243, 205);
+      pdf.roundedRect(20, y, 170, 10, 2, 2, 'F');
+      pdf.setFontSize(7); pdf.setFont(undefined, 'bold'); pdf.setTextColor(146, 64, 14);
+      pdf.text('\u26A0 NOTA: Este documento no tiene valor tributario. Para efectos fiscales solicite Factura o Boleta electr\u00F3nica.', 105, y + 6, { align: 'center' });
+      y += 16;
+      drawBankAccounts();
+      break;
+    }
+
+    case 'orden_servicio': {
+      drawSectionHeader('DATOS DEL SERVICIO');
+      drawInfoBox([
+        ['Fecha Inicio:', issueDate || '-', 5, 75],
+        ['Fecha Fin:', dueDate || '-', 5, 150],
+        ['Lugar del Servicio:', 'Sitio del cliente', 11, 75],
+        ['Responsable:', company.name || '-', 11, 150],
+        ['Estado:', 'PENDIENTE', 17, 75],
+        ['IGV:', igvEnabled ? 'Incluido (18%)' : 'No aplicable', 17, 150]
+      ], 25);
+      drawSectionHeader('DESCRIPCI\u00D3N DEL TRABAJO');
+      newPageIfNeeded(12);
+      if (items.length > 0) {
+        pdf.setFontSize(8); pdf.setTextColor(...DARK);
+        items.forEach(function(item, i) {
+          newPageIfNeeded(8);
+          var desc = (i+1) + '. ' + (item.description || 'Servicio') + ' (Cantidad: ' + item.quantity + ')';
+          var splitDesc = pdf.splitTextToSize(desc, 160);
+          pdf.text(splitDesc, 25, y); y += splitDesc.length * 4 + 2;
+        });
+      } else {
+        pdf.setFontSize(8); pdf.setTextColor(...DARK);
+        pdf.text('Ver detalle de servicios en el cuadro superior.', 25, y); y += 6;
+      }
+      y += 2;
+      drawSectionHeader('CONDICIONES DEL SERVICIO');
+      drawBulletList(clauseLines);
+      drawBankAccounts();
+      break;
+    }
+
+    case 'factura': {
+      drawSectionHeader('INFORMACI\u00D3N TRIBUTARIA');
+      drawInfoBox([
+        ['RUC Emisor:', company.ruc || '-', 5, 80],
+        ['Raz\u00F3n Social:', company.name || '-', 5, 110],
+        ['Direcci\u00F3n:', company.address || '-', 11, 80],
+        ['RUC Cliente:', '-', 17, 80],
+        ['Cliente:', clientName, 17, 110]
+      ], 25);
+      drawSectionHeader('CONDICIONES DE PAGO');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(paymentCondition, 25, y); y += 8;
+      drawSectionHeader('T\u00C9RMINOS Y CONDICIONES');
+      drawBulletList(clauseLines);
+      drawBankAccounts();
+      newPageIfNeeded(10);
+      y += 4;
+      pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('Representaci\u00F3n impresa de la FACTURA ELECTR\u00D3NICA. Consulte su documento en: https://www.sunat.gob.pe', 105, y, { align: 'center' });
+      y += 6;
+      break;
+    }
+
+    case 'boleta': {
+      drawSectionHeader('DATOS DEL COMPRADOR');
+      drawInfoBox([
+        ['Cliente:', clientName, 5, 80],
+        ['DNI / RUC:', 'Consumidor Final', 5, 150],
+        ['Direcci\u00F3n:', '-', 11, 80]
+      ], 18);
+      drawSectionHeader('CONDICIONES DE PAGO');
+      pdf.setFontSize(9); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(paymentCondition, 25, y); y += 8;
+      drawBankAccounts();
+      newPageIfNeeded(10);
+      y += 4;
+      pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('Representaci\u00F3n impresa de la BOLETA DE VENTA ELECTR\u00D3NICA. Usuario final: Consumidor final.', 105, y, { align: 'center' });
+      y += 6;
+      break;
+    }
+
+    case 'recibo': {
+      var totalAmount = items.reduce(function(s, i) { return s + ((i.quantity||0) * (i.unitPrice||0)); }, 0);
+      drawSectionHeader('DATOS DEL PAGO');
+      drawInfoBox([
+        ['Concepto:', 'Pago por servicios y/o productos', 5, 90],
+        ['Forma de Pago:', paymentCondition, 5, 105],
+        ['Fecha de Pago:', issueDate || new Date().toISOString().split('T')[0], 11, 90],
+        ['Moneda:', 'PEN (Soles)', 11, 105],
+        ['Recib\u00ED de:', clientName, 17, 90],
+        ['Monto Total:', 'S/ ' + totalAmount.toFixed(2), 17, 105]
+      ], 25);
+      drawSectionHeader('CERTIFICACI\u00D3N');
+      newPageIfNeeded(12);
+      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text('Por medio de la presente se certifica que se ha recibido el pago arriba indicado en su totalidad.', 25, y);
+      y += 12;
+      newPageIfNeeded(28);
+      y += 4;
+      pdf.setDrawColor(...GRAY_TEXT); pdf.setLineWidth(0.5);
+      pdf.line(25, y + 16, 95, y + 16);
+      pdf.line(115, y + 16, 185, y + 16);
+      pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('Firma del Recibido', 60, y + 20, { align: 'center' });
+      pdf.text('Firma del Entregado', 150, y + 20, { align: 'center' });
+      y += 28;
+      break;
+    }
+
+    case 'contrato': {
+      drawSectionHeader('PARTES CONTRATANTES');
+      newPageIfNeeded(28);
+      pdf.setFillColor(...GRAY_BG);
+      pdf.roundedRect(20, y, 170, 26, 2, 2, 'F');
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      pdf.text('EL PRESTADOR:', 25, y + 5);
+      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(company.name || '-', 25, y + 10);
+      pdf.text('RUC: ' + (company.ruc||'-') + ' | ' + (company.address||''), 25, y + 16);
+      pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
+      pdf.text('EL CLIENTE:', 105, y + 5);
+      pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text(clientName, 105, y + 10);
+      pdf.text('Fecha: ' + (issueDate||'-'), 105, y + 16);
+      pdf.setFont(undefined, 'bold'); pdf.text('Ref.:', 25, y + 22);
+      pdf.setFont(undefined, 'normal'); pdf.text('Contrato de Prestaci\u00F3n de Servicios', 50, y + 22);
+      y += 32;
+
+      drawSectionHeader('CL\u00C1USULAS CONTRACTUALES');
+      drawBulletList([
+        'PRIMERA: OBJETO - El Prestador se compromete a proveer los servicios/productos detallados en el presente documento.',
+        'SEGUNDA: PLAZO - El plazo de ejecuci\u00F3n es desde ' + (issueDate||'---') + ' hasta ' + (dueDate||'---') + '.',
+        'TERCERA: MONTO - El monto total es el indicado en el cuadro de detalle, ' + (igvEnabled ? 'incluye IGV del 18%.' : 'sin IGV.'),
+        'CUARTA: FORMA DE PAGO - ' + paymentCondition + '.',
+        'QUINTA: CONFIDENCIALIDAD - Ambas partes se comprometen a mantener la confidencialidad de toda informaci\u00F3n compartida.',
+        'SEXTA: GARANT\u00CDA - El Prestador garantiza la calidad por un per\u00EDodo de 90 d\u00EDas calendario.',
+        'S\u00C9PTIMA: RESOLUCI\u00D3N - Cualquiera podr\u00E1 resolver el contrato con 15 d\u00EDas de aviso escrito en caso de incumplimiento.',
+        'OCTAVA: JURISDICCI\u00D3N - Para controversias, las partes se someten a los Juzgados de Lima, legislaci\u00F3n peruana vigente.'
+      ]);
+
+      y += 4;
+      drawSectionHeader('VIGENCIA DEL CONTRATO');
+      newPageIfNeeded(12);
+      pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
+      pdf.text('El presente contrato tiene vigencia desde el ' + (issueDate||'---') + ' hasta el ' + (dueDate||'---') + '.', 25, y);
+      y += 14;
+
+      newPageIfNeeded(32);
+      y += 4;
+      pdf.setDrawColor(...GRAY_TEXT); pdf.setLineWidth(0.5);
+      pdf.line(25, y + 20, 95, y + 20);
+      pdf.line(115, y + 20, 185, y + 20);
+      pdf.setFontSize(7); pdf.setTextColor(...GRAY_TEXT);
+      pdf.text('________________________', 60, y + 10, { align: 'center' });
+      pdf.text(company.name || 'EL PRESTADOR', 60, y + 24, { align: 'center' });
+      pdf.text('DNI/RUC: ' + (company.ruc||'-'), 60, y + 28, { align: 'center' });
+      pdf.text('________________________', 150, y + 10, { align: 'center' });
+      pdf.text(clientName, 150, y + 24, { align: 'center' });
+      pdf.text('DNI/RUC: _______________', 150, y + 28, { align: 'center' });
+      y += 36;
+      break;
+    }
+
+    case 'garantia': {
+      var mainItem = items.length > 0 ? items[0] : null;
+      drawSectionHeader('DATOS DEL PRODUCTO / SERVICIO');
+      drawInfoBox([
+        ['Producto/Servicio:', mainItem ? mainItem.description : '-', 5, 90],
+        ['Fecha Compra:', issueDate || '-', 5, 150],
+        ['Cliente:', clientName, 11, 90],
+        ['Cantidad:', mainItem ? String(mainItem.quantity) : '-', 11, 150],
+        ['Vendedor:', company.name || '-', 17, 90],
+        ['RUC Vendedor:', company.ruc || '-', 17, 150]
+      ], 25);
+
+      drawSectionHeader('COBERTURA DE GARANT\u00CDA');
+      drawInfoBox([
+        ['Per\u00EDodo:', 'Desde ' + (issueDate||'---') + ' hasta ' + (dueDate||'---'), 5, 80],
+        ['Tipo:', 'Garant\u00EDa por defectos de fabricaci\u00F3n y funcionamiento', 11, 80],
+        ['Alcance:', 'Reparaci\u00F3n o reemplazo del producto/servicio', 17, 80]
+      ], 25);
+
+      drawSectionHeader('CONDICIONES DE LA GARANT\u00CDA');
+      var warrantyClauses = clauseLines.length > 0 ? clauseLines : [
+        'La garant\u00EDa cubre defectos de fabricaci\u00F3n y funcionamiento normal del producto.',
+        'NO cubre da\u00F1os por mal uso, modificaciones no autorizadas o desgaste natural.',
+        'Para validar la garant\u00EDa, presente este certificado junto con el comprobante de compra.',
+        'El tiempo de reparaci\u00F3n o reemplazo no exceder\u00E1 los 30 d\u00EDas calendario.',
+        'Esta garant\u00EDa es transferible al nuevo propietario dentro del per\u00EDodo de vigencia.',
+        'Se rige por el C\u00F3digo de Protecci\u00F3n y Defensa del Consumidor (Ley N\u00B0 29571).'
+      ];
+      drawBulletList(warrantyClauses);
+      break;
+    }
+  }
+
+  return y;
 }
 
 // ==========================================================
@@ -1445,54 +1679,84 @@ window.generateShareLink = async function(id) {
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
 
-    // Generate short share ID
-    const shareId = 'q_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
-    
-    // Store quote DATA (not PDF) in shared_quotes collection to avoid Firestore 1MB limit
-    const sharedData = {
-      shareId,
-      quoteId: id,
-      userId: currentUser.uid,
-      clientName,
-      clientDocument: quote.client?.document || '',
-      clientEmail: quote.client?.email || '',
-      clientPhone: quote.client?.phone || '',
-      clientAddress: quote.client?.address || '',
-      quoteNumber: quote.number || 0,
-      documentType: quote.documentType || 'cotizacion',
-      items: quote.items || [],
-      issueDate: quote.issueDate || '',
-      dueDate: quote.dueDate || '',
-      subtotal: quote.subtotal || 0,
-      igv: quote.igv || 0,
-      total: quote.total || 0,
-      igvEnabled: quote.igvEnabled || false,
-      igvType: quote.igvType || 'apart',
-      // Company data for PDF rendering
-      company: {
-        name: company.name || '',
-        ruc: company.ruc || '',
-        address: company.address || '',
-        phone: company.phone || '',
-        email: company.email || '',
-        paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
-        clauses: company.clauses || DEFAULT_CLAUSES,
-        bankAccounts: company.bankAccounts || []
-      },
-      createdAt: new Date().toISOString(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days
+    // Build compact share data
+    const sharePayload = {
+      n: quote.number || 0,
+      dt: quote.documentType || 'cotizacion',
+      cn: clientName,
+      cd: quote.client?.document || '',
+      items: (quote.items || []).map(i => ({ q: i.quantity, p: i.unitPrice, d: i.description })),
+      id: quote.issueDate || '',
+      dd: quote.dueDate || '',
+      s: quote.subtotal || 0,
+      i: quote.igv || 0,
+      t: quote.total || 0,
+      ie: quote.igvEnabled || false,
+      it: quote.igvType || 'apart',
+      co: {
+        n: company.name || '',
+        r: company.ruc || '',
+        a: company.address || '',
+        ph: company.phone || '',
+        e: company.email || '',
+        pc: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
+        cl: company.clauses || DEFAULT_CLAUSES,
+        ba: (company.bankAccounts || []).map(b => ({ n: b.name, t: b.accountType, h: b.holder, num: b.number }))
+      }
     };
-    
-    await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
-    
-    const shareUrl = `${window.location.origin}/view.html?id=${shareId}`;
+
+    // Try Firestore first, fallback to URL encoding
+    try {
+      const shareId = 'q_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      
+      const sharedData = {
+        shareId,
+        quoteId: id,
+        userId: currentUser.uid,
+        clientName,
+        clientDocument: quote.client?.document || '',
+        clientEmail: quote.client?.email || '',
+        clientPhone: quote.client?.phone || '',
+        clientAddress: quote.client?.address || '',
+        quoteNumber: quote.number || 0,
+        documentType: quote.documentType || 'cotizacion',
+        items: quote.items || [],
+        issueDate: quote.issueDate || '',
+        dueDate: quote.dueDate || '',
+        subtotal: quote.subtotal || 0,
+        igv: quote.igv || 0,
+        total: quote.total || 0,
+        igvEnabled: quote.igvEnabled || false,
+        igvType: quote.igvType || 'apart',
+        company: {
+          name: company.name || '',
+          ruc: company.ruc || '',
+          address: company.address || '',
+          phone: company.phone || '',
+          email: company.email || '',
+          paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
+          clauses: company.clauses || DEFAULT_CLAUSES,
+          bankAccounts: company.bankAccounts || []
+        },
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      };
+      
+      await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
+      var shareUrl = `${window.location.origin}/view.html?id=${shareId}`;
+    } catch (firestoreError) {
+      console.warn('Firestore share failed, using URL fallback:', firestoreError.message);
+      // Fallback: encode data in URL
+      const jsonStr = JSON.stringify(sharePayload);
+      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      var shareUrl = `${window.location.origin}/view.html#data=${encoded}`;
+    }
     
     // Copy to clipboard
     try {
       await navigator.clipboard.writeText(shareUrl);
       showToast('✅ Enlace copiado al portapapeles');
     } catch (e) {
-      // Fallback for older browsers
       const textarea = document.createElement('textarea');
       textarea.value = shareUrl;
       textarea.style.position = 'fixed';
