@@ -9,6 +9,12 @@ let quoteItems = [];
 let currentWizardStep = 1;
 let isGeneratingPDF = false;
 
+// Demo account detection (ONLY for these specific demo emails)
+const DEMO_EMAILS = ['demo.pro@cotizapro.com', 'demo.business@cotizapro.com', 'demo.basico@cotizapro.com'];
+function isDemoAccount() {
+  return currentUser && DEMO_EMAILS.includes((currentUser.email || '').toLowerCase());
+}
+
 // Default clauses for new clients
 const DEFAULT_PAYMENT_CONDITION = 'Contado';
 const DEFAULT_CLAUSES = `Esta cotización tiene una validez de 30 días calendario.\nLos precios están expresados en Soles (PEN) e incluyen IGV.\nLa forma de pago y plazos están detallados en la sección de condiciones de pago.\nEsta cotización está sujeta a disponibilidad de stock al momento de la orden de compra.\nPara consultas, comuníquese a los datos de contacto indicados en el encabezado.`;
@@ -87,7 +93,11 @@ function initUI() {
 
   updatePlanProgress();
 
-  if (userData.planEndDate) {
+  if (isDemoAccount()) {
+    const demoExpiry = new Date();
+    demoExpiry.setMonth(demoExpiry.getMonth() + 12);
+    document.getElementById('stat-plan-expires').textContent = formatDateShort(demoExpiry);
+  } else if (userData.planEndDate) {
     document.getElementById('stat-plan-expires').textContent = formatDateShort(new Date(userData.planEndDate));
   } else {
     document.getElementById('stat-plan-expires').textContent = 'Gratis';
@@ -232,11 +242,11 @@ async function loadDashboard() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
   });
 
-  // Exclude demo quotes from count and total
-  const realQuotes = thisMonth.filter(q => !q.isDemo);
-  const totalAmount = realQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
+  // For demo accounts: include ALL quotes for realistic demo; for real: exclude demo quotes
+  const statsQuotes = isDemoAccount() ? thisMonth : thisMonth.filter(q => !q.isDemo);
+  const totalAmount = statsQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
   
-  document.getElementById('stat-quotes-month').textContent = realQuotes.length;
+  document.getElementById('stat-quotes-month').textContent = statsQuotes.length;
   document.getElementById('stat-total-amount').textContent = formatCurrency(totalAmount);
 
   // Update remaining quotes widget
@@ -1851,9 +1861,21 @@ window.previewQuote = async function(id) {
     const clientName = quote.client?.name || 'Sin nombre';
     const clientDoc = quote.client?.document || '';
 
+    // For demo accounts: fill missing dates with reasonable values
+    let prevIssue = quote.issueDate;
+    let prevDue = quote.dueDate;
+    if (isDemoAccount() && (!prevIssue || !prevDue)) {
+      const created = new Date(quote.createdAt);
+      const cDate = isNaN(created.getTime()) ? new Date(2025, 5, 15) : created;
+      prevIssue = prevIssue || cDate.toISOString().split('T')[0];
+      const dDate = new Date(cDate);
+      dDate.setDate(dDate.getDate() + 15);
+      prevDue = prevDue || dDate.toISOString().split('T')[0];
+    }
+
     const { pdf } = await renderPDF(
       company, clientName, quote.items || [],
-      quote.number || 0, quote.issueDate, quote.dueDate,
+      quote.number || 0, prevIssue, prevDue,
       quote.subtotal || 0, quote.igv || 0, quote.total || 0,
       quote.igvEnabled, quote.igvType || 'apart',
       quote.documentType || 'cotizacion', clientDoc
@@ -1904,10 +1926,22 @@ window.downloadQuote = async function(id) {
     const clientName = quote.client?.name || 'Sin nombre';
     const clientDoc = quote.client?.document || '';
 
+    // For demo accounts: fill missing dates with reasonable values
+    let dlIssue = quote.issueDate;
+    let dlDue = quote.dueDate;
+    if (isDemoAccount() && (!dlIssue || !dlDue)) {
+      const created = new Date(quote.createdAt);
+      const cDate = isNaN(created.getTime()) ? new Date(2025, 5, 15) : created;
+      dlIssue = dlIssue || cDate.toISOString().split('T')[0];
+      const dDate = new Date(cDate);
+      dDate.setDate(dDate.getDate() + 15);
+      dlDue = dlDue || dDate.toISOString().split('T')[0];
+    }
+
     // Use centralized PDF renderer
     const { pdf } = await renderPDF(
       company, clientName, quote.items || [],
-      quote.number || 0, quote.issueDate, quote.dueDate,
+      quote.number || 0, dlIssue, dlDue,
       quote.subtotal || 0, quote.igv || 0, quote.total || 0,
       quote.igvEnabled, quote.igvType || 'apart',
       quote.documentType || 'cotizacion', clientDoc
@@ -1947,6 +1981,18 @@ window.generateShareLink = async function(id) {
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
 
+    // For demo accounts: fill missing dates with reasonable values
+    let shareIssueDate = quote.issueDate;
+    let shareDueDate = quote.dueDate;
+    if (isDemoAccount() && (!shareIssueDate || !shareDueDate)) {
+      const created = new Date(quote.createdAt);
+      const cDate = isNaN(created.getTime()) ? new Date(2025, 5, 15) : created;
+      shareIssueDate = shareIssueDate || cDate.toISOString().split('T')[0];
+      const dDate = new Date(cDate);
+      dDate.setDate(dDate.getDate() + 15);
+      shareDueDate = shareDueDate || dDate.toISOString().split('T')[0];
+    }
+
     // Build compact share data
     const sharePayload = {
       n: quote.number || 0,
@@ -1954,8 +2000,8 @@ window.generateShareLink = async function(id) {
       cn: clientName,
       cd: quote.client?.document || '',
       items: (quote.items || []).map(i => ({ q: i.quantity, p: i.unitPrice, d: i.description })),
-      id: quote.issueDate || '',
-      dd: quote.dueDate || '',
+      id: shareIssueDate || '',
+      dd: shareDueDate || '',
       s: quote.subtotal || 0,
       i: quote.igv || 0,
       t: quote.total || 0,
@@ -2198,7 +2244,11 @@ function formatCurrency(amount) {
 }
 
 function formatDateShort(date) {
-  return date.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
+  if (!date || isNaN(new Date(date).getTime())) {
+    if (isDemoAccount()) return '15 jun 2025';
+    return '—';
+  }
+  return new Date(date).toLocaleDateString('es-PE', { day: '2-digit', month: 'short' });
 }
 
 async function getUserQuotes() {
