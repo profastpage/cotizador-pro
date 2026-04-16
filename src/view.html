@@ -785,9 +785,21 @@
 
     async function loadSharedQuote() {
       const params = new URLSearchParams(window.location.search);
-      const shareId = params.get('id');
+      const companySlug = params.get('c');
+      const quoteNum = params.get('n');
+      const legacyId = params.get('id');
       
-      // Check for URL-encoded data fallback (hash fragment)
+      // Build Firestore doc ID from clean URL params
+      let shareId = null;
+      if (companySlug && quoteNum) {
+        // New clean format: ?c=Tech-Solutions-SAC&n=001
+        shareId = `${companySlug}_${quoteNum}`;
+      } else if (legacyId) {
+        // Legacy format: ?id=q_xxxxx
+        shareId = legacyId;
+      }
+      
+      // Check for old base64 hash fallback
       const hashData = window.location.hash;
       let urlEncodedData = null;
       if (hashData.startsWith('#data=')) {
@@ -800,8 +812,83 @@
         }
       }
 
+      // Priority 1: New clean URL or legacy Firestore ID
+      if (shareId) {
+        try {
+          const docSnap = await getDoc(doc(db, 'shared_quotes', shareId));
+
+          if (!docSnap.exists()) {
+            showError('Cotizacion no encontrada', 'El enlace que seguiste puede haber expirado o ser invalido.');
+            return;
+          }
+
+          const data = docSnap.data();
+
+          // Check expiration
+          if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
+            showError('Enlace expirado', 'Este enlace de cotizacion ha expirado (vigencia de 30 dias).');
+            return;
+          }
+
+          // Update header info
+          const docType = DOCUMENT_TYPES[data.documentType] || DOCUMENT_TYPES.cotizacion;
+          const num = String(data.quoteNumber || 0).padStart(3, '0');
+          document.getElementById('quote-info').textContent = `${docType.name} #${num} - ${data.clientName || 'Sin cliente'}`;
+
+          // Check if this is a NEW format (data-based) or OLD format (pdfBase64-based)
+          if (data.pdfBase64) {
+            // OLD format - direct base64 display
+            const dataUrl = `data:application/pdf;base64,${data.pdfBase64}`;
+            const iframe = document.getElementById('pdf-display');
+            iframe.src = dataUrl;
+            iframe.classList.remove('hidden');
+            document.getElementById('state-loading').classList.add('hidden');
+            document.getElementById('header-actions').classList.remove('hidden');
+          } else if (data.items && data.company) {
+            // NEW format - render PDF from stored data
+            const jspdf = await loadJsPDF();
+            window.jspdf = jspdf;
+
+            const pdf = renderPDF(
+              data.company,
+              data.clientName || 'Sin cliente',
+              data.items || [],
+              data.quoteNumber || 0,
+              data.issueDate || '',
+              data.dueDate || '',
+              data.subtotal || 0,
+              data.igv || 0,
+              data.total || 0,
+              data.igvEnabled || false,
+              data.igvType || 'apart',
+              data.documentType || 'cotizacion',
+              data.clientDocument || ''
+            );
+
+            currentPdfBlob = pdf.output('blob');
+            currentDownloadName = (data.company?.name || 'Cotizacion').replace(/[^a-zA-Z0-9\s]/g, '').trim() + '-' + String(data.quoteNumber || 0).padStart(3, '0') + '.pdf';
+            const dataUrl = pdf.output('datauristring');
+            const iframe = document.getElementById('pdf-display');
+            iframe.src = dataUrl;
+            iframe.classList.remove('hidden');
+            document.getElementById('state-loading').classList.add('hidden');
+            document.getElementById('header-actions').classList.remove('hidden');
+          } else {
+            showError('Datos incompletos', 'No se encontraron los datos necesarios para generar la cotizacion.');
+          }
+          return;
+        } catch (error) {
+          console.error('Error loading shared quote:', error);
+          // Fall through to base64 fallback if available
+          if (!urlEncodedData) {
+            showError('Error de conexion', 'No se pudo cargar la cotizacion. Intenta nuevamente.');
+            return;
+          }
+        }
+      }
+
+      // Priority 2: Base64 URL-encoded fallback (old format backwards compatibility)
       if (urlEncodedData) {
-        // URL-encoded fallback mode - render directly from URL data
         try {
           const jspdf = await loadJsPDF();
           window.jspdf = jspdf;
@@ -859,77 +946,8 @@
         return;
       }
 
-      if (!shareId) {
-        showError('Enlace invalido', 'No se encontro el ID de la cotizacion en el enlace.');
-        return;
-      }
-
-      try {
-        const docSnap = await getDoc(doc(db, 'shared_quotes', shareId));
-
-        if (!docSnap.exists()) {
-          showError('Cotizacion no encontrada', 'El enlace que seguiste puede haber expirado o ser invalido.');
-          return;
-        }
-
-        const data = docSnap.data();
-
-        // Check expiration
-        if (data.expiresAt && new Date(data.expiresAt) < new Date()) {
-          showError('Enlace expirado', 'Este enlace de cotizacion ha expirado (vigencia de 30 dias).');
-          return;
-        }
-
-        // Update header info
-        const docType = DOCUMENT_TYPES[data.documentType] || DOCUMENT_TYPES.cotizacion;
-        const num = String(data.quoteNumber || 0).padStart(3, '0');
-        document.getElementById('quote-info').textContent = `${docType.name} #${num} - ${data.clientName || 'Sin cliente'}`;
-
-        // Check if this is a NEW format (data-based) or OLD format (pdfBase64-based)
-        if (data.pdfBase64) {
-          // OLD format - direct base64 display
-          const dataUrl = `data:application/pdf;base64,${data.pdfBase64}`;
-          const iframe = document.getElementById('pdf-display');
-          iframe.src = dataUrl;
-          iframe.classList.remove('hidden');
-          document.getElementById('state-loading').classList.add('hidden');
-          document.getElementById('header-actions').classList.remove('hidden');
-        } else if (data.items && data.company) {
-          // NEW format - render PDF from stored data
-          const jspdf = await loadJsPDF();
-          window.jspdf = jspdf; // Store globally for download
-
-          const pdf = renderPDF(
-            data.company,
-            data.clientName || 'Sin cliente',
-            data.items || [],
-            data.quoteNumber || 0,
-            data.issueDate || '',
-            data.dueDate || '',
-            data.subtotal || 0,
-            data.igv || 0,
-            data.total || 0,
-            data.igvEnabled || false,
-            data.igvType || 'apart',
-            data.documentType || 'cotizacion',
-            data.clientDocument || ''
-          );
-
-          currentPdfBlob = pdf.output('blob');
-          currentDownloadName = (data.company?.name || 'Cotizacion').replace(/[^a-zA-Z0-9\s]/g, '').trim() + '-' + String(data.quoteNumber || 0).padStart(3, '0') + '.pdf';
-          const dataUrl = pdf.output('datauristring');
-          const iframe = document.getElementById('pdf-display');
-          iframe.src = dataUrl;
-          iframe.classList.remove('hidden');
-          document.getElementById('state-loading').classList.add('hidden');
-          document.getElementById('header-actions').classList.remove('hidden');
-        } else {
-          showError('Datos incompletos', 'No se encontraron los datos necesarios para generar la cotizacion.');
-        }
-      } catch (error) {
-        console.error('Error loading shared quote:', error);
-        showError('Error de conexion', 'No se pudo cargar la cotizacion. Intenta nuevamente.');
-      }
+      // No valid URL params found
+      showError('Enlace invalido', 'No se encontro la cotizacion en el enlace.');
     }
 
     function showError(title, message) {

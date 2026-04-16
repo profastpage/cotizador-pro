@@ -2025,9 +2025,13 @@ window.generateShareLink = async function(id) {
       }
     };
 
-    // Try Firestore first, fallback to URL encoding
+    // Try Firestore with clean URL
     try {
-      const shareId = 'q_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+      // Build slug from company name: "Tech Solutions SAC" → "Tech-Solutions-SAC"
+      const companySlug = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '-');
+      const quoteNum = String(quote.number || 0).padStart(3, '0');
+      // Predictable doc ID: companySlug_quoteNumber
+      const shareId = `${companySlug}_${quoteNum}`;
       
       const sharedData = {
         shareId,
@@ -2041,8 +2045,8 @@ window.generateShareLink = async function(id) {
         quoteNumber: quote.number || 0,
         documentType: quote.documentType || 'cotizacion',
         items: quote.items || [],
-        issueDate: quote.issueDate || '',
-        dueDate: quote.dueDate || '',
+        issueDate: shareIssueDate || '',
+        dueDate: shareDueDate || '',
         subtotal: quote.subtotal || 0,
         igv: quote.igv || 0,
         total: quote.total || 0,
@@ -2056,20 +2060,19 @@ window.generateShareLink = async function(id) {
           email: company.email || '',
           paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
           clauses: company.clauses || DEFAULT_CLAUSES,
-          bankAccounts: company.bankAccounts || []
+          bankAccounts: company.bankAccounts || [],
+          templateColor: company.templateColor || 'blue'
         },
         createdAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       };
       
       await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
-      var shareUrl = `${window.location.origin}/view.html?id=${shareId}`;
+      var shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companySlug)}&n=${encodeURIComponent(quoteNum)}`;
     } catch (firestoreError) {
-      console.warn('Firestore share failed, using URL fallback:', firestoreError.message);
-      // Fallback: encode data in URL
-      const jsonStr = JSON.stringify(sharePayload);
-      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
-      var shareUrl = `${window.location.origin}/view.html#data=${encoded}`;
+      console.error('Share error:', firestoreError);
+      showToast('Error al guardar enlace: ' + firestoreError.message, 'error');
+      return;
     }
     
     // Copy to clipboard
