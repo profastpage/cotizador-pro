@@ -1998,7 +1998,7 @@ window.generateShareLink = async function(id) {
       shareDueDate = shareDueDate || dDate.toISOString().split('T')[0];
     }
 
-    // Build compact share data
+    // Build compact share payload for URL fallback
     const sharePayload = {
       n: quote.number || 0,
       dt: quote.documentType || 'cotizacion',
@@ -2025,12 +2025,11 @@ window.generateShareLink = async function(id) {
       }
     };
 
-    // Try Firestore with clean URL
+    var shareUrl = '';
     try {
-      // Build slug from company name: "Tech Solutions SAC" → "Tech-Solutions-SAC"
+      // Try Firestore with clean URL first
       const companySlug = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '-');
       const quoteNum = String(quote.number || 0).padStart(3, '0');
-      // Predictable doc ID: companySlug_quoteNumber
       const shareId = `${companySlug}_${quoteNum}`;
       
       const sharedData = {
@@ -2068,11 +2067,13 @@ window.generateShareLink = async function(id) {
       };
       
       await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
-      var shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companySlug)}&n=${encodeURIComponent(quoteNum)}`;
+      shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companySlug)}&n=${encodeURIComponent(quoteNum)}`;
     } catch (firestoreError) {
-      console.error('Share error:', firestoreError);
-      showToast('Error al guardar enlace: ' + firestoreError.message, 'error');
-      return;
+      console.warn('Firestore share failed, using URL fallback:', firestoreError.message);
+      // Fallback: encode essential data in URL hash
+      const jsonStr = JSON.stringify(sharePayload);
+      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      shareUrl = `${window.location.origin}/view.html#data=${encoded}`;
     }
     
     // Copy to clipboard
