@@ -236,14 +236,19 @@ function navigateTo(screen) {
 
 async function loadDashboard() {
   const quotes = await getUserQuotes();
-  const thisMonth = quotes.filter(q => {
-    const d = new Date(q.createdAt);
-    const now = new Date();
-    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-  });
-
-  // For demo accounts: include ALL quotes for realistic demo; for real: exclude demo quotes
-  const statsQuotes = isDemoAccount() ? thisMonth : thisMonth.filter(q => !q.isDemo);
+  // For demo accounts: use ALL history quotes for realistic demo
+  // For real accounts: only this month, excluding demo quotes
+  let statsQuotes;
+  if (isDemoAccount()) {
+    statsQuotes = quotes; // ALL quotes from history
+  } else {
+    const thisMonth = quotes.filter(q => {
+      const d = new Date(q.createdAt);
+      const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+    statsQuotes = thisMonth.filter(q => !q.isDemo);
+  }
   const totalAmount = statsQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
   
   document.getElementById('stat-quotes-month').textContent = statsQuotes.length;
