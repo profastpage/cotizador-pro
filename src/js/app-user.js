@@ -1960,6 +1960,11 @@ window.downloadQuote = async function(id) {
   }
 };
 
+// Share service API base URL (configurable for production deployment)
+// Local dev: uses the gateway proxy with XTransformPort
+// Production: point to your deployed share service URL
+const SHARE_SERVICE_URL = '/api/share';
+
 // Generate shareable link for a quote
 window.generateShareLink = async function(id) {
   try {
@@ -1998,88 +2003,119 @@ window.generateShareLink = async function(id) {
       shareDueDate = shareDueDate || dDate.toISOString().split('T')[0];
     }
 
-    // Build compact share payload for URL fallback
-    const sharePayload = {
-      n: quote.number || 0,
-      dt: quote.documentType || 'cotizacion',
-      cn: clientName,
-      cd: quote.client?.document || '',
-      items: (quote.items || []).map(i => ({ q: i.quantity, p: i.unitPrice, d: i.description })),
-      id: shareIssueDate || '',
-      dd: shareDueDate || '',
-      s: quote.subtotal || 0,
-      i: quote.igv || 0,
-      t: quote.total || 0,
-      ie: quote.igvEnabled || false,
-      it: quote.igvType || 'apart',
-      co: {
-        n: company.name || '',
-        r: company.ruc || '',
-        a: company.address || '',
-        ph: company.phone || '',
-        e: company.email || '',
-        pc: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
-        cl: company.clauses || DEFAULT_CLAUSES,
-        ba: (company.bankAccounts || []).map(b => ({ n: b.name, t: b.accountType, h: b.holder, num: b.number })),
-        tc: company.templateColor || 'blue'
-      }
+    // Build company slug and quote number for clean URL
+    const companySlug = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '-');
+    const quoteNum = String(quote.number || 0).padStart(3, '0');
+    const shareId = `${companySlug}_${quoteNum}`;
+
+    // Build the shared data payload
+    const sharedData = {
+      id: shareId,
+      userId: currentUser.uid,
+      clientName,
+      clientDocument: quote.client?.document || '',
+      clientEmail: quote.client?.email || '',
+      clientPhone: quote.client?.phone || '',
+      clientAddress: quote.client?.address || '',
+      quoteNumber: quote.number || 0,
+      documentType: quote.documentType || 'cotizacion',
+      items: quote.items || [],
+      issueDate: shareIssueDate || '',
+      dueDate: shareDueDate || '',
+      subtotal: quote.subtotal || 0,
+      igv: quote.igv || 0,
+      total: quote.total || 0,
+      igvEnabled: quote.igvEnabled || false,
+      igvType: quote.igvType || 'apart',
+      company: {
+        name: company.name || '',
+        ruc: company.ruc || '',
+        address: company.address || '',
+        phone: company.phone || '',
+        email: company.email || '',
+        paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
+        clauses: company.clauses || DEFAULT_CLAUSES,
+        bankAccounts: company.bankAccounts || [],
+        templateColor: company.templateColor || 'blue'
+      },
+      createdAt: new Date().toISOString(),
+      expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
     };
 
     var shareUrl = '';
+    var cleanUrlUsed = false;
+
+    // Strategy 1: Share Service API (preferred - clean URL)
     try {
-      // Try Firestore with clean URL first
-      const companySlug = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim().replace(/\s+/g, '-');
-      const quoteNum = String(quote.number || 0).padStart(3, '0');
-      const shareId = `${companySlug}_${quoteNum}`;
-      
-      const sharedData = {
-        shareId,
-        quoteId: id,
-        userId: currentUser.uid,
-        clientName,
-        clientDocument: quote.client?.document || '',
-        clientEmail: quote.client?.email || '',
-        clientPhone: quote.client?.phone || '',
-        clientAddress: quote.client?.address || '',
-        quoteNumber: quote.number || 0,
-        documentType: quote.documentType || 'cotizacion',
-        items: quote.items || [],
-        issueDate: shareIssueDate || '',
-        dueDate: shareDueDate || '',
-        subtotal: quote.subtotal || 0,
-        igv: quote.igv || 0,
-        total: quote.total || 0,
-        igvEnabled: quote.igvEnabled || false,
-        igvType: quote.igvType || 'apart',
-        company: {
-          name: company.name || '',
-          ruc: company.ruc || '',
-          address: company.address || '',
-          phone: company.phone || '',
-          email: company.email || '',
-          paymentCondition: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
-          clauses: company.clauses || DEFAULT_CLAUSES,
-          bankAccounts: company.bankAccounts || [],
-          templateColor: company.templateColor || 'blue'
-        },
-        createdAt: new Date().toISOString(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      const apiUrl = `${SHARE_SERVICE_URL}?XTransformPort=3020`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sharedData)
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // Clean URL: company name + quote number
+          const companyName = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+          const paddedNum = String(quote.number || 0).padStart(3, '0');
+          shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companyName)}&n=${encodeURIComponent(paddedNum)}`;
+          cleanUrlUsed = true;
+        }
+      }
+    } catch (apiError) {
+      console.warn('Share service unavailable, trying Firestore...', apiError.message);
+    }
+
+    // Strategy 2: Firestore direct write (fallback)
+    if (!shareUrl) {
+      try {
+        await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
+        const companyName = (company.name || 'Empresa').replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s]/g, '').trim();
+        const paddedNum = String(quote.number || 0).padStart(3, '0');
+        shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companyName)}&n=${encodeURIComponent(paddedNum)}`;
+        cleanUrlUsed = true;
+      } catch (firestoreError) {
+        console.warn('Firestore share failed, using compact URL fallback:', firestoreError.message);
+      }
+    }
+
+    // Strategy 3: Compact base64 URL fallback (always works)
+    if (!shareUrl) {
+      const sharePayload = {
+        n: quote.number || 0,
+        dt: quote.documentType || 'cotizacion',
+        cn: clientName,
+        cd: quote.client?.document || '',
+        items: (quote.items || []).map(i => ({ q: i.quantity, p: i.unitPrice, d: i.description })),
+        id: shareIssueDate || '',
+        dd: shareDueDate || '',
+        s: quote.subtotal || 0,
+        i: quote.igv || 0,
+        t: quote.total || 0,
+        ie: quote.igvEnabled || false,
+        it: quote.igvType || 'apart',
+        co: {
+          n: company.name || '',
+          r: company.ruc || '',
+          a: company.address || '',
+          ph: company.phone || '',
+          e: company.email || '',
+          pc: company.paymentCondition || DEFAULT_PAYMENT_CONDITION,
+          cl: company.clauses || DEFAULT_CLAUSES,
+          ba: (company.bankAccounts || []).map(b => ({ n: b.name, t: b.accountType, h: b.holder, num: b.number })),
+          tc: company.templateColor || 'blue'
+        }
       };
-      
-      await setDoc(doc(db, 'shared_quotes', shareId), sharedData);
-      shareUrl = `${window.location.origin}/view.html?c=${encodeURIComponent(companySlug)}&n=${encodeURIComponent(quoteNum)}`;
-    } catch (firestoreError) {
-      console.warn('Firestore share failed, using URL fallback:', firestoreError.message);
-      // Fallback: encode essential data in URL hash
       const jsonStr = JSON.stringify(sharePayload);
       const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
       shareUrl = `${window.location.origin}/view.html#data=${encoded}`;
     }
-    
+
     // Copy to clipboard
     try {
       await navigator.clipboard.writeText(shareUrl);
-      showToast('✅ Enlace copiado al portapapeles');
+      showToast(cleanUrlUsed ? '✅ Enlace limpio copiado' : '✅ Enlace copiado al portapapeles');
     } catch (e) {
       const textarea = document.createElement('textarea');
       textarea.value = shareUrl;
@@ -2089,7 +2125,7 @@ window.generateShareLink = async function(id) {
       textarea.select();
       document.execCommand('copy');
       document.body.removeChild(textarea);
-      showToast('✅ Enlace copiado al portapapeles');
+      showToast(cleanUrlUsed ? '✅ Enlace limpio copiado' : '✅ Enlace copiado al portapapeles');
     }
   } catch (error) {
     console.error('Share error:', error);
