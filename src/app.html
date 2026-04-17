@@ -274,6 +274,10 @@
         <span class="nav-icon">📋</span>
         <span class="nav-label">Historial</span>
       </button>
+      <button class="nav-item" data-screen="finances">
+        <span class="nav-icon">💰</span>
+        <span class="nav-label">Finanzas</span>
+      </button>
       <button class="nav-item" data-screen="settings">
         <span class="nav-icon">⚙️</span>
         <span class="nav-label">Ajustes</span>
@@ -530,6 +534,122 @@
       </div>
     </section>
 
+    <!-- Finanzas -->
+    <section id="screen-finances" class="screen">
+      <div class="container">
+        <h2 class="section-title">Ingresos y Gastos 💰</h2>
+        <p style="color:var(--color-text-muted);font-size:0.85rem;margin-bottom:1.25rem;">
+          Aprueba cotizaciones desde el Historial para registrar ingresos. Agrega tus gastos manualmente.
+        </p>
+
+        <!-- Financial Summary Cards -->
+        <div class="finance-summary-grid">
+          <div class="finance-card finance-income">
+            <div class="finance-card-icon">📈</div>
+            <div class="finance-card-info">
+              <p class="finance-card-label">Total Ingresos</p>
+              <h3 class="finance-card-value" id="finance-total-income">S/ 0.00</h3>
+              <p class="finance-card-detail" id="finance-income-count">0 cotizaciones aprobadas</p>
+            </div>
+          </div>
+          <div class="finance-card finance-expense">
+            <div class="finance-card-icon">📉</div>
+            <div class="finance-card-info">
+              <p class="finance-card-label">Total Gastos</p>
+              <h3 class="finance-card-value" id="finance-total-expenses">S/ 0.00</h3>
+              <p class="finance-card-detail" id="finance-expense-count">0 gastos registrados</p>
+            </div>
+          </div>
+          <div class="finance-card finance-profit">
+            <div class="finance-card-icon">💎</div>
+            <div class="finance-card-info">
+              <p class="finance-card-label">Ganancia Neta</p>
+              <h3 class="finance-card-value" id="finance-net-profit">S/ 0.00</h3>
+              <p class="finance-card-detail" id="finance-profit-percent">0%</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Approved Quotes Section -->
+        <div class="finance-section">
+          <h3 class="finance-section-title">📊 Cotizaciones Aprobadas</h3>
+          <p style="color:var(--color-text-muted);font-size:0.8rem;margin-bottom:0.75rem;">
+            Aprueba cotizaciones desde el Historial (ícono ✓ verde)
+          </p>
+          <div id="finance-approved-list" class="finance-approved-list">
+            <div class="empty-state" style="padding:1.5rem;">
+              <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay cotizaciones aprobadas aún</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Expense Form -->
+        <div class="finance-section">
+          <h3 class="finance-section-title">💸 Agregar Gasto / Inversión</h3>
+          <form id="form-add-expense" class="form" style="margin-top:0.75rem;">
+            <div class="form-row">
+              <div class="form-group" style="flex:2;">
+                <label class="form-label">Descripción *</label>
+                <input type="text" id="expense-description" class="form-input" placeholder="Ej: Compra de materiales" required>
+              </div>
+              <div class="form-group" style="flex:1;">
+                <label class="form-label">Monto (S/) *</label>
+                <input type="number" id="expense-amount" class="form-input" placeholder="0.00" min="0" step="0.01" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Categoría</label>
+                <select id="expense-category" class="form-input form-select">
+                  <option value="materiales">🧱 Materiales</option>
+                  <option value="servicios">🔧 Servicios</option>
+                  <option value="transporte">🚗 Transporte</option>
+                  <option value="alimentacion">🍔 Alimentación</option>
+                  <option value="alquiler">🏠 Alquiler</option>
+                  <option value="software">💻 Software</option>
+                  <option value="marketing">📢 Marketing</option>
+                  <option value="impuestos">🧾 Impuestos</option>
+                  <option value="salarios">👥 Salarios</option>
+                  <option value="otros">📦 Otros</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Fecha</label>
+                <input type="date" id="expense-date" class="form-input">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top:0.5rem;">
+              ➕ Agregar Gasto
+            </button>
+          </form>
+        </div>
+
+        <!-- Expenses List -->
+        <div class="finance-section">
+          <h3 class="finance-section-title">📝 Gastos Registrados</h3>
+          <div id="finance-expenses-list" class="finance-expenses-list">
+            <div class="empty-state" style="padding:1.5rem;">
+              <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay gastos registrados aún</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Weekly Summary -->
+        <div class="finance-section">
+          <h3 class="finance-section-title">📅 Resumen Semanal</h3>
+          <p style="color:var(--color-text-muted);font-size:0.8rem;margin-bottom:0.75rem;">
+            Ganancia automática = Ingresos - Gastos por cada semana
+          </p>
+          <div id="finance-weekly-summary" class="finance-weekly-summary">
+            <div class="empty-state" style="padding:1.5rem;">
+              <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay datos suficientes para generar resumen semanal</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
     <!-- Settings -->
     <section id="screen-settings" class="screen">
       <div class="container">
@@ -721,6 +841,10 @@
     <button class="nav-item" data-screen="history">
       <span class="nav-icon">📋</span>
       <span class="nav-label">Historial</span>
+    </button>
+    <button class="nav-item" data-screen="finances">
+      <span class="nav-icon">💰</span>
+      <span class="nav-label">Finanzas</span>
     </button>
     <button class="nav-item" data-screen="settings">
       <span class="nav-icon">⚙️</span>

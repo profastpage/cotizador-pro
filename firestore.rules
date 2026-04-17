@@ -135,6 +135,24 @@ service cloud.firestore {
     }
     
     // ==========================================================
+    // EXPENSES - Solo el propietario puede acceder a sus gastos
+    // ==========================================================
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && 
+                     (isOwner(resource.data.userId) || isAdmin());
+      
+      allow create: if isAuthenticated() && 
+                       isOwner(request.resource.data.userId) &&
+                       isActiveUser();
+      
+      allow update: if isAuthenticated() && 
+                       (isOwner(resource.data.userId) || isAdmin());
+      
+      allow delete: if isAuthenticated() && 
+                       (isOwner(resource.data.userId) || isAdmin());
+    }
+    
+    // ==========================================================
     // DENY ALL por defecto
     // ==========================================================
     match /{document=**} {

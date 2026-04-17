@@ -227,6 +227,7 @@ function navigateTo(screen) {
   if (screen === 'history') loadHistory();
   if (screen === 'new-quote') resetWizard();
   if (screen === 'settings') loadSettings();
+  if (screen === 'finances') loadFinances();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -294,20 +295,32 @@ function createQuoteCard(quote, showActions = false, position = null) {
   // Document type icon
   const typeIcon = `<span style="margin-right:0.25rem;">${docType.icon}</span>`;
 
+  // Approve button (green check) - only in history view
+  const isApproved = quote.approved === true;
+  const approveBtn = showActions ? `
+    <button class="btn-approve-quote ${isApproved ? 'approved' : ''}" 
+            onclick="event.stopPropagation();window.toggleApproveQuote('${quote.id}')" 
+            title="${isApproved ? 'Desaprobar cotización' : 'Aprobar cotización - Registrar como ingreso'}">
+      ✓
+    </button>` : '';
+
   return `
-    <div class="quote-card" ${showActions ? '' : `onclick="window.downloadQuote('${quote.id}')" style="cursor:pointer;"`}>
-      <div class="quote-card-header">
-        <span class="quote-number">${typeIcon}#${displayNum}${demoBadge}</span>
-        <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
+    <div class="quote-card" style="display:flex;gap:0.75rem;align-items:flex-start;${showActions ? '' : 'cursor:pointer;'}" ${showActions ? '' : `onclick="window.downloadQuote('${quote.id}')"`}>
+      <div style="flex:1;min-width:0;">
+        <div class="quote-card-header">
+          <span class="quote-number">${typeIcon}#${displayNum}${demoBadge}</span>
+          <span class="quote-date">${formatDateShort(new Date(quote.createdAt))}</span>
+        </div>
+        <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
+        <div class="quote-amount">${formatCurrency(quote.total)}</div>
+        ${showActions ? `<div class="quote-actions">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.previewQuote('${quote.id}')">👁️ Ver</button>
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.downloadQuote('${quote.id}')">📄 PDF</button>
+          <button class="btn-link-share" onclick="event.stopPropagation();window.generateShareLink('${quote.id}')">🔗 Enlace</button>
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();window.deleteQuote('${quote.id}')">🗑️</button>
+        </div>` : ''}
       </div>
-      <div class="quote-client">${quote.client?.name || 'Sin cliente'}</div>
-      <div class="quote-amount">${formatCurrency(quote.total)}</div>
-      ${showActions ? `<div class="quote-actions">
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.previewQuote('${quote.id}')">👁️ Ver</button>
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();window.downloadQuote('${quote.id}')">📄 PDF</button>
-        <button class="btn-link-share" onclick="event.stopPropagation();window.generateShareLink('${quote.id}')">🔗 Enlace</button>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();window.deleteQuote('${quote.id}')">🗑️</button>
-      </div>` : ''}
+      ${approveBtn}
     </div>
   `;
 }
@@ -2441,6 +2454,351 @@ function showToast(message, type = 'success') {
   setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
 }
 
+// ==========================================================
+// FINANCES - Ingresos y Gastos
+// ==========================================================
+
+const EXPENSE_CATEGORIES = {
+  materiales: { icon: '🧱', label: 'Materiales' },
+  servicios: { icon: '🔧', label: 'Servicios' },
+  transporte: { icon: '🚗', label: 'Transporte' },
+  alimentacion: { icon: '🍔', label: 'Alimentación' },
+  alquiler: { icon: '🏠', label: 'Alquiler' },
+  software: { icon: '💻', label: 'Software' },
+  marketing: { icon: '📢', label: 'Marketing' },
+  impuestos: { icon: '🧾', label: 'Impuestos' },
+  salarios: { icon: '👥', label: 'Salarios' },
+  otros: { icon: '📦', label: 'Otros' }
+};
+
+// Toggle approve/unapprove a quote (registers as income)
+window.toggleApproveQuote = async function(quoteId) {
+  try {
+    const quoteDoc = await getDoc(doc(db, 'quotes', quoteId));
+    if (!quoteDoc.exists()) {
+      showToast('Cotización no encontrada', 'error');
+      return;
+    }
+
+    const quote = quoteDoc.data();
+    const newApproved = !quote.approved;
+
+    await updateDoc(doc(db, 'quotes', quoteId), {
+      approved: newApproved,
+      approvedAt: newApproved ? new Date().toISOString() : null
+    });
+
+    showToast(newApproved ? '✅ Cotización aprobada - Registrada como ingreso' : '❌ Cotización desaprobada');
+    loadHistory();
+  } catch (error) {
+    console.error('Error toggling approval:', error);
+    showToast('Error al cambiar estado: ' + error.message, 'error');
+  }
+};
+
+// Load all finances data
+async function loadFinances() {
+  try {
+    // Set default date for expense form
+    const dateInput = document.getElementById('expense-date');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Load approved quotes and expenses in parallel
+    const [quotes, expenses] = await Promise.all([
+      getUserQuotes(),
+      getUserExpenses()
+    ]);
+
+    const approvedQuotes = quotes.filter(q => q.approved === true && !q.isDemo);
+    const totalIncome = approvedQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
+    const totalExpenses = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const netProfit = totalIncome - totalExpenses;
+    const profitPercent = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : 0;
+
+    // Update summary cards
+    document.getElementById('finance-total-income').textContent = formatCurrency(totalIncome);
+    document.getElementById('finance-income-count').textContent = `${approvedQuotes.length} cotización${approvedQuotes.length !== 1 ? 'es' : ''} aprobada${approvedQuotes.length !== 1 ? 's' : ''}`;
+    document.getElementById('finance-total-expenses').textContent = formatCurrency(totalExpenses);
+    document.getElementById('finance-expense-count').textContent = `${expenses.length} gasto${expenses.length !== 1 ? 's' : ''} registrado${expenses.length !== 1 ? 's' : ''}`;
+    document.getElementById('finance-net-profit').textContent = formatCurrency(netProfit);
+    document.getElementById('finance-profit-percent').textContent = `${profitPercent}% margen`;
+
+    // Render approved quotes list
+    renderApprovedQuotes(approvedQuotes);
+
+    // Render expenses list
+    renderExpensesList(expenses);
+
+    // Render weekly summary
+    renderWeeklySummary(approvedQuotes, expenses);
+
+  } catch (error) {
+    console.error('Error loading finances:', error);
+    showToast('Error al cargar finanzas', 'error');
+  }
+}
+
+// Get all user expenses from Firestore
+async function getUserExpenses() {
+  try {
+    const q = query(collection(db, 'expenses'), where('userId', '==', currentUser.uid), orderBy('date', 'desc'));
+    const snapshot = await getDocs(q);
+    const expenses = [];
+    snapshot.forEach(docSnap => expenses.push({ id: docSnap.id, ...docSnap.data() }));
+    return expenses;
+  } catch (error) {
+    console.error('Error fetching expenses:', error);
+    if (error.code === 'failed-precondition') {
+      showToast('Crea el índice en Firebase Console (userId + date)', 'error');
+    }
+    return [];
+  }
+}
+
+// Render approved quotes in finance section
+function renderApprovedQuotes(approvedQuotes) {
+  const container = document.getElementById('finance-approved-list');
+
+  if (approvedQuotes.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding:1.5rem;">
+        <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay cotizaciones aprobadas aún</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = approvedQuotes.map(q => {
+    const num = typeof q.number === 'number' ? String(q.number).padStart(3, '0') : (q.number || 'N/A');
+    const date = q.approvedAt ? formatDateShort(new Date(q.approvedAt)) : formatDateShort(new Date(q.createdAt));
+
+    return `
+      <div class="finance-approved-item">
+        <div class="finance-approved-left">
+          <div class="finance-approved-check">✓</div>
+          <div class="finance-approved-info">
+            <div class="finance-approved-name">#${num} - ${q.client?.name || 'Sin cliente'}</div>
+            <div class="finance-approved-date">${date}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;">
+          <span class="finance-approved-amount">+${formatCurrency(q.total)}</span>
+          <button class="finance-approved-unapprove" onclick="window.toggleApproveQuote('${q.id}')" title="Desaprobar">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Render expenses list
+function renderExpensesList(expenses) {
+  const container = document.getElementById('finance-expenses-list');
+
+  if (expenses.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding:1.5rem;">
+        <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay gastos registrados aún</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = expenses.map(e => {
+    const cat = EXPENSE_CATEGORIES[e.category] || EXPENSE_CATEGORIES.otros;
+    const dateStr = e.date ? formatDateShort(new Date(e.date)) : 'Sin fecha';
+
+    return `
+      <div class="finance-expense-item">
+        <div class="finance-expense-left">
+          <div class="finance-expense-category">${cat.icon}</div>
+          <div class="finance-expense-info">
+            <div class="finance-expense-desc">${e.description || 'Sin descripción'}</div>
+            <div class="finance-expense-meta">${cat.label} · ${dateStr}</div>
+          </div>
+        </div>
+        <div class="finance-expense-right">
+          <span class="finance-expense-amount">-${formatCurrency(e.amount)}</span>
+          <button class="finance-expense-delete" onclick="window.deleteExpense('${e.id}')" title="Eliminar gasto">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// Render weekly summary
+function renderWeeklySummary(approvedQuotes, expenses) {
+  const container = document.getElementById('finance-weekly-summary');
+
+  if (approvedQuotes.length === 0 && expenses.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state" style="padding:1.5rem;">
+        <p style="color:var(--color-text-muted);font-size:0.85rem;">No hay datos suficientes para generar resumen semanal</p>
+      </div>`;
+    return;
+  }
+
+  // Group data by week
+  const weeklyData = {};
+
+  // Add approved quotes to weeks
+  approvedQuotes.forEach(q => {
+    const date = q.approvedAt ? new Date(q.approvedAt) : new Date(q.createdAt);
+    const weekKey = getWeekKey(date);
+    if (!weeklyData[weekKey]) {
+      weeklyData[weekKey] = { income: 0, expenses: 0, label: getWeekLabel(date) };
+    }
+    weeklyData[weekKey].income += (q.total || 0);
+  });
+
+  // Add expenses to weeks
+  expenses.forEach(e => {
+    const date = e.date ? new Date(e.date) : new Date(e.createdAt);
+    const weekKey = getWeekKey(date);
+    if (!weeklyData[weekKey]) {
+      weeklyData[weekKey] = { income: 0, expenses: 0, label: getWeekLabel(date) };
+    }
+    weeklyData[weekKey].expenses += (e.amount || 0);
+  });
+
+  // Sort weeks descending
+  const sortedWeeks = Object.keys(weeklyData).sort((a, b) => b.localeCompare(a));
+
+  let totalIncome = 0, totalExpenses = 0, totalProfit = 0;
+
+  const rows = sortedWeeks.map(weekKey => {
+    const week = weeklyData[weekKey];
+    const profit = week.income - week.expenses;
+    totalIncome += week.income;
+    totalExpenses += week.expenses;
+    totalProfit += profit;
+    const profitClass = profit >= 0 ? 'finance-weekly-profit-positive' : 'finance-weekly-profit-negative';
+
+    return `
+      <tr>
+        <td>${week.label}</td>
+        <td style="color:#059669;">+${formatCurrency(week.income)}</td>
+        <td style="color:#dc2626;">-${formatCurrency(week.expenses)}</td>
+        <td class="${profitClass}">${profit >= 0 ? '+' : ''}${formatCurrency(profit)}</td>
+      </tr>`;
+  }).join('');
+
+  const totalProfitClass = totalProfit >= 0 ? 'finance-weekly-profit-positive' : 'finance-weekly-profit-negative';
+
+  container.innerHTML = `
+    <table class="finance-weekly-table">
+      <thead>
+        <tr>
+          <th>Semana</th>
+          <th>Ingresos</th>
+          <th>Gastos</th>
+          <th>Ganancia</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows}
+        <tr style="border-top:2px solid var(--color-primary, #1e40af);font-weight:700;">
+          <td style="font-weight:700;">TOTAL</td>
+          <td style="color:#059669;font-weight:700;">+${formatCurrency(totalIncome)}</td>
+          <td style="color:#dc2626;font-weight:700;">-${formatCurrency(totalExpenses)}</td>
+          <td class="${totalProfitClass}" style="font-size:0.95rem;">${totalProfit >= 0 ? '+' : ''}${formatCurrency(totalProfit)}</td>
+        </tr>
+      </tbody>
+    </table>`;
+}
+
+// Get week key (ISO week number + year)
+function getWeekKey(date) {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  // Thursday of current week decides the year
+  d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7));
+  const week1 = new Date(d.getFullYear(), 0, 4);
+  const weekNum = 1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + ((week1.getDay() + 6) % 7)) / 7);
+  return `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`;
+}
+
+// Get human-readable week label
+function getWeekLabel(date) {
+  const d = new Date(date);
+  // Get Monday of this week
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d);
+  monday.setDate(diff);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const opts = { day: '2-digit', month: 'short' };
+  return `${monday.toLocaleDateString('es-PE', opts)} - ${sunday.toLocaleDateString('es-PE', opts)}`;
+}
+
+// Add new expense
+window.addExpense = async function(expenseData) {
+  try {
+    await addDoc(collection(db, 'expenses'), {
+      ...expenseData,
+      userId: currentUser.uid,
+      createdAt: new Date().toISOString()
+    });
+    showToast('Gasto registrado correctamente');
+    return true;
+  } catch (error) {
+    console.error('Error adding expense:', error);
+    showToast('Error al registrar gasto: ' + error.message, 'error');
+    return false;
+  }
+};
+
+// Delete expense
+window.deleteExpense = async function(expenseId) {
+  if (!confirm('¿Eliminar este gasto?')) return;
+  try {
+    await deleteDoc(doc(db, 'expenses', expenseId));
+    showToast('Gasto eliminado');
+    loadFinances();
+  } catch (error) {
+    console.error('Error deleting expense:', error);
+    showToast('Error al eliminar gasto', 'error');
+  }
+};
+
+// Setup expense form
+function setupExpenseForm() {
+  const form = document.getElementById('form-add-expense');
+  if (!form) return;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const description = document.getElementById('expense-description').value.trim();
+    const amount = parseFloat(document.getElementById('expense-amount').value);
+    const category = document.getElementById('expense-category').value;
+    const date = document.getElementById('expense-date').value;
+
+    if (!description) {
+      showToast('Ingresa la descripción del gasto', 'error');
+      return;
+    }
+
+    if (!amount || amount <= 0) {
+      showToast('Ingresa un monto válido', 'error');
+      return;
+    }
+
+    const success = await window.addExpense({
+      description,
+      amount,
+      category,
+      date: date || new Date().toISOString().split('T')[0]
+    });
+
+    if (success) {
+      form.reset();
+      const dateInput = document.getElementById('expense-date');
+      if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+      loadFinances();
+    }
+  });
+}
+
 window.logout = logout;
 
 // ==========================================================
@@ -2517,6 +2875,7 @@ initUI = function() {
   setupPWAInstall();
   setupHelpToggle();
   checkCompanyConfig();
+  setupExpenseForm();
   
   // PDF Preview modal handlers
   const btnDownloadFromPreview = document.getElementById('btn-download-from-preview');
