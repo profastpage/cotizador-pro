@@ -170,57 +170,315 @@ body {
   padding: 4rem 0;
   background: white;
 }
-.plans-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-  max-width: 1000px;
-  margin: 0 auto;
+
+/* Plan Comparator */
+.plan-landing-comparator {
+  text-align: center;
+  margin-bottom: 2rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.04), rgba(30, 64, 175, 0.08));
+  border: 1px solid rgba(30, 64, 175, 0.12);
 }
-.plan-card {
-  background: var(--color-gray-50);
-  border-radius: var(--radius-xl);
-  padding: 2rem;
-  position: relative;
-  border: 2px solid var(--color-gray-200);
-  transition: all 0.2s;
-}
-.plan-card:hover { border-color: var(--color-primary); }
-.plan-card.featured {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: var(--color-primary);
-}
-.plan-badge {
-  position: absolute;
-  top: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--color-primary);
-  color: white;
-  padding: 0.25rem 1rem;
-  border-radius: 999px;
-  font-size: 0.75rem;
+.plan-landing-comparator-title {
+  font-size: 0.9rem;
   font-weight: 600;
+  color: var(--color-gray-700);
+  margin: 0 0 0.6rem;
 }
-.plan-header { text-align: center; margin-bottom: 1.5rem; }
-.plan-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
-.plan-price { display: flex; align-items: baseline; justify-content: center; gap: 0.25rem; }
-.price-currency { font-size: 1.25rem; font-weight: 600; color: var(--color-gray-600); }
-.price-amount { font-size: 3rem; font-weight: 800; color: var(--color-primary); }
-.plan-period { color: var(--color-gray-600); font-size: 0.875rem; }
-.plan-features {
-  list-style: none;
+.plan-landing-comparator-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+.plan-landing-chip {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.8);
+  color: var(--color-gray-600);
+  border: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+.plan-landing-chip b { color: var(--color-primary); }
+.plan-landing-c-free { background: rgba(107,114,128,0.08); }
+.plan-landing-c-free b { color: #475569; }
+.plan-landing-c-credits { background: rgba(245,158,11,0.08); }
+.plan-landing-c-credits b { color: #d97706; }
+.plan-landing-c-starter { background: rgba(5,150,105,0.08); }
+.plan-landing-c-starter b { color: #059669; }
+.plan-landing-c-business { background: rgba(30,64,175,0.08); }
+.plan-landing-c-business b { color: #1e40af; }
+.plan-landing-c-pro { background: rgba(124,58,237,0.08); }
+.plan-landing-c-pro b { color: #7c3aed; }
+
+/* Plans Grid - 5 cards in a row on desktop, scroll on mobile */
+.plans-grid-landing {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1rem;
   margin-bottom: 1.5rem;
 }
-.plan-features li {
-  padding: 0.5rem 0;
-  font-size: 0.875rem;
-  color: var(--color-gray-700);
+
+/* Plan Card */
+.plan-landing-card {
+  background: var(--color-gray-50);
+  border-radius: 16px;
+  padding: 1.5rem 1rem;
+  text-align: center;
+  position: relative;
+  border: 2px solid var(--color-gray-200);
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
 }
-.plan-features li::before {
-  content: '✓ ';
+.plan-landing-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+}
+
+/* Badge */
+.plan-landing-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.2rem 0.75rem;
+  border-radius: 20px;
+  background: #f1f5f9;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+.plan-landing-badge-credits {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+.plan-landing-badge-starter {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+}
+.plan-landing-badge-business {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff;
+}
+.plan-landing-badge-pro {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+}
+
+/* Plan Name */
+.plan-landing-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 0.4rem;
+  color: var(--color-gray-800);
+}
+
+/* Price */
+.plan-landing-price {
+  margin-bottom: 0.2rem;
+}
+.plan-landing-amount {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+.plan-landing-period {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--color-gray-600);
+  font-weight: 400;
+}
+
+/* Per quote info */
+.plan-landing-per-quote {
+  font-size: 0.72rem;
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  background: rgba(30, 64, 175, 0.06);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Features list */
+.plan-landing-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1rem;
+  text-align: left;
+  flex: 1;
+}
+.plan-landing-features-mini {
+  margin-bottom: 0.75rem;
+}
+.plan-landing-features li {
+  font-size: 0.78rem;
+  padding: 0.25rem 0;
+  padding-left: 1.25rem;
+  position: relative;
+  color: var(--color-gray-700);
+  line-height: 1.4;
+}
+.plan-landing-features li.included::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
   color: var(--color-success);
   font-weight: 700;
+  font-size: 0.75rem;
+}
+
+/* Card variants */
+.plan-landing-credits {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+}
+.plan-landing-credits:hover {
+  border-color: #d97706;
+}
+.plan-landing-starter {
+  border-color: #059669;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+}
+.plan-landing-starter:hover {
+  border-color: #047857;
+}
+.plan-landing-business {
+  border-color: #1e40af;
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  box-shadow: 0 0 0 1px rgba(30,64,175,0.15), 0 4px 16px rgba(30,64,175,0.1);
+}
+.plan-landing-business:hover {
+  border-color: #1d4ed8;
+}
+.plan-landing-pro {
+  border-color: #7c3aed;
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.15), 0 4px 16px rgba(124,58,237,0.08);
+}
+.plan-landing-pro:hover {
+  border-color: #6d28d9;
+}
+
+/* CTA Buttons for each plan */
+.btn-landing-credits {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+}
+.btn-landing-credits:hover {
+  background: linear-gradient(135deg, #d97706, #b45309);
+}
+.btn-landing-starter {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+}
+.btn-landing-starter:hover {
+  background: linear-gradient(135deg, #047857, #065f46);
+}
+.btn-landing-business {
+  background: linear-gradient(135deg, #1e40af, #1d4ed8);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+}
+.btn-landing-business:hover {
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+}
+.btn-landing-pro {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+  font-weight: 700;
+  border: none;
+}
+.btn-landing-pro:hover {
+  background: linear-gradient(135deg, #6d28d9, #5b21b6);
+}
+
+/* Payment note */
+.plan-landing-payment {
+  text-align: center;
+  padding: 1rem;
+  border-radius: 12px;
+  background: var(--color-gray-50);
+  border: 1px solid var(--color-gray-200);
+  margin-top: 0.5rem;
+}
+.plan-landing-payment p {
+  font-size: 0.82rem;
+  color: var(--color-gray-600);
+  margin: 0.25rem 0;
+}
+
+/* Responsive: Tablet */
+@media (max-width: 1100px) {
+  .plans-grid-landing {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Responsive: Mobile */
+@media (max-width: 768px) {
+  .plans-grid-landing {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  .plan-landing-card {
+    padding: 1.25rem 0.75rem;
+  }
+  .plan-landing-amount {
+    font-size: 1.4rem;
+  }
+  .plan-landing-name {
+    font-size: 1rem;
+  }
+  .plan-landing-features li {
+    font-size: 0.72rem;
+  }
+  .plan-landing-comparator-options {
+    gap: 0.35rem;
+  }
+  .plan-landing-chip {
+    font-size: 0.68rem;
+    padding: 0.25rem 0.5rem;
+  }
+}
+
+/* Responsive: Small mobile */
+@media (max-width: 520px) {
+  .plans-grid-landing {
+    grid-template-columns: 1fr 1fr;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    gap: 0.65rem;
+    padding-bottom: 0.5rem;
+  }
+  .plan-landing-card {
+    min-width: 160px;
+    scroll-snap-align: start;
+    padding: 1rem 0.6rem;
+  }
+  .plan-landing-amount {
+    font-size: 1.25rem;
+  }
+  .plan-landing-features li {
+    font-size: 0.68rem;
+    padding-left: 1.1rem;
+  }
+  .plan-landing-badge {
+    font-size: 0.55rem;
+  }
+  .plan-landing-per-quote {
+    font-size: 0.65rem;
+  }
 }
 
 /* CTA */
@@ -419,53 +677,7 @@ body {
   background: linear-gradient(135deg, #d97706, #b45309);
 }
 
-/* Credit Plan */
-.credit-badge {
-  background: linear-gradient(135deg, #059669, #047857);
-}
-.credit-plan-card {
-  border-color: #059669;
-  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
-}
-.credit-plan-card:hover {
-  border-color: #047857;
-}
-.credit-tiers {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-}
-.credit-tier {
-  background: white;
-  border-radius: 8px;
-  padding: 0.75rem 1rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 0.25rem;
-  border: 1px solid #d1fae5;
-}
-.credit-tier.featured-tier {
-  background: linear-gradient(135deg, #059669, #047857);
-  color: white;
-  border-color: #059669;
-}
-.credit-tier-label {
-  font-weight: 600;
-  font-size: 0.8rem;
-}
-.credit-tier-price {
-  font-weight: 700;
-  font-size: 0.85rem;
-}
-.credit-tier-desc {
-  width: 100%;
-  font-size: 0.75rem;
-  opacity: 0.8;
-  margin-top: 0.25rem;
-}
+/* Old credit-plan styles removed - using plan-landing-* classes now */
 
 /* FAQ Section */
 .faq {
@@ -536,16 +748,10 @@ body {
   .faq-answer p {
     font-size: 0.8rem;
   }
-  .credit-tier {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.125rem;
-  }
-  .credit-tier-price {
-    font-size: 0.8rem;
-  }
-  .plans-grid {
-    grid-template-columns: 1fr;
+  .plans-grid-landing {
+    grid-template-columns: 1fr 1fr;
     max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }

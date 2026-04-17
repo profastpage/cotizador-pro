@@ -167,134 +167,135 @@
   <section class="plans" id="plans">
     <div class="container">
       <h2 class="section-title">Planes y Precios</h2>
-      <p class="section-subtitle">Empieza gratis, escala cuando lo necesites</p>
+      <p class="section-subtitle">Paga solo por lo que usas o suscríbete y ahorra</p>
 
-      <div class="plans-grid">
+      <!-- Frequency Comparator -->
+      <div class="plan-landing-comparator">
+        <p class="plan-landing-comparator-title">¿Con qué frecuencia cotizas?</p>
+        <div class="plan-landing-comparator-options">
+          <span class="plan-landing-chip plan-landing-c-free">1-3/mes → <b>FREE</b></span>
+          <span class="plan-landing-chip plan-landing-c-credits">5-10/mes → <b>Créditos</b></span>
+          <span class="plan-landing-chip plan-landing-c-starter">1-2/sem → <b>STARTER</b></span>
+          <span class="plan-landing-chip plan-landing-c-business">3-4/sem → <b>BUSINESS</b></span>
+          <span class="plan-landing-chip plan-landing-c-pro">Diario → <b>PRO</b></span>
+        </div>
+      </div>
+
+      <div class="plans-grid-landing">
+
         <!-- Free Plan -->
-        <div class="plan-card">
-          <div class="plan-header">
-            <h3 class="plan-name">Gratis</h3>
-            <div class="plan-price">
-              <span class="price-currency">S/</span>
-              <span class="price-amount">0</span>
-            </div>
-            <p class="plan-period">Para siempre</p>
+        <div class="plan-landing-card">
+          <div class="plan-landing-badge">GRATIS</div>
+          <h3 class="plan-landing-name">Free</h3>
+          <div class="plan-landing-price">
+            <span class="plan-landing-amount">S/ 0</span>
+            <span class="plan-landing-period">para siempre</span>
           </div>
-          <ul class="plan-features">
-            <li>✓ 3 cotizaciones de prueba/mes</li>
-            <li>✓ 1 empresa</li>
-            <li>✓ 10 clientes máximo</li>
-            <li>✓ 1 plantilla básica</li>
-            <li>✓ PDF estándar</li>
-            <li>✓ Historial 30 días</li>
-            <li>✓ 1 cuenta bancaria</li>
+          <div class="plan-landing-per-quote">S/ 0 por cotización</div>
+          <ul class="plan-landing-features">
+            <li class="included">3 cotizaciones al mes</li>
+            <li class="included">10 clientes máximo</li>
+            <li class="included">1 tipo: Cotización</li>
+            <li class="included">PDF estándar con marca de agua</li>
+            <li class="included">Historial 30 días</li>
+            <li class="included">Soporte por chat</li>
           </ul>
-          <button class="btn btn-outline btn-block" onclick="showRegister()">Comenzar Gratis</button>
+          <button class="btn btn-outline btn-block" onclick="showRegister()">Comenzar gratis</button>
         </div>
 
-        <!-- Basic Plan -->
-        <div class="plan-card">
-          <div class="plan-badge">Popular</div>
-          <div class="plan-header">
-            <h3 class="plan-name">Básico</h3>
-            <div class="plan-price">
-              <span class="price-currency">S/</span>
-              <span class="price-amount">35</span>
-            </div>
-            <p class="plan-period">por mes</p>
+        <!-- Créditos Plan -->
+        <div class="plan-landing-card plan-landing-credits">
+          <div class="plan-landing-badge plan-landing-badge-credits">RECOMENDADO</div>
+          <h3 class="plan-landing-name">🪙 Créditos</h3>
+          <div class="plan-landing-price">
+            <span class="plan-landing-amount">S/ 0.80</span>
+            <span class="plan-landing-period">por cotización</span>
           </div>
-          <ul class="plan-features">
-            <li>✓ 60 cotizaciones/mes</li>
-            <li>✓ 50 clientes</li>
-            <li>✓ 2 plantillas profesionales</li>
-            <li>✓ PDF profesional con logo</li>
-            <li>✓ Historial ilimitado</li>
-            <li>✓ 3 cuentas bancarias</li>
-            <li>✓ Soporte prioritario</li>
+          <div class="plan-landing-per-quote">desde S/ 7.50 · sin vencimiento</div>
+          <ul class="plan-landing-features plan-landing-features-mini">
+            <li class="included">Paga solo por lo que usas</li>
+            <li class="included">Sin vencimiento mensual</li>
+            <li class="included">Yape / Plin / Tarjeta</li>
+            <li class="included">Saldo al instante</li>
           </ul>
-          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Básico</button>
+          <button class="btn btn-block btn-landing-credits" onclick="landingSelectCredits()">Comprar créditos</button>
+        </div>
+
+        <!-- Starter Plan -->
+        <div class="plan-landing-card plan-landing-starter">
+          <div class="plan-landing-badge plan-landing-badge-starter">NUEVO</div>
+          <h3 class="plan-landing-name">Starter</h3>
+          <div class="plan-landing-price">
+            <span class="plan-landing-amount">S/ 19.90</span>
+            <span class="plan-landing-period">/mes</span>
+          </div>
+          <div class="plan-landing-per-quote">S/ 0.66 por cotización</div>
+          <ul class="plan-landing-features">
+            <li class="included">30 cotizaciones al mes</li>
+            <li class="included">50 clientes</li>
+            <li class="included">3 tipos de documentos</li>
+            <li class="included">Logo personalizado en PDF</li>
+            <li class="included">PDF sin marca de agua</li>
+            <li class="included">Historial ilimitado</li>
+            <li class="included">Soporte por email</li>
+            <li class="included">Prueba gratis 7 días</li>
+          </ul>
+          <button class="btn btn-block btn-landing-starter" onclick="landingSelectPlan('Starter', 'S/ 19.90/mes', ['30 cotizaciones al mes', '50 clientes', '3 tipos de documentos', 'Logo personalizado en PDF', 'PDF sin marca de agua', 'Historial ilimitado', 'Prueba gratis 7 días'])">Empezar prueba gratis</button>
         </div>
 
         <!-- Business Plan -->
-        <div class="plan-card featured">
-          <div class="plan-badge featured-badge">Mejor Valor</div>
-          <div class="plan-header">
-            <h3 class="plan-name">Business</h3>
-            <div class="plan-price">
-              <span class="price-currency">S/</span>
-              <span class="price-amount">59</span>
-            </div>
-            <p class="plan-period">por mes</p>
+        <div class="plan-landing-card plan-landing-business">
+          <div class="plan-landing-badge plan-landing-badge-business">⭐ MÁS POPULAR</div>
+          <h3 class="plan-landing-name">Business</h3>
+          <div class="plan-landing-price">
+            <span class="plan-landing-amount">S/ 35.00</span>
+            <span class="plan-landing-period">/mes</span>
           </div>
-          <ul class="plan-features">
-            <li>✓ 200 cotizaciones/mes</li>
-            <li>✓ 200 clientes</li>
-            <li>✓ 5 plantillas premium</li>
-            <li>✓ PDF premium con branding</li>
-            <li>✓ Duplicar cotizaciones</li>
-            <li>✓ Exportar/Importar Excel</li>
-            <li>✓ Marca personalizada</li>
-            <li>✓ Soporte 24/7</li>
+          <div class="plan-landing-per-quote">S/ 0.58 por cotización</div>
+          <ul class="plan-landing-features">
+            <li class="included">60 documentos al mes</li>
+            <li class="included">200 clientes</li>
+            <li class="included">4 tipos de documentos</li>
+            <li class="included">Branding personalizado</li>
+            <li class="included">Duplicar documentos</li>
+            <li class="included">Exportar/Importar</li>
+            <li class="included">Estadísticas básicas</li>
+            <li class="included">Soporte WhatsApp prioritario</li>
+            <li class="included">Prueba gratis 7 días</li>
           </ul>
-          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Business</button>
+          <button class="btn btn-block btn-landing-business" onclick="landingSelectPlan('Business', 'S/ 35.00/mes', ['60 documentos al mes', '200 clientes', '4 tipos de documentos', 'Branding personalizado', 'Duplicar documentos', 'Exportar/Importar', 'Estadísticas básicas', 'Soporte WhatsApp prioritario', 'Prueba gratis 7 días'])">Empezar prueba gratis</button>
         </div>
 
         <!-- Pro Plan -->
-        <div class="plan-card">
-          <div class="plan-header">
-            <h3 class="plan-name">Pro</h3>
-            <div class="plan-price">
-              <span class="price-currency">S/</span>
-              <span class="price-amount">99</span>
-            </div>
-            <p class="plan-period">por mes</p>
+        <div class="plan-landing-card plan-landing-pro">
+          <div class="plan-landing-badge plan-landing-badge-pro">PREMIUM</div>
+          <h3 class="plan-landing-name">Pro</h3>
+          <div class="plan-landing-price">
+            <span class="plan-landing-amount">S/ 59.00</span>
+            <span class="plan-landing-period">/mes</span>
           </div>
-          <ul class="plan-features">
-            <li>✓ Cotizaciones ILIMITADAS</li>
-            <li>✓ Clientes ILIMITADOS</li>
-            <li>✓ Todo ilimitado</li>
-            <li>✓ PDF enterprise</li>
-            <li>✓ Multi-usuario (5)</li>
-            <li>✓ API REST access</li>
-            <li>✓ Integraciones</li>
-            <li>✓ Soporte VIP 24/7</li>
+          <div class="plan-landing-per-quote">Ilimitado</div>
+          <ul class="plan-landing-features">
+            <li class="included">Documentos ILIMITADOS</li>
+            <li class="included">Clientes ILIMITADOS</li>
+            <li class="included">10 tipos + personalizados</li>
+            <li class="included">PDF enterprise</li>
+            <li class="included">Multi-usuario (hasta 3)</li>
+            <li class="included">API REST access</li>
+            <li class="included">Estadísticas avanzadas</li>
+            <li class="included">Gerente de cuenta</li>
+            <li class="included">Soporte VIP 24/7</li>
+            <li class="included">Prueba gratis 7 días</li>
           </ul>
-          <button class="btn btn-primary btn-block" onclick="showRegister()">Elegir Pro</button>
+          <button class="btn btn-block btn-landing-pro" onclick="landingSelectPlan('Pro', 'S/ 59.00/mes', ['Documentos ILIMITADOS', 'Clientes ILIMITADOS', '10 tipos + personalizados', 'PDF enterprise', 'Multi-usuario (hasta 3)', 'API REST access', 'Estadísticas avanzadas', 'Gerente de cuenta', 'Soporte VIP 24/7', 'Prueba gratis 7 días'])">Empezar prueba gratis</button>
         </div>
 
-        <!-- Credit Plan -->
-        <div class="plan-card credit-plan-card">
-          <div class="plan-badge credit-badge">Por Créditos</div>
-          <div class="plan-header">
-            <h3 class="plan-name">🪙 Créditos</h3>
-            <div class="plan-price">
-              <span class="price-currency">S/ 1</span>
-            </div>
-            <p class="plan-period">por crédito (1 PDF)</p>
-          </div>
-          <div class="credit-tiers">
-            <div class="credit-tier">
-              <span class="credit-tier-label">30-59 créditos</span>
-              <span class="credit-tier-price">S/ 30 - 59</span>
-              <span class="credit-tier-desc">Cotizaciones normales</span>
-            </div>
-            <div class="credit-tier featured-tier">
-              <span class="credit-tier-label">60+ créditos</span>
-              <span class="credit-tier-price">S/ 60+</span>
-              <span class="credit-tier-desc">✨ Todos los beneficios Pro</span>
-            </div>
-          </div>
-          <ul class="plan-features">
-            <li>✓ Paga solo por lo que usas</li>
-            <li>✓ Mínimo 30 créditos (S/ 30)</li>
-            <li>✓ 1 crédito = 1 PDF de cotización</li>
-            <li>✓ Sin vencimiento mensual</li>
-            <li>✓ 60+ créditos: todas las plantillas</li>
-            <li>✓ 60+ créditos: todos los tipos de docs</li>
-            <li>✓ 60+ créditos: PDF premium</li>
-          </ul>
-          <button class="btn btn-primary btn-block" onclick="selectCreditPlan()">Solicitar Créditos</button>
-        </div>
+      </div>
+
+      <!-- Payment Methods Note -->
+      <div class="plan-landing-payment">
+        <p>💳 <b>Métodos de pago:</b> Yape · Plin · Tarjeta de débito/crédito</p>
+        <p>🔒 Pago seguro · Sin compromisos · Cancela cuando quieras</p>
       </div>
     </div>
   </section>
@@ -331,7 +332,7 @@
             <span class="faq-icon">+</span>
           </div>
           <div class="faq-answer">
-            <p>¡Sí! Con los planes Business y Pro puedes personalizar tus cotizaciones con tu marca (branding), elegir entre múltiples plantillas premium, y agregar elementos personalizados como marca de agua. Además, todos los planes te permiten configurar tus cuentas bancarias (BCP, BBVA, Interbank, Yape, Plin), condiciones de pago y cláusulas legales que aparecerán en cada PDF generado.</p>
+            <p>¡Sí! Con los planes <strong>Business (S/ 35/mes)</strong> y <strong>Pro (S/ 59/mes)</strong> puedes personalizar tus cotizaciones con tu marca (branding), elegir entre múltiples tipos de documentos (cotización, propuesta, nota de venta, orden de servicio y más), y generar PDFs enterprise. El plan <strong>Starter (S/ 19.90/mes)</strong> incluye logo personalizado y PDF sin marca de agua. Además, todos los planes te permiten configurar tus cuentas bancarias (BCP, BBVA, Interbank, Yape, Plin), condiciones de pago y cláusulas legales.</p>
           </div>
         </div>
 
@@ -341,7 +342,7 @@
             <span class="faq-icon">+</span>
           </div>
           <div class="faq-answer">
-            <p>El plan por créditos es ideal si no necesitas cotizaciones mensuales fijas. <strong>Cada crédito = 1 PDF de cotización al costo de S/ 1.</strong> El mínimo de compra es 30 créditos (S/ 30). Si compras <strong>60 o más créditos (S/ 60+)</strong>, obtienes todos los beneficios del plan Pro: acceso a las 10 plantillas, todos los tipos de documentos (factura, boleta, contrato, etc.), y calidad de PDF premium. Los créditos no vencen por mes, se consumen según los uses.</p>
+            <p>El plan por créditos es ideal si no necesitas cotizaciones mensuales fijas. <strong>Paga desde S/ 0.80 por cotización.</strong> Paquetes disponibles: 5 créditos (S/ 7.50), 15 (S/ 18.00, ahorro 20%), 30 (S/ 30.00, ahorro 33%), 60 (S/ 48.00, ahorro 47%). Los créditos no vencen por mes, se consumen según los uses. Aceptamos Yape, Plin y tarjeta de débito/crédito.</p>
           </div>
         </div>
 
@@ -570,6 +571,34 @@
         'Por favor indicar la cantidad de créditos que desea solicitar.'
       );
       window.open(`https://wa.me/51933667414?text=${message}`, '_blank');
+    };
+
+    // Landing page plan selection (WhatsApp redirect)
+    window.landingSelectPlan = function(planName, price, benefits) {
+      const featuresText = benefits.map((f, i) => (i + 1) + '. ' + f).join('\n');
+      const message = encodeURIComponent(
+        '¡Hola! Me interesa activar el plan *' + planName + '* de CotizaPro (' + price + ').\n\n' +
+        '⭐ *Prueba gratis de 7 días*\nCobrar al día 8 si no cancelas\n\n' +
+        '📋 *Beneficios:*\n' + featuresText + '\n\n' +
+        '💳 Pago: Yape · Plin · Tarjeta\n\n' +
+        '¡Gracias!'
+      );
+      window.open('https://wa.me/51933667414?text=' + message, '_blank');
+    };
+
+    // Landing page credits selection (WhatsApp redirect)
+    window.landingSelectCredits = function() {
+      const message = encodeURIComponent(
+        '¡Hola! Me interesa comprar *créditos* de CotizaPro 🪙\n\n' +
+        '📋 Paquetes disponibles:\n' +
+        '• 5 créditos → S/ 7.50 (S/ 1.50/u)\n' +
+        '• 15 créditos → S/ 18.00 (S/ 1.20/u) Ahorro 20%\n' +
+        '• 30 créditos → S/ 30.00 (S/ 1.00/u) Ahorro 33%\n' +
+        '• 60 créditos → S/ 48.00 (S/ 0.80/u) Ahorro 47%\n\n' +
+        '💳 Pago: Yape / Plin / Tarjeta\n\n' +
+        '¡Gracias!'
+      );
+      window.open('https://wa.me/51933667414?text=' + message, '_blank');
     };
 
     // FAQ toggle

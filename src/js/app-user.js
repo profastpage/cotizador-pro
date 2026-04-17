@@ -2538,71 +2538,7 @@ function showUpsellBanner(message) {
   setTimeout(function() { if (banner.parentNode) { banner.remove(); currentUpsellBanner = null; } }, 8000);
 }
 
-window.selectPlan = function(plan) {
-  const planDetails = {
-    basic: {
-      name: 'Básico',
-      price: 'S/ 35/mes',
-      features: [
-        '60 cotizaciones al mes',
-        '1 empresa',
-        '50 clientes',
-        'Cotización profesional',
-        'PDF profesional con logo',
-        'Historial ilimitado',
-        '3 cuentas bancarias',
-        'Soporte prioritario'
-      ]
-    },
-    business: {
-      name: 'Business',
-      price: 'S/ 59/mes',
-      features: [
-        '200 documentos al mes',
-        '3 empresas',
-        '200 clientes',
-        '4 tipos de documentos (Cotización, Propuesta, Nota de Venta, Orden de Servicio)',
-        'PDF premium con branding',
-        'Historial ilimitado',
-        '10 cuentas bancarias',
-        'Duplicar documentos',
-        'Exportar/Importar Excel',
-        'Marca personalizada',
-        'Soporte prioritario 24/7'
-      ]
-    },
-    pro: {
-      name: 'Pro',
-      price: 'S/ 99/mes',
-      features: [
-        'Documentos ILIMITADOS',
-        '5 empresas',
-        'Clientes ILIMITADOS',
-        '10 tipos de documentos + personalizados',
-        'PDF enterprise personalizado',
-        'Cuentas bancarias ilimitadas',
-        'Multi-usuario (hasta 5)',
-        'API REST access',
-        'Marca de agua personalizada',
-        'Reportes avanzados',
-        'Soporte VIP 24/7',
-        'Integraciones personalizadas'
-      ]
-    }
-  };
-
-  const selected = planDetails[plan];
-  if (!selected) return;
-
-  const featuresText = selected.features.map((f, i) => `${i + 1}. ${f}`).join('\n');
-  const message = `¡Hola! Me interesa activar el plan *${selected.name}* de CotizaPro (${selected.price}).\n\n📋 *Beneficios del plan ${selected.name}:*\n${featuresText}\n\nMi correo: ${currentUser?.email || 'No especificado'}\n\n¡Gracias!`;
-
-  const encodedMessage = encodeURIComponent(message);
-  const whatsappUrl = `https://wa.me/51933667414?text=${encodedMessage}`;
-
-  window.open(whatsappUrl, '_blank');
-  document.getElementById('modal-upgrade').classList.add('hidden');
-};
+// (selectPlan is already defined above with correct new plan data - removed duplicate)
 
 function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
