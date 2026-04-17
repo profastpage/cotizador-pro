@@ -1526,9 +1526,6 @@ async function generatePDF() {
     await saveItemCatalog(quoteItems);
 
     // Determine if using subscription quota or credits
-    const plan = userData.plan;
-    const quota = getPlanQuota(plan);
-    const used = userData.quotesUsedThisMonth || 0;
     const useCredits = (quota !== -1 && used >= quota) || plan === 'free';
 
     if (useCredits && !(plan !== 'free' && used < quota)) {
