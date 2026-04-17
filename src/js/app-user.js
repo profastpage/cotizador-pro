@@ -470,7 +470,58 @@ function nextStep() {
     showToast('Agrega al menos un item', 'error');
     return;
   }
+
+  // Auto-save client when advancing from Step 1 to Step 2
+  if (currentWizardStep === 1) {
+    const clientName = document.getElementById('client-name').value.trim();
+    if (clientName) {
+      const clientData = {
+        name: clientName,
+        document: document.getElementById('client-document').value.trim(),
+        email: document.getElementById('client-email').value.trim(),
+        phone: document.getElementById('client-phone').value.trim(),
+        address: document.getElementById('client-address').value.trim()
+      };
+      saveClientSilent(clientData);
+    }
+  }
+
   if (currentWizardStep < 3) { currentWizardStep++; updateWizardUI(); }
+}
+
+// Save client silently (no toast, no error popup) and refresh dropdown
+async function saveClientSilent(clientData) {
+  try {
+    if (clientData.document && clientData.document.trim()) {
+      const doc = clientData.document.trim();
+      if (/^\d{11}$/.test(doc) && !isValidRUC(doc)) return;
+    }
+
+    const clientsRef = collection(db, 'clients');
+    const q = query(clientsRef, where('userId', '==', currentUser.uid), where('name', '==', clientData.name));
+    const existing = await getDocs(q);
+
+    if (!existing.empty) {
+      const docRef = existing.docs[0].ref;
+      await updateDoc(docRef, {
+        ...clientData,
+        userId: currentUser.uid,
+        updatedAt: new Date().toISOString()
+      });
+    } else {
+      await addDoc(clientsRef, {
+        ...clientData,
+        userId: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // Refresh client selector dropdown so the new/saved client appears
+    loadClientSelector();
+  } catch (e) {
+    console.error('Silent client save error:', e);
+  }
 }
 
 function prevStep() {

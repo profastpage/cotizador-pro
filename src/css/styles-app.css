@@ -1696,3 +1696,518 @@ body {
   color: #92400e;
   font-weight: 500;
 }
+
+/* ==========================================================
+   DARK MODE - Comprehensive Component Overrides
+   ========================================================== */
+
+/* Bank Account Entry */
+[data-theme="dark"] .bank-account-entry {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+/* Finance Cards */
+[data-theme="dark"] .finance-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+/* Finance Card Label */
+[data-theme="dark"] .finance-card-label {
+  color: var(--color-text-muted);
+}
+
+/* Finance Card Values - brighter for dark background */
+[data-theme="dark"] .finance-income .finance-card-value {
+  color: #34d399;
+}
+[data-theme="dark"] .finance-expense .finance-card-value {
+  color: #f87171;
+}
+[data-theme="dark"] .finance-profit .finance-card-value {
+  color: #60a5fa;
+}
+
+/* Finance Card Detail */
+[data-theme="dark"] .finance-card-detail {
+  color: var(--color-text-muted);
+}
+
+/* Finance Card Icon - higher opacity for dark mode */
+[data-theme="dark"] .finance-income .finance-card-icon {
+  background: rgba(5, 150, 105, 0.2);
+}
+[data-theme="dark"] .finance-expense .finance-card-icon {
+  background: rgba(220, 38, 38, 0.2);
+}
+[data-theme="dark"] .finance-profit .finance-card-icon {
+  background: rgba(30, 64, 175, 0.2);
+}
+
+/* Finance Sections */
+[data-theme="dark"] .finance-section {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .finance-section-title {
+  color: var(--color-text-primary);
+}
+
+/* Finance Approved Items */
+[data-theme="dark"] .finance-approved-item {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .finance-approved-item:hover {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .finance-approved-name {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .finance-approved-date {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .finance-approved-amount {
+  color: #34d399;
+}
+
+/* Finance Expense Items */
+[data-theme="dark"] .finance-expense-item {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .finance-expense-item:hover {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .finance-expense-desc {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .finance-expense-meta {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .finance-expense-amount {
+  color: #f87171;
+}
+
+[data-theme="dark"] .finance-expense-category {
+  background: rgba(220, 38, 38, 0.15);
+}
+
+/* Finance Weekly Table */
+[data-theme="dark"] .finance-weekly-table thead th {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .finance-weekly-table tbody td {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .finance-weekly-table tbody tr:hover {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .finance-weekly-profit-positive {
+  color: #34d399;
+}
+[data-theme="dark"] .finance-weekly-profit-negative {
+  color: #f87171;
+}
+
+/* Item Cards */
+[data-theme="dark"] .item-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .item-number {
+  color: var(--color-primary-light);
+}
+
+[data-theme="dark"] .item-subtotal {
+  color: var(--color-primary-light);
+  border-color: var(--color-border);
+}
+
+/* Item Catalog */
+[data-theme="dark"] .item-catalog-panel {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .item-catalog-item {
+  background: transparent;
+}
+
+[data-theme="dark"] .item-catalog-item:hover {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .item-catalog-item-name {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .item-catalog-item-price {
+  color: var(--color-text-muted);
+}
+
+/* Quote Cards (History) */
+[data-theme="dark"] .quote-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .quote-number {
+  color: var(--color-primary-light);
+}
+
+[data-theme="dark"] .quote-date {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .quote-amount {
+  color: var(--color-primary-light);
+}
+
+[data-theme="dark"] .quote-client {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .quote-actions {
+  border-top-color: var(--color-border);
+}
+
+/* Empty State */
+[data-theme="dark"] .empty-state {
+  color: var(--color-text-muted);
+}
+
+/* Review Section */
+[data-theme="dark"] .review-section-title {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .quote-review-container {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+/* Summary */
+[data-theme="dark"] .quote-summary {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .summary-total {
+  border-top-color: var(--color-border);
+}
+
+[data-theme="dark"] .summary-total span:last-child {
+  color: var(--color-primary-light);
+}
+
+/* Section Titles */
+[data-theme="dark"] .section-title {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .form-section-title {
+  color: var(--color-text-primary);
+  border-bottom-color: var(--color-border);
+}
+
+/* Form Elements */
+[data-theme="dark"] .form-label {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .form-input {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .form-select {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* Wizard */
+[data-theme="dark"] .wizard-step .step-label {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .wizard-bar {
+  background: var(--color-bg-tertiary);
+}
+
+[data-theme="dark"] .step-number {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+}
+
+/* Search */
+[data-theme="dark"] .search-input {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+/* Buttons */
+[data-theme="dark"] .btn-secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .btn-outline {
+  border-color: var(--color-border);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .btn-outline:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* Modal */
+[data-theme="dark"] .modal-dialog {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom-color: var(--color-border);
+}
+
+[data-theme="dark"] .modal-title {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .upgrade-plan-card {
+  border-color: var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .upgrade-plan-card:hover {
+  border-color: var(--color-primary);
+}
+
+[data-theme="dark"] .upgrade-features li {
+  color: var(--color-text-secondary);
+}
+
+/* Stats */
+[data-theme="dark"] .stat-card {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-border);
+}
+
+[data-theme="dark"] .stat-label {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .stat-value {
+  color: var(--color-text-primary);
+}
+
+/* PDF Preview Dialog */
+[data-theme="dark"] .pdf-preview-dialog {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .pdf-preview-header {
+  border-bottom-color: var(--color-border);
+}
+
+[data-theme="dark"] .pdf-preview-actions {
+  border-top-color: var(--color-border);
+}
+
+/* Toast */
+[data-theme="dark"] .toast {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+/* Plan Card User */
+[data-theme="dark"] .plan-card-user {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+}
+
+/* Help Content */
+[data-theme="dark"] .help-content {
+  background: var(--color-bg-secondary);
+}
+
+[data-theme="dark"] .help-content h4 {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .help-step strong {
+  color: var(--color-text-primary);
+}
+
+[data-theme="dark"] .help-step p {
+  color: var(--color-text-secondary);
+}
+
+/* Topbar Mobile */
+[data-theme="dark"] .topbar-mobile {
+  background: var(--color-bg-primary);
+}
+
+[data-theme="dark"] .topbar-logo {
+  color: var(--color-primary-light);
+}
+
+/* Bottom Nav */
+[data-theme="dark"] .bottom-nav {
+  background: var(--color-bg-primary);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Share/Link Button */
+[data-theme="dark"] .btn-link-share {
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .btn-link-share:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary-light);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+/* Credit Balance Widget */
+[data-theme="dark"] .credit-balance-widget {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(245, 158, 11, 0.04));
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+[data-theme="dark"] .credit-balance-label {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .credit-balance-number {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .credit-balance-action {
+  color: #fbbf24;
+}
+
+/* Credit Pack */
+[data-theme="dark"] .credit-pack-qty {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .credit-pack-price {
+  color: var(--color-text-primary);
+}
+
+/* Buttons hover states for dark mode */
+[data-theme="dark"] .btn-secondary:hover {
+  background: var(--color-border);
+}
+
+/* Plan free button */
+[data-theme="dark"] .plan-btn-free {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .plan-btn-free:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Upsell Banner already uses blue gradient so it works in dark mode */
+
+/* Badge adjustments for dark mode */
+[data-theme="dark"] .badge-free {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .badge-basic {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+}
+
+[data-theme="dark"] .badge-business {
+  background: rgba(5, 150, 105, 0.15);
+  color: #6ee7b7;
+}
+
+[data-theme="dark"] .badge-pro {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+/* Form row background consistency */
+[data-theme="dark"] .summary-row {
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .review-item {
+  color: var(--color-text-secondary);
+}
+
+/* Install Section - warm gradient works fine, just adjust text */
+[data-theme="dark"] .install-hint {
+  color: #fbbf24;
+}
+
+/* Company Warning - keep warm tones */
+[data-theme="dark"] .company-warning {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .company-warning h4 {
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .company-warning p {
+  color: #fcd34d;
+}
+
+/* Finance approved unapprove button */
+[data-theme="dark"] .finance-approved-unapprove:hover {
+  background: rgba(220, 38, 38, 0.2);
+}
+
+/* Finance expense delete button */
+[data-theme="dark"] .finance-expense-delete:hover {
+  background: rgba(220, 38, 38, 0.2);
+}
+
+/* Remaining quotes widget */
+[data-theme="dark"] .remaining-quotes-widget {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(59, 130, 246, 0.05));
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+[data-theme="dark"] .remaining-quotes-label {
+  color: var(--color-text-muted);
+}
+
+[data-theme="dark"] .remaining-quotes-number {
+  color: var(--color-primary-light);
+}
