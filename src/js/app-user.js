@@ -1,6 +1,6 @@
 // App User Logic - SDK Modular v10+
 
-import { auth, db, PLANS, DOCUMENT_TYPES, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
+import { auth, db, PLANS, DOCUMENT_TYPES, CREDIT_PACKAGES, CREDIT_PLAN_INFO, UPSELL_CONFIG, signOut, onAuthStateChanged, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, query, where, orderBy, getDocs, addDoc, serverTimestamp, increment, FieldValue } from '../firebase-config.js';
 import { protectRoute, logout } from './auth.js';
 
 let currentUser = null;
@@ -8,6 +8,8 @@ let userData = null;
 let quoteItems = [];
 let currentWizardStep = 1;
 let isGeneratingPDF = false;
+let userCreditBalance = 0;
+let upsellShownThisSession = { free_limit: false, credits_80_percent: false, near_subscription_limit: false };
 
 // Demo account detection (ONLY for these specific demo emails)
 const DEMO_EMAILS = ['demo.pro@cotizapro.com', 'demo.business@cotizapro.com', 'demo.basico@cotizapro.com'];
@@ -1417,12 +1419,55 @@ async function generatePDF() {
   isGeneratingPDF = true;
 
   try {
-    const quota = getPlanQuota(userData.plan);
-    if (quota !== -1 && userData.quotesUsedThisMonth >= quota) {
+    const plan = userData.plan;
+    const quota = getPlanQuota(plan);
+    const used = userData.quotesUsedThisMonth || 0;
+    const isSubscription = (plan !== 'free' && quota !== -1);
+    const isUnlimited = (quota === -1);
+    const hasCredits = userCreditBalance > 0;
+
+    // Check if user can generate PDF
+    if (plan === 'free' && used >= quota && !hasCredits) {
+      // FREE user exhausted, no credits
+      if (!upsellShownThisSession.free_limit) {
+        showUpsellBanner('Desbloquea más con STARTER desde S/19.90/mes');
+        upsellShownThisSession.free_limit = true;
+      }
       showToast('¡Límite alcanzado! Mejora tu plan.', 'error');
       showUpgradeModal();
       isGeneratingPDF = false;
       return;
+    }
+
+    if (isSubscription && used >= quota && !hasCredits) {
+      // Subscription user exhausted monthly quota, no credits
+      if (!upsellShownThisSession.near_subscription_limit) {
+        showUpsellBanner('¿Necesitas más? Cambia a BUSINESS o compra créditos extra');
+        upsellShownThisSession.near_subscription_limit = true;
+      }
+      showToast('¡Cuota mensual alcanzada! Compra créditos o mejora tu plan.', 'error');
+      showUpgradeModal();
+      isGeneratingPDF = false;
+      return;
+    }
+
+    if (plan === 'free' && used >= quota && hasCredits) {
+      // FREE user using credits
+      const willProceed = confirm(`Tus 3 cotizaciones gratis se agotaron. ¿Usar 1 crédito? (Saldo: ${userCreditBalance})`);
+      if (!willProceed) { isGeneratingPDF = false; return; }
+    }
+
+    if (isSubscription && used >= quota && hasCredits) {
+      // Subscription user using credits for extra
+      const willProceed = confirm(`Tu cuota mensual se agotó. ¿Usar 1 crédito? (Saldo: ${userCreditBalance})`);
+      if (!willProceed) { isGeneratingPDF = false; return; }
+    }
+
+    // Check credits upsell (80% threshold)
+    if (hasCredits && userCreditBalance <= 6 && userCreditBalance > 0 && !upsellShownThisSession.credits_80_percent) {
+      // Check if total credits bought was <= 10 (so they'd benefit from starter)
+      showUpsellBanner('¿Usas mucho? El plan STARTER te sale a S/0.66/cotización. ¡Ahorra 56%!');
+      upsellShownThisSession.credits_80_percent = true;
     }
 
     const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
@@ -1479,7 +1524,24 @@ async function generatePDF() {
     }
     // Save items to catalog for quick reuse
     await saveItemCatalog(quoteItems);
-    await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
+
+    // Determine if using subscription quota or credits
+    const plan = userData.plan;
+    const quota = getPlanQuota(plan);
+    const used = userData.quotesUsedThisMonth || 0;
+    const useCredits = (quota !== -1 && used >= quota) || plan === 'free';
+
+    if (useCredits && !(plan !== 'free' && used < quota)) {
+      // Deduct from credit balance
+      await deductCredit(1);
+      userCreditBalance--;
+      loadUserCreditBalance();
+      showToast('1 crédito usado. ' + (userCreditBalance > 0 ? `Saldo restante: ${userCreditBalance}` : 'Sin créditos restantes'));
+    } else {
+      // Use subscription quota
+      await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
+      userData.quotesUsedThisMonth++;
+    }
 
     // Use centralized PDF renderer
     const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType, clientDoc);
@@ -1490,7 +1552,6 @@ async function generatePDF() {
     showToast('¡PDF generado exitosamente!');
     resetWizard();
     navigateTo('dashboard');
-    userData.quotesUsedThisMonth++;
     updatePlanProgress();
     updateRemainingQuotes();
 
@@ -2270,22 +2331,23 @@ function updateRemainingQuotes() {
 }
 
 function getPlanQuota(plan) {
-  return { free: 3, basic: 60, business: 200, pro: -1 }[plan] || 3;
+  return { free: 3, starter: 30, basic: 60, business: 60, pro: -1 }[plan] || 3;
 }
 
 function getPlanName(plan) {
-  return { free: 'Gratis', basic: 'Básico', business: 'Business', pro: 'Pro' }[plan] || 'Gratis';
+  return { free: 'Gratis', starter: 'Starter', basic: 'Básico', business: 'Business', pro: 'Pro' }[plan] || 'Gratis';
 }
 
 function getPlanPrice(plan) {
-  return { free: 'S/ 0', basic: 'S/ 35', business: 'S/ 59', pro: 'S/ 99' }[plan] || 'S/ 0';
+  return { free: 'S/ 0', starter: 'S/ 19.90', basic: 'S/ 35', business: 'S/ 35', pro: 'S/ 59' }[plan] || 'S/ 0';
 }
 
 function getPlanDesc(plan) {
   const descs = {
     free: '3 cotizaciones de prueba/mes • 1 empresa',
+    starter: '30 cotizaciones por mes • 1 empresa',
     basic: '60 cotizaciones por mes • 1 empresa',
-    business: '200 cotizaciones por mes • 3 empresas',
+    business: '60 cotizaciones por mes • 3 empresas',
     pro: 'Cotizaciones ilimitadas • 5 empresas'
   };
   return descs[plan] || descs.free;
@@ -2332,51 +2394,152 @@ window.deleteQuote = async function(id) {
     loadHistory();
   }
 };
-
 window.showUpgradeModal = function() {
   document.getElementById('modal-upgrade').classList.remove('hidden');
 };
 
-// Plan data with full benefits for WhatsApp message
+// ==========================================================
+// CREDIT SYSTEM
+// ==========================================================
+
+async function loadUserCreditBalance() {
+  try {
+    if (!currentUser) return;
+    const q = query(collection(db, 'userCredits'), where('userId', '==', currentUser.uid));
+    const snapshot = await getDocs(q);
+    if (!snapshot.empty) {
+      const data = snapshot.docs[0].data();
+      userCreditBalance = data.balance || 0;
+    } else {
+      userCreditBalance = 0;
+    }
+    updateCreditBalanceUI();
+  } catch (e) {
+    console.error('Error loading credit balance:', e);
+    userCreditBalance = 0;
+  }
+}
+
+async function deductCredit(amount) {
+  try {
+    const q = query(collection(db, 'userCredits'), where('userId', '==', currentUser.uid));
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) return false;
+    const docRef = snapshot.docs[0].ref;
+    const currentBalance = snapshot.docs[0].data().balance || 0;
+    if (currentBalance < amount) return false;
+    await updateDoc(docRef, { balance: increment(-amount), lastUsed: new Date().toISOString() });
+    return true;
+  } catch (e) {
+    console.error('Error deducting credit:', e);
+    return false;
+  }
+}
+
+function updateCreditBalanceUI() {
+  const existingWidget = document.getElementById('credit-balance-sidebar');
+  if (existingWidget) {
+    const numEl = existingWidget.querySelector('.credit-balance-number');
+    if (numEl) numEl.textContent = userCreditBalance;
+    existingWidget.style.display = userCreditBalance > 0 ? '' : 'none';
+    return;
+  }
+  if (userCreditBalance > 0) {
+    const sidebarPlan = document.querySelector('.sidebar-plan');
+    if (sidebarPlan) {
+      const widget = document.createElement('div');
+      widget.id = 'credit-balance-sidebar';
+      widget.className = 'credit-balance-widget';
+      widget.onclick = () => showUpgradeModal();
+      widget.innerHTML = '<p class="credit-balance-label">Saldo de Créditos</p><p class="credit-balance-number">' + userCreditBalance + '</p><p class="credit-balance-action">+ Comprar más</p>';
+      sidebarPlan.parentNode.insertBefore(widget, sidebarPlan.nextSibling);
+    }
+  }
+}
+
+// ==========================================================
+// PLAN SELECTION & MIGRATION
+// ==========================================================
+
+async function checkAndMigratePlan() {
+  try {
+    if (!userData || !userData.plan) return;
+    if (userData.plan === 'basic' && !userData.legacyPlan) {
+      console.log('Migrating user from basic to starter...');
+      await updateDoc(doc(db, 'users', currentUser.uid), {
+        plan: 'starter', legacyPlan: 'basic', migratedAt: new Date().toISOString()
+      });
+      userData.plan = 'starter';
+      userData.legacyPlan = 'basic';
+      showToast('Tu plan fue actualizado a Starter automáticamente. ¡Mismos beneficios!');
+      if (document.getElementById('user-plan-badge')) {
+        document.getElementById('user-plan-badge').className = 'badge badge-starter';
+        document.getElementById('user-plan-badge').textContent = 'Starter';
+      }
+      updatePlanProgress();
+    }
+  } catch (e) {
+    console.error('Plan migration error:', e);
+  }
+}
+
 const PLAN_WHATSAPP_DATA = {
-  basic: {
-    name: 'Plan Básico',
-    price: 'S/ 35/mes',
-    benefits: [
-      '60 cotizaciones por mes',
-      '1 empresa registrada',
-      'Tipos de documento básicos (Cotización)',
-      'Clientes guardados automáticamente',
-      'Soporte por WhatsApp'
-    ]
+  starter: {
+    name: 'Plan Starter', price: 'S/ 19.90/mes',
+    benefits: ['30 cotizaciones al mes', '50 clientes', '3 tipos de documentos', 'Logo personalizado en PDF', 'PDF sin marca de agua', 'Historial ilimitado', 'Prueba gratis 7 días']
   },
   business: {
-    name: 'Plan Business',
-    price: 'S/ 59/mes',
-    benefits: [
-      '200 cotizaciones por mes',
-      '3 empresas registradas',
-      'Todos los tipos de documento (Cotización, Factura, Boleta, Nota de Venta)',
-      'Soporte prioritario',
-      'Clientes guardados automáticamente',
-      'Descarga de PDF profesional'
-    ]
+    name: 'Plan Business', price: 'S/ 35.00/mes',
+    benefits: ['60 documentos al mes', '3 empresas', '200 clientes', '4 tipos de documentos', 'Branding personalizado', 'Duplicar documentos', 'Estadísticas básicas', 'Soporte WhatsApp prioritario', 'Prueba gratis 7 días']
   },
   pro: {
-    name: 'Plan Pro',
-    price: 'S/ 99/mes',
-    benefits: [
-      'Cotizaciones ilimitadas',
-      '5 empresas registradas',
-      'Todos los tipos de documento',
-      'Soporte dedicado',
-      'Personalización de cláusulas y documentos',
-      'Clientes ilimitados',
-      'Descarga de PDF profesional',
-      'Acceso anticipado a nuevas funciones'
-    ]
+    name: 'Plan Pro', price: 'S/ 59.00/mes',
+    benefits: ['Cotizaciones ilimitadas', '5 empresas', '10 tipos de documentos', 'Multi-usuario (hasta 3)', 'API REST access', 'Estadísticas avanzadas', 'Gerente de cuenta', 'Soporte VIP 24/7', 'Prueba gratis 7 días']
   }
 };
+
+window.selectPlan = function(plan) {
+  if (plan === 'free') { document.getElementById('modal-upgrade').classList.add('hidden'); return; }
+  const planDetails = PLAN_WHATSAPP_DATA[plan];
+  if (!planDetails) return;
+  const planConfig = PLANS[plan];
+  const hasTrial = planConfig && planConfig.trialDays > 0;
+  const trialText = hasTrial ? '\n\ud83c\udf1f *Prueba gratis de ' + planConfig.trialDays + ' d\u00edas*\nCobrar al d\u00eda 8 si no cancelas' : '';
+  const featuresText = planDetails.benefits.map((f, i) => (i + 1) + '. ' + f).join('\n');
+  const message = '\u00a1Hola! Me interesa activar el plan *' + planDetails.name + '* de CotizaPro (' + planDetails.price + ').' + trialText + '\n\n\ud83d\udccb *Beneficios:*\n' + featuresText + '\n\n\ud83d\udcb3 Pago: Yape \u00b7 Plin \u00b7 Tarjeta\n\nMi correo: ' + (currentUser?.email || 'No especificado') + '\n\n\u00a1Gracias!';
+  window.open('https://wa.me/51933667414?text=' + encodeURIComponent(message), '_blank');
+  document.getElementById('modal-upgrade').classList.add('hidden');
+};
+
+window.selectCreditPack = function(packId) {
+  const pack = CREDIT_PACKAGES.find(p => p.id === packId);
+  if (!pack) return;
+  const message = '\u00a1Hola! Quiero comprar *' + pack.credits + ' cr\u00e9ditos* de CotizaPro a *' + pack.priceLabel + '*.' + (pack.discount ? ' (Ahorro ' + pack.discount + ')' : '') + '\n\n\ud83d\udcb3 Pago: Yape / Plin / Tarjeta\n\nMi correo: ' + (currentUser?.email || 'No especificado') + '\n\n\u00a1Gracias!';
+  window.open('https://wa.me/51933667414?text=' + encodeURIComponent(message), '_blank');
+  document.getElementById('modal-upgrade').classList.add('hidden');
+};
+
+// ==========================================================
+// UPSELL BANNER
+// ==========================================================
+
+let currentUpsellBanner = null;
+
+function showUpsellBanner(message) {
+  if (currentUpsellBanner) return;
+  const banner = document.createElement('div');
+  banner.className = 'upsell-banner';
+  banner.innerHTML = '<span class="upsell-banner-text">' + message + '</span><button class="upsell-banner-close" onclick="this.parentElement.remove(); currentUpsellBanner = null;">\u2715</button>';
+  banner.onclick = function(e) {
+    if (e.target.closest('.upsell-banner-close')) return;
+    showUpgradeModal();
+    banner.remove();
+    currentUpsellBanner = null;
+  };
+  document.body.appendChild(banner);
+  currentUpsellBanner = banner;
+  setTimeout(function() { if (banner.parentNode) { banner.remove(); currentUpsellBanner = null; } }, 8000);
+}
 
 window.selectPlan = function(plan) {
   const planDetails = {
@@ -2876,6 +3039,8 @@ initUI = function() {
   setupHelpToggle();
   checkCompanyConfig();
   setupExpenseForm();
+  loadUserCreditBalance();
+  checkAndMigratePlan();
   
   // PDF Preview modal handlers
   const btnDownloadFromPreview = document.getElementById('btn-download-from-preview');

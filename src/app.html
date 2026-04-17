@@ -855,67 +855,180 @@
   <!-- Upgrade Modal -->
   <div id="modal-upgrade" class="modal hidden">
     <div class="modal-backdrop" data-close-modal></div>
-    <div class="modal-dialog">
+    <div class="modal-dialog" style="max-width:960px;max-height:92vh;overflow-y:auto;">
       <div class="modal-header">
-        <h2 class="modal-title">⚡ Mejorar Plan</h2>
+        <div>
+          <h2 class="modal-title" style="margin:0;font-size:1.15rem;">Elige el plan que se adapte a tu negocio</h2>
+          <p style="margin:0.25rem 0 0;color:var(--color-text-muted);font-size:0.82rem;">Paga solo por lo que usas o suscríbete y ahorra</p>
+        </div>
         <button class="modal-close" data-close-modal>✕</button>
       </div>
-      <div class="modal-body">
-        <div class="upgrade-plans">
-          <div class="upgrade-plan-card" onclick="selectPlan('basic')">
-            <h4>📋 Plan Básico</h4>
-            <p class="upgrade-price">S/ 35/mes</p>
-            <ul class="upgrade-features">
-              <li>60 cotizaciones al mes</li>
-              <li>1 empresa</li>
-              <li>50 clientes</li>
-              <li>Cotización profesional</li>
-              <li>PDF profesional con logo</li>
-              <li>Historial ilimitado</li>
-              <li>3 cuentas bancarias</li>
-              <li>Soporte prioritario</li>
-            </ul>
-            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Básico</button>
-          </div>
-          <div class="upgrade-plan-card featured" onclick="selectPlan('business')">
-            <div class="featured-badge">⭐ MÁS POPULAR</div>
-            <h4>💼 Business</h4>
-            <p class="upgrade-price">S/ 59/mes</p>
-            <ul class="upgrade-features">
-              <li>200 documentos al mes</li>
-              <li>3 empresas</li>
-              <li>200 clientes</li>
-              <li>4 tipos de documentos</li>
-              <li>PDF premium con branding</li>
-              <li>Historial ilimitado</li>
-              <li>10 cuentas bancarias</li>
-              <li>Duplicar documentos</li>
-              <li>Exportar/Importar Excel</li>
-              <li>Marca personalizada</li>
-              <li>Soporte 24/7</li>
-            </ul>
-            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Business</button>
-          </div>
-          <div class="upgrade-plan-card" onclick="selectPlan('pro')">
-            <h4>🚀 Plan Pro</h4>
-            <p class="upgrade-price">S/ 99/mes</p>
-            <ul class="upgrade-features">
-              <li>Documentos ILIMITADOS</li>
-              <li>5 empresas</li>
-              <li>Clientes ILIMITADOS</li>
-              <li>10 tipos de documentos</li>
-              <li>PDF enterprise personalizado</li>
-              <li>Cuentas bancarias ilimitadas</li>
-              <li>Multi-usuario (hasta 5)</li>
-              <li>API REST access</li>
-              <li>Marca de agua personalizada</li>
-              <li>Reportes avanzados</li>
-              <li>Soporte VIP 24/7</li>
-            </ul>
-            <button class="btn btn-primary btn-block" style="margin-top:0.75rem;">Solicitar Plan Pro</button>
+      <div class="modal-body" style="padding:1rem;">
+        
+        <!-- Comparador rápido -->
+        <div class="plan-comparator">
+          <p class="plan-comparator-title">¿Con qué frecuencia cotizas?</p>
+          <div class="plan-comparator-options">
+            <span class="plan-comparator-chip plan-c-free">1-3/mes → <b>FREE</b></span>
+            <span class="plan-comparator-chip plan-c-credits">5-10/mes → <b>Créditos</b></span>
+            <span class="plan-comparator-chip plan-c-starter">1-2/sem → <b>STARTER</b></span>
+            <span class="plan-comparator-chip plan-c-business">3-4/sem → <b>BUSINESS</b></span>
+            <span class="plan-comparator-chip plan-c-pro">Diario → <b>PRO</b></span>
           </div>
         </div>
-        <p class="upgrade-note">💬 Al seleccionar un plan serás redirigido a WhatsApp para coordinar la activación</p>
+
+        <!-- Plan Cards Grid -->
+        <div class="plans-grid-v2">
+
+          <!-- FREE -->
+          <div class="plan-card-v2 plan-free-v2">
+            <div class="plan-v2-badge">GRATIS</div>
+            <h3 class="plan-v2-name">Free</h3>
+            <div class="plan-v2-price">
+              <span class="plan-v2-amount">S/ 0</span>
+              <span class="plan-v2-period">para siempre</span>
+            </div>
+            <div class="plan-v2-per-quote">S/ 0 por cotización</div>
+            <ul class="plan-v2-features">
+              <li class="included">3 cotizaciones al mes</li>
+              <li class="included">10 clientes máximo</li>
+              <li class="included">1 tipo: Cotización</li>
+              <li class="included">PDF estándar con marca de agua</li>
+              <li class="included">Historial 30 días</li>
+              <li class="included">Soporte por chat</li>
+              <li class="excluded">Logo personalizado</li>
+              <li class="excluded">Sin marca de agua</li>
+              <li class="excluded">Estadísticas</li>
+            </ul>
+            <button class="plan-v2-btn plan-btn-free" onclick="selectPlan('free')">Comenzar gratis</button>
+          </div>
+
+          <!-- CRÉDITOS -->
+          <div class="plan-card-v2 plan-credits-v2">
+            <div class="plan-v2-badge">FLEXIBLE</div>
+            <h3 class="plan-v2-name">Créditos</h3>
+            <div class="plan-v2-price">
+              <span class="plan-v2-amount">S/ 0.80</span>
+              <span class="plan-v2-period">por cotización</span>
+            </div>
+            <div class="plan-v2-per-quote">desde S/ 7.50 · sin vencimiento</div>
+            <div class="plan-credit-packages">
+              <div class="credit-pack" onclick="selectCreditPack('pack_5')">
+                <span class="credit-pack-qty">5</span>
+                <span class="credit-pack-price">S/ 7.50</span>
+                <span class="credit-pack-unit">S/ 1.50/u</span>
+              </div>
+              <div class="credit-pack" onclick="selectCreditPack('pack_15')">
+                <span class="credit-pack-qty">15</span>
+                <span class="credit-pack-price">S/ 18.00</span>
+                <span class="credit-pack-unit">S/ 1.20/u</span>
+                <span class="credit-pack-discount">-20%</span>
+              </div>
+              <div class="credit-pack recommended" onclick="selectCreditPack('pack_30')">
+                <span class="credit-pack-tag">RECOMENDADO</span>
+                <span class="credit-pack-qty">30</span>
+                <span class="credit-pack-price">S/ 30.00</span>
+                <span class="credit-pack-unit">S/ 1.00/u</span>
+                <span class="credit-pack-discount">-33%</span>
+              </div>
+              <div class="credit-pack" onclick="selectCreditPack('pack_60')">
+                <span class="credit-pack-qty">60</span>
+                <span class="credit-pack-price">S/ 48.00</span>
+                <span class="credit-pack-unit">S/ 0.80/u</span>
+                <span class="credit-pack-discount">-47%</span>
+              </div>
+            </div>
+            <ul class="plan-v2-features plan-v2-features-mini">
+              <li class="included">Sin vencimiento</li>
+              <li class="included">Yape / Plin / Tarjeta</li>
+              <li class="included">Saldo al instante</li>
+            </ul>
+            <button class="plan-v2-btn plan-btn-credits" onclick="selectCreditPack('pack_30')">Comprar créditos</button>
+          </div>
+
+          <!-- STARTER -->
+          <div class="plan-card-v2 plan-starter-v2">
+            <div class="plan-v2-badge">NUEVO</div>
+            <h3 class="plan-v2-name">Starter</h3>
+            <div class="plan-v2-price">
+              <span class="plan-v2-amount">S/ 19.90</span>
+              <span class="plan-v2-period">/mes</span>
+            </div>
+            <div class="plan-v2-per-quote">S/ 0.66 por cotización</div>
+            <ul class="plan-v2-features">
+              <li class="included">30 cotizaciones al mes</li>
+              <li class="included">50 clientes</li>
+              <li class="included">3 tipos de documentos</li>
+              <li class="included">Logo personalizado en PDF</li>
+              <li class="included">PDF sin marca de agua</li>
+              <li class="included">Historial ilimitado</li>
+              <li class="included">Soporte por email</li>
+              <li class="included">Prueba gratis 7 días</li>
+              <li class="excluded">Duplicar documentos</li>
+              <li class="excluded">Branding personalizado</li>
+            </ul>
+            <button class="plan-v2-btn plan-btn-starter" onclick="selectPlan('starter')">Empezar prueba de 7 días</button>
+          </div>
+
+          <!-- BUSINESS -->
+          <div class="plan-card-v2 plan-business-v2">
+            <div class="plan-v2-badge popular-badge">⭐ MÁS POPULAR</div>
+            <h3 class="plan-v2-name">Business</h3>
+            <div class="plan-v2-price">
+              <span class="plan-v2-amount">S/ 35.00</span>
+              <span class="plan-v2-period">/mes</span>
+            </div>
+            <div class="plan-v2-per-quote">S/ 0.58 por cotización</div>
+            <ul class="plan-v2-features">
+              <li class="included">60 documentos al mes</li>
+              <li class="included">200 clientes</li>
+              <li class="included">4 tipos de documentos</li>
+              <li class="included">Branding personalizado</li>
+              <li class="included">Duplicar documentos</li>
+              <li class="included">Exportar/Importar</li>
+              <li class="included">Estadísticas básicas</li>
+              <li class="included">Recordatorios automáticos</li>
+              <li class="included">Soporte WhatsApp prioritario</li>
+              <li class="included">Prueba gratis 7 días</li>
+              <li class="excluded">Multi-usuario</li>
+              <li class="excluded">API Access</li>
+            </ul>
+            <button class="plan-v2-btn plan-btn-business" onclick="selectPlan('business')">Empezar prueba de 7 días</button>
+          </div>
+
+          <!-- PRO -->
+          <div class="plan-card-v2 plan-pro-v2">
+            <div class="plan-v2-badge premium-badge">PREMIUM</div>
+            <h3 class="plan-v2-name">Pro</h3>
+            <div class="plan-v2-price">
+              <span class="plan-v2-amount">S/ 59.00</span>
+              <span class="plan-v2-period">/mes</span>
+            </div>
+            <div class="plan-v2-per-quote">Ilimitado</div>
+            <ul class="plan-v2-features">
+              <li class="included">Documentos ILIMITADOS</li>
+              <li class="included">Clientes ILIMITADOS</li>
+              <li class="included">10 tipos + personalizados</li>
+              <li class="included">PDF enterprise</li>
+              <li class="included">Branding completo</li>
+              <li class="included">Multi-usuario (hasta 3)</li>
+              <li class="included">API REST access</li>
+              <li class="included">Estadísticas avanzadas</li>
+              <li class="included">Gerente de cuenta</li>
+              <li class="included">Soporte VIP 24/7</li>
+              <li class="included">Prueba gratis 7 días</li>
+            </ul>
+            <button class="plan-v2-btn plan-btn-pro" onclick="selectPlan('pro')">Empezar prueba de 7 días</button>
+          </div>
+
+        </div>
+
+        <!-- Payment Methods Note -->
+        <div class="plan-payment-note">
+          <p>💳 <b>Métodos de pago:</b> Yape · Plin · Tarjeta de débito/crédito</p>
+          <p>🔒 Pago seguro · Sin compromisos · Cancela cuando quieras</p>
+        </div>
+
       </div>
     </div>
   </div>

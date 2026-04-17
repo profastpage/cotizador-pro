@@ -153,6 +153,23 @@ service cloud.firestore {
     }
     
     // ==========================================================
+    // USER_CREDITS - Saldo de créditos prepago del usuario
+    // ==========================================================
+    match /userCredits/{creditId} {
+      allow read: if isAuthenticated() && 
+                     (isOwner(resource.data.userId) || isAdmin());
+      
+      allow create: if isAuthenticated() && 
+                       isOwner(request.resource.data.userId) &&
+                       isActiveUser();
+      
+      allow update: if isAuthenticated() && 
+                       (isOwner(resource.data.userId) || isAdmin());
+      
+      allow delete: if isAdmin();
+    }
+    
+    // ==========================================================
     // DENY ALL por defecto
     // ==========================================================
     match /{document=**} {

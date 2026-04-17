@@ -1241,3 +1241,458 @@ body {
     padding: 0.4rem 0.3rem;
   }
 }
+
+/* ==========================================================
+   PLANS v2 - Nueva estructura de precios
+   ========================================================== */
+
+/* Comparador rápido */
+.plan-comparator {
+  text-align: center;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.04), rgba(30, 64, 175, 0.08));
+  border: 1px solid rgba(30, 64, 175, 0.12);
+}
+
+.plan-comparator-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+  margin: 0 0 0.5rem;
+}
+
+.plan-comparator-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.plan-comparator-chip {
+  font-size: 0.72rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.8);
+  color: var(--color-text-muted, #6b7280);
+  border: 1px solid rgba(0,0,0,0.08);
+  white-space: nowrap;
+}
+
+.plan-comparator-chip b { color: var(--color-primary, #1e40af); }
+.plan-c-free { background: rgba(107,114,128,0.08); }
+.plan-c-credits { background: rgba(245,158,11,0.08); }
+.plan-c-credits b { color: #d97706; }
+.plan-c-starter { background: rgba(5,150,105,0.08); }
+.plan-c-starter b { color: #059669; }
+.plan-c-business { background: rgba(30,64,175,0.08); }
+.plan-c-business b { color: #1e40af; }
+.plan-c-pro { background: rgba(124,58,237,0.08); }
+.plan-c-pro b { color: #7c3aed; }
+
+/* Plan cards grid */
+.plans-grid-v2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.plan-card-v2 {
+  background: #fff;
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 1rem 0.85rem;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.plan-card-v2:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+}
+
+/* Badge */
+.plan-v2-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.15rem 0.6rem;
+  border-radius: 20px;
+  background: #f1f5f9;
+  color: #64748b;
+  margin-bottom: 0.4rem;
+}
+
+.popular-badge {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff;
+}
+
+.premium-badge {
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+}
+
+/* Name */
+.plan-v2-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+  color: var(--color-text-primary, #0f172a);
+}
+
+/* Price */
+.plan-v2-price {
+  margin-bottom: 0.2rem;
+}
+
+.plan-v2-amount {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.plan-v2-period {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+  font-weight: 400;
+}
+
+.plan-v2-per-quote {
+  font-size: 0.7rem;
+  color: var(--color-primary, #1e40af);
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+  background: rgba(30, 64, 175, 0.06);
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+/* Features list */
+.plan-v2-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.85rem;
+  text-align: left;
+}
+
+.plan-v2-features-mini {
+  margin-bottom: 0.5rem;
+}
+
+.plan-v2-features li {
+  font-size: 0.72rem;
+  padding: 0.2rem 0;
+  padding-left: 1.15rem;
+  position: relative;
+  color: var(--color-text-primary, #0f172a);
+  line-height: 1.4;
+}
+
+.plan-v2-features li.included::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: #059669;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.plan-v2-features li.excluded {
+  color: #9ca3af;
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+
+.plan-v2-features li.excluded::before {
+  content: '✗';
+  position: absolute;
+  left: 0;
+  color: #d1d5db;
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+/* CTA Buttons */
+.plan-v2-btn {
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.plan-v2-btn:active { transform: scale(0.97); }
+
+.plan-btn-free {
+  background: #f1f5f9;
+  color: #475569;
+}
+.plan-btn-free:hover { background: #e2e8f0; }
+
+.plan-btn-credits {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+}
+.plan-btn-credits:hover { background: linear-gradient(135deg, #d97706, #b45309); }
+
+.plan-btn-starter {
+  background: linear-gradient(135deg, #059669, #047857);
+  color: #fff;
+}
+.plan-btn-starter:hover { background: linear-gradient(135deg, #047857, #065f46); }
+
+.plan-btn-business {
+  background: linear-gradient(135deg, #1e40af, #1d4ed8);
+  color: #fff;
+}
+.plan-btn-business:hover { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+
+.plan-btn-pro {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9);
+  color: #fff;
+}
+.plan-btn-pro:hover { background: linear-gradient(135deg, #6d28d9, #5b21b6); }
+
+/* Business card highlight */
+.plan-business-v2 {
+  border-color: #1e40af;
+  box-shadow: 0 0 0 1px rgba(30,64,175,0.15), 0 4px 16px rgba(30,64,175,0.1);
+}
+
+.plan-pro-v2 {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 1px rgba(124,58,237,0.15), 0 4px 16px rgba(124,58,237,0.08);
+}
+
+/* Credit packages */
+.plan-credit-packages {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.credit-pack {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-size: 0.68rem;
+  position: relative;
+  background: #fafafa;
+}
+
+.credit-pack:hover {
+  border-color: #f59e0b;
+  background: rgba(245,158,11,0.04);
+}
+
+.credit-pack.recommended {
+  border-color: #f59e0b;
+  background: rgba(245,158,11,0.06);
+  grid-column: 1 / -1;
+}
+
+.credit-pack-tag {
+  position: absolute;
+  top: -0.5rem;
+  left: 0.4rem;
+  font-size: 0.55rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.credit-pack-qty {
+  font-weight: 700;
+  color: #92400e;
+  font-size: 0.8rem;
+}
+
+.credit-pack-price {
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.credit-pack-unit {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.62rem;
+}
+
+.credit-pack-discount {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #059669;
+  background: rgba(5,150,105,0.1);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+  margin-left: auto;
+}
+
+/* Payment note */
+.plan-payment-note {
+  text-align: center;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(30, 64, 175, 0.03);
+  border: 1px solid rgba(30, 64, 175, 0.08);
+}
+
+.plan-payment-note p {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0.2rem 0;
+}
+
+/* Responsive for plans */
+@media (max-width: 768px) {
+  .plans-grid-v2 {
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 0.65rem;
+  }
+  
+  .plan-card-v2 {
+    padding: 0.85rem 0.65rem;
+  }
+  
+  .plan-v2-amount {
+    font-size: 1.35rem;
+  }
+  
+  .plan-comparator-options {
+    gap: 0.3rem;
+  }
+  
+  .plan-comparator-chip {
+    font-size: 0.65rem;
+    padding: 0.2rem 0.45rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .plans-grid-v2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-dialog {
+    margin: 0.5rem !important;
+  }
+}
+
+/* Dark mode for plans */
+[data-theme="dark"] .plan-card-v2 {
+  background: var(--card-bg, #1e293b);
+  border-color: var(--border-color, #334155);
+  color: var(--text-primary, #f8fafc);
+}
+
+[data-theme="dark"] .plan-v2-amount { color: var(--text-primary, #f8fafc); }
+[data-theme="dark"] .plan-v2-name { color: var(--text-primary, #f8fafc); }
+[data-theme="dark"] .plan-v2-per-quote { background: rgba(59,130,246,0.15); color: #93c5fd; }
+[data-theme="dark"] .plan-v2-features li.included { color: var(--text-secondary, #cbd5e1); }
+[data-theme="dark"] .plan-v2-badge { background: rgba(255,255,255,0.08); color: #94a3b8; }
+[data-theme="dark"] .credit-pack { background: rgba(255,255,255,0.04); border-color: var(--border-color, #334155); }
+[data-theme="dark"] .credit-pack.recommended { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); }
+[data-theme="dark"] .plan-comparator { background: rgba(255,255,255,0.03); border-color: var(--border-color, #334155); }
+[data-theme="dark"] .plan-comparator-chip { background: rgba(255,255,255,0.06); border-color: var(--border-color, #334155); }
+[data-theme="dark"] .plan-payment-note { background: rgba(255,255,255,0.03); border-color: var(--border-color, #334155); }
+
+/* Upsell Banner */
+.upsell-banner {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  color: #fff;
+  padding: 0.65rem 1.25rem;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(30,64,175,0.3);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 90vw;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(20px); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0); opacity: 1; }
+}
+
+.upsell-banner-text { flex: 1; }
+.upsell-banner-close {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: #fff;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.upsell-banner-close:hover { background: rgba(255,255,255,0.3); }
+
+/* Credit balance widget in sidebar */
+.credit-balance-widget {
+  background: linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.03));
+  border: 1px solid rgba(245,158,11,0.2);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  margin-top: 0.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.credit-balance-widget:hover {
+  background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.05));
+}
+
+.credit-balance-label {
+  font-size: 0.65rem;
+  color: #92400e;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.credit-balance-number {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #d97706;
+  margin: 0.15rem 0;
+}
+
+.credit-balance-action {
+  font-size: 0.68rem;
+  color: #92400e;
+  font-weight: 500;
+}
