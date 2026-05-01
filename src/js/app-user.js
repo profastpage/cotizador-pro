@@ -616,6 +616,7 @@ async function saveClient(clientData) {
     return true;
   } catch (error) {
     console.error('Error saving client:', error);
+    showToast('Error al guardar el cliente: ' + error.message, 'error');
     return false;
   }
 }
@@ -644,8 +645,22 @@ async function loadJsPDF() {
   return new Promise((resolve, reject) => {
     const scriptTag = document.createElement('script');
     scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    scriptTag.onload = () => resolve(window.jspdf);
-    scriptTag.onerror = reject;
+    // Timeout: reject after 15 seconds to avoid infinite hang
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Tiempo de espera agotado al cargar la librería PDF. Verifica tu conexión a internet.'));
+    }, 15000);
+    scriptTag.onload = () => {
+      clearTimeout(timeoutId);
+      if (window.jspdf) {
+        resolve(window.jspdf);
+      } else {
+        reject(new Error('La librería PDF no se cargó correctamente. Intenta recargar la página.'));
+      }
+    };
+    scriptTag.onerror = () => {
+      clearTimeout(timeoutId);
+      reject(new Error('Error al cargar la librería PDF. Verifica tu conexión a internet.'));
+    };
     document.head.appendChild(scriptTag);
   });
 }
@@ -864,8 +879,8 @@ async function generatePDF() {
     }
 
     const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
-    if (!companySnap.exists() || !companySnap.data().ruc) {
-      showToast('Configura los datos de tu empresa primero', 'error');
+    if (!companySnap.exists() || !companySnap.data().name) {
+      showToast('Configura los datos de tu empresa primero (al menos el nombre)', 'error');
       navigateTo('settings');
       isGeneratingPDF = false;
       return;
@@ -912,6 +927,7 @@ async function generatePDF() {
     await addDoc(collection(db, 'quotes'), quoteData);
     const clientSaved = await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
     if (!clientSaved) {
+      showToast('No se pudo guardar el cliente. Verifica los datos e intenta de nuevo.', 'error');
       isGeneratingPDF = false;
       return;
     }
@@ -932,7 +948,7 @@ async function generatePDF() {
 
   } catch (error) {
     console.error('PDF Error:', error);
-    showToast('Error: ' + error.message, 'error');
+    showToast('Error al generar PDF: ' + error.message, 'error');
   } finally {
     isGeneratingPDF = false;
   }
@@ -1206,9 +1222,10 @@ function showToast(message, type = 'success') {
   if (!container) return;
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span><span>${message}</span>`;
+  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'info' ? '⏳' : 'ℹ️';
+  toast.innerHTML = `<span>${icon}</span><span>${message}</span>`;
   container.appendChild(toast);
-  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 3000);
+  setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 300); }, 4000);
 }
 
 window.logout = logout;
@@ -1271,7 +1288,7 @@ function setupHelpToggle() {
 async function checkCompanyConfig() {
   try {
     const snap = await getDoc(doc(db, 'companies', currentUser.uid));
-    isCompanyConfigured = snap.exists() && snap.data().ruc;
+    isCompanyConfigured = snap.exists() && snap.data().name;
     const w = document.getElementById('company-warning');
     if (w) {
       if (!isCompanyConfigured) w.classList.remove('hidden');
