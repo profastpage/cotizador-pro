@@ -3,7 +3,7 @@ name: Deploy to Cloudflare Pages
 on:
   push:
     branches:
-      - master
+      - main
   workflow_dispatch: # Permite disparar manualmente
 
 jobs:
@@ -16,6 +16,14 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Deploy Firestore Rules
+        if: ${{ secrets.FIREBASE_TOKEN }}
+        uses: w9jds/firebase-action@v13.9.0
+        with:
+          args: deploy --only firestore:rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
