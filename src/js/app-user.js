@@ -924,14 +924,27 @@ async function generatePDF() {
       createdAt: new Date().toISOString()
     };
 
-    await addDoc(collection(db, 'quotes'), quoteData);
-    const clientSaved = await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
-    if (!clientSaved) {
-      showToast('No se pudo guardar el cliente. Verifica los datos e intenta de nuevo.', 'error');
-      isGeneratingPDF = false;
-      return;
+    // Guardar cotizacion en Firestore
+    try {
+      await addDoc(collection(db, 'quotes'), quoteData);
+    } catch (quoteErr) {
+      console.warn('No se pudo guardar la cotizacion en Firestore:', quoteErr);
+      // Continuamos generando el PDF aunque falle el guardado en DB
     }
-    await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
+
+    // Guardar cliente (no bloqueante - si falla, no impedimos el PDF)
+    try {
+      await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
+    } catch (clientErr) {
+      console.warn('No se pudo guardar el cliente:', clientErr);
+    }
+
+    // Actualizar contador de cotizaciones usadas (no bloqueante)
+    try {
+      await updateDoc(doc(db, 'users', currentUser.uid), { quotesUsedThisMonth: increment(1) });
+    } catch (counterErr) {
+      console.warn('No se pudo actualizar contador:', counterErr);
+    }
 
     // Use centralized PDF renderer
     const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType);
@@ -1163,7 +1176,7 @@ window.downloadQuote = async function(id) {
 
     const quoteDoc = await getDoc(doc(db, 'quotes', id));
     if (!quoteDoc.exists()) {
-      showToast('Cotización no encontrada', 'error');
+      showToast('Cotizacion no encontrada', 'error');
       return;
     }
 
@@ -1171,18 +1184,20 @@ window.downloadQuote = async function(id) {
 
     // Verify ownership
     if (quote.userId !== currentUser.uid) {
-      showToast('No tienes permiso para esta cotización', 'error');
+      showToast('No tienes permiso para esta cotizacion', 'error');
       return;
     }
 
     const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
     if (!companySnap.exists()) {
-      showToast('Configura los datos de tu empresa primero', 'error');
+      showToast('Configura los datos de tu empresa primero (Nombre, RUC, etc.)', 'error');
+      navigateTo('settings');
       return;
     }
 
     const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
+    const clientDocument = quote.client?.document || '';
 
     // Use centralized PDF renderer
     const { pdf } = await renderPDF(
@@ -1197,14 +1212,15 @@ window.downloadQuote = async function(id) {
       quote.total || 0,
       quote.igvEnabled,
       quote.igvType || 'apart',
-      quote.documentType || 'cotizacion'
+      quote.documentType || 'cotizacion',
+      clientDocument
     );
 
     pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
-    showToast('¡PDF descargado!');
+    showToast('PDF generado exitosamente');
   } catch (error) {
     console.error('Download error:', error);
-    showToast('Error al generar PDF', 'error');
+    showToast('Error al generar PDF: ' + error.message, 'error');
   }
 };
 
