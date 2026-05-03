@@ -10,6 +10,52 @@ let currentWizardStep = 1;
 let isGeneratingPDF = false;
 
 // ==========================================================
+// LOCAL STORAGE FALLBACK - Cuando Firestore falla por permisos
+// ==========================================================
+
+function getLocalStorageKey(collection) {
+  return `cotizapro_${currentUser?.uid || 'anon'}_${collection}`;
+}
+
+function saveToLocal(collection, data) {
+  try {
+    const key = getLocalStorageKey(collection);
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    if (data.id) {
+      const idx = existing.findIndex(item => item.id === data.id);
+      if (idx >= 0) existing[idx] = data;
+      else existing.unshift(data);
+    } else {
+      existing.unshift(data);
+    }
+    localStorage.setItem(key, JSON.stringify(existing));
+    return data;
+  } catch (e) {
+    console.error('localStorage save error:', e);
+    return null;
+  }
+}
+
+function loadFromLocal(collection) {
+  try {
+    return JSON.parse(localStorage.getItem(getLocalStorageKey(collection)) || '[]');
+  } catch (e) {
+    return [];
+  }
+}
+
+function deleteFromLocal(collection, docId) {
+  try {
+    const key = getLocalStorageKey(collection);
+    const existing = JSON.parse(localStorage.getItem(key) || '[]');
+    const filtered = existing.filter(item => item.id !== docId);
+    localStorage.setItem(key, JSON.stringify(filtered));
+  } catch (e) {
+    console.error('localStorage delete error:', e);
+  }
+}
+
+// ==========================================================
 // AUTH CHECK - NO redirects to avoid loops
 // ==========================================================
 
@@ -628,10 +674,18 @@ async function loadClients() {
     const snapshot = await getDocs(q);
     const clients = [];
     snapshot.forEach(docSnap => clients.push({ id: docSnap.id, ...docSnap.data() }));
+    // Sincronizar con localStorage
+    if (clients.length > 0) {
+      try { localStorage.setItem(getLocalStorageKey('clients'), JSON.stringify(clients)); } catch(e) {}
+    }
+    if (clients.length === 0) {
+      const localClients = loadFromLocal('clients');
+      if (localClients.length > 0) return localClients;
+    }
     return clients;
   } catch (error) {
-    console.error('Error loading clients:', error);
-    return [];
+    console.warn('Firestore clients no disponible, usando localStorage:', error.message);
+    return loadFromLocal('clients');
   }
 }
 
@@ -925,19 +979,26 @@ async function generatePDF() {
     };
 
     // Guardar cotizacion en Firestore
+    let quoteId = `local_${Date.now()}`;
     try {
-      await addDoc(collection(db, 'quotes'), quoteData);
+      const docRef = await addDoc(collection(db, 'quotes'), quoteData);
+      quoteId = docRef.id;
+      quoteData.id = quoteId;
     } catch (quoteErr) {
       console.warn('No se pudo guardar la cotizacion en Firestore:', quoteErr);
-      // Continuamos generando el PDF aunque falle el guardado en DB
+      // Fallback: guardar en localStorage
+      quoteData.id = quoteId;
+      saveToLocal('quotes', quoteData);
     }
 
-    // Guardar cliente (no bloqueante - si falla, no impedimos el PDF)
+    // Guardar cliente en Firestore y localStorage (no bloqueante)
     try {
       await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
     } catch (clientErr) {
-      console.warn('No se pudo guardar el cliente:', clientErr);
+      console.warn('No se pudo guardar el cliente en Firestore:', clientErr);
     }
+    // Siempre guardar en localStorage como respaldo
+    saveToLocal('clients', { id: `local_${Date.now()}`, name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress, userId: currentUser.uid, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 
     // Actualizar contador de cotizaciones usadas (no bloqueante)
     try {
@@ -1147,24 +1208,36 @@ function formatDateShort(date) {
 }
 
 async function getUserQuotes() {
+  // Intentar Firestore primero
   try {
     const q = query(collection(db, 'quotes'), where('userId', '==', currentUser.uid), orderBy('createdAt', 'desc'));
     const snapshot = await getDocs(q);
     const quotes = [];
     snapshot.forEach(docSnap => quotes.push({ id: docSnap.id, ...docSnap.data() }));
+    // Si Firestore retorna datos, sincronizar con localStorage
+    if (quotes.length > 0) {
+      try {
+        localStorage.setItem(getLocalStorageKey('quotes'), JSON.stringify(quotes));
+      } catch (e) { /* ignore */ }
+    }
+    // Si Firestore esta vacio pero localStorage tiene datos, usar localStorage
+    if (quotes.length === 0) {
+      const localQuotes = loadFromLocal('quotes');
+      if (localQuotes.length > 0) return localQuotes;
+    }
     return quotes;
   } catch (error) {
-    console.error('Error fetching quotes:', error);
-    if (error.code === 'failed-precondition') {
-      showToast('Crea el índice en Firebase Console (userId + createdAt)', 'error');
-    }
-    return [];
+    console.warn('Firestore quotes no disponible, usando localStorage:', error.message);
+    return loadFromLocal('quotes');
   }
 }
 
 window.deleteQuote = async function(id) {
   if (confirm('¿Eliminar esta cotización?')) {
-    await deleteDoc(doc(db, 'quotes', id));
+    // Intentar borrar de Firestore
+    try { await deleteDoc(doc(db, 'quotes', id)); } catch (e) { console.warn('No se pudo borrar de Firestore:', e.message); }
+    // Siempre borrar de localStorage
+    deleteFromLocal('quotes', id);
     showToast('Cotización eliminada');
     loadHistory();
   }
@@ -1174,13 +1247,26 @@ window.downloadQuote = async function(id) {
   try {
     showToast('Generando PDF...', 'info');
 
-    const quoteDoc = await getDoc(doc(db, 'quotes', id));
-    if (!quoteDoc.exists()) {
+    let quote = null;
+
+    // Intentar leer desde Firestore
+    try {
+      const quoteDoc = await getDoc(doc(db, 'quotes', id));
+      if (quoteDoc.exists()) quote = quoteDoc.data();
+    } catch (firestoreErr) {
+      console.warn('No se pudo leer de Firestore, intentando localStorage:', firestoreErr.message);
+    }
+
+    // Si no esta en Firestore, buscar en localStorage
+    if (!quote) {
+      const localQuotes = loadFromLocal('quotes');
+      quote = localQuotes.find(q => q.id === id);
+    }
+
+    if (!quote) {
       showToast('Cotizacion no encontrada', 'error');
       return;
     }
-
-    const quote = quoteDoc.data();
 
     // Verify ownership
     if (quote.userId !== currentUser.uid) {
@@ -1188,14 +1274,27 @@ window.downloadQuote = async function(id) {
       return;
     }
 
-    const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
-    if (!companySnap.exists()) {
+    let company = null;
+    // Intentar leer empresa desde Firestore
+    try {
+      const companySnap = await getDoc(doc(db, 'companies', currentUser.uid));
+      if (companySnap.exists()) company = companySnap.data();
+    } catch (companyErr) {
+      console.warn('No se pudo leer empresa de Firestore:', companyErr.message);
+    }
+
+    // Si no hay empresa en Firestore, buscar en localStorage
+    if (!company) {
+      const localCompanies = loadFromLocal('companies');
+      company = localCompanies.find(c => c.userId === currentUser.uid) || localCompanies[0];
+    }
+
+    if (!company || !company.name) {
       showToast('Configura los datos de tu empresa primero (Nombre, RUC, etc.)', 'error');
       navigateTo('settings');
       return;
     }
 
-    const company = companySnap.data();
     const clientName = quote.client?.name || 'Sin nombre';
     const clientDocument = quote.client?.document || '';
 
