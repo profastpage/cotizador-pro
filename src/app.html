@@ -242,6 +242,26 @@
 </head>
 <body>
   <div id="toast-container" class="toast-container"></div>
+  <script>
+    // Suppress Firebase index error toasts (indexes are being deployed)
+    (function(){
+      var tc = document.getElementById('toast-container');
+      if (!tc) return;
+      var obs = new MutationObserver(function(mutations) {
+        mutations.forEach(function(m) {
+          m.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && node.classList && node.classList.contains('toast-error')) {
+              var t = node.textContent || '';
+              if (t.indexOf('indice') !== -1 || t.indexOf('Firebase Console') !== -1) {
+                node.remove();
+              }
+            }
+          });
+        });
+      });
+      obs.observe(tc, { childList: true });
+    })();
+  </script>
 
   <!-- Sidebar (Desktop) -->
   <aside class="sidebar">
