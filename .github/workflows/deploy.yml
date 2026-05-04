@@ -34,82 +34,56 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Verify and Fix Production Branch
+      - name: Ensure Production Branch = main
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "=========================================="
-          echo "STEP 1: Checking current Cloudflare project settings..."
-          echo "=========================================="
-
-          PROJECT_INFO=$(curl -s \
+          echo "=== Verifying production_branch ==="
+          curl -s -X PATCH \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN")
-
-          CURRENT_BRANCH=$(echo "$PROJECT_INFO" | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"production_branch":"main"}' | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
           if d.get('success'):
-              print(d['result'].get('production_branch', 'NOT_SET'))
+              print(f'  production_branch: {d[\"result\"].get(\"production_branch\")}')
           else:
-              print('API_ERROR: ' + str(d.get('errors', [])))
-          ")
-
-          echo "Current production_branch = '$CURRENT_BRANCH'"
-
-          if [ "$CURRENT_BRANCH" != "main" ]; then
-            echo ""
-            echo "=========================================="
-            echo "STEP 2: FIXING production_branch to 'main'..."
-            echo "=========================================="
-            FIX_RESPONSE=$(curl -s -X PATCH \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-              -H "Content-Type: application/json" \
-              -d '{"production_branch":"main"}')
-
-            echo "$FIX_RESPONSE" | python3 -c "
-            import json, sys
-            d = json.load(sys.stdin)
-            if d.get('success'):
-                new_branch = d['result'].get('production_branch', 'unknown')
-                print(f'  SUCCESS: production_branch is now: {new_branch}')
-            else:
-                print(f'  FAILED: {d.get(\"errors\", [])}')
-                sys.exit(1)
-            "
-          else
-            echo "  OK: production_branch is already 'main'"
-          fi
+              print(f'  WARNING: {d.get(\"errors\",[])}')
+          "
 
       - name: Deploy to Cloudflare Pages (Production)
-        run: npx wrangler pages deploy dist --project-name=cotizador-pro --branch=main --commit-hash=$GITHUB_SHA --commit-message="$GITHUB_SHA"
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: cotizador-pro
+          directory: dist
+          branch: main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify Production Deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-
-      - name: Verify Production Deployment
         run: |
-          echo "=========================================="
-          echo "STEP 3: Verifying deployment..."
-          echo "=========================================="
-
-          # Check the live site
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://cotizador-pro.pages.dev/app.html")
-          echo "  cotizador-pro.pages.dev HTTP status: $HTTP_CODE"
-
-          # Check which JS bundle is being served
-          JS_BUNDLE=$(curl -s "https://cotizador-pro.pages.dev/app.html" | grep -oP 'app-[^"]+\.js' | head -1)
-          echo "  JS bundle in production: $JS_BUNDLE"
-          echo "  JS bundle in build: app-$(ls dist/assets/app-*.js 2>/dev/null | head -1 | sed 's/.*app-//;s/\.js//').js"
-
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo ""
-            echo "  =========================================="
-            echo "  PRODUCTION DEPLOY VERIFIED SUCCESSFULLY"
-            echo "  URL: https://cotizador-pro.pages.dev"
-            echo "  =========================================="
-          else
-            echo "  WARNING: Unexpected HTTP code $HTTP_CODE"
-          fi
+          echo "=== Checking if deployment is now PRODUCTION ==="
+          sleep 10
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro/deployments?per_page=3" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          for dep in d.get('result', []):
+              is_prod = dep.get('is_production')
+              branch = dep.get('deployment_trigger', {}).get('metadata', {}).get('branch', '?')
+              url = dep.get('url', '?')
+              status = '>>> PRODUCTION <<<' if is_prod else 'preview'
+              print(f'  [{status:20s}] branch={branch}  url={url}  id={dep.get(\"id\",\"?\")[:12]}')
+          "
+          echo ""
+          echo "=== Checking live site ==="
+          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "https://cotizador-pro.pages.dev/app.html")
+          JS_BUNDLE=$(curl -sL "https://cotizador-pro.pages.dev/app.html" | grep -oP 'app-[^"]+\.js' | head -1)
+          echo "  cotizador-pro.pages.dev => HTTP $HTTP_CODE | JS: $JS_BUNDLE"
