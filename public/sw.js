@@ -1,21 +1,30 @@
 // Service Worker para CotizaPro PWA
-const CACHE_NAME = 'cotizapro-v2';
+const CACHE_NAME = 'cotizapro-v3';
 
 self.addEventListener('install', (e) => {
-  console.log('[SW] Installed');
+  console.log('[SW] Installed v3 - busting old caches');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (e) => {
-  console.log('[SW] Activated');
+  console.log('[SW] Activated v3');
   e.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        keys.filter(k => k !== CACHE_NAME).map(k => {
+          console.log('[SW] Deleting old cache:', k);
+          return caches.delete(k);
+        })
       );
     })
   );
   self.clients.claim();
+  // Force all clients to reload
+  self.clients.matchAll().then(clients => {
+    clients.forEach(client => {
+      client.postMessage({ type: 'SW_UPDATED', version: CACHE_NAME });
+    });
+  });
 });
 
 self.addEventListener('fetch', (e) => {
@@ -34,7 +43,8 @@ self.addEventListener('fetch', (e) => {
       url.pathname.endsWith('.html') ||
       url.pathname === '/' ||
       url.pathname === '/app' ||
-      url.pathname === '/superadmin') {
+      url.pathname === '/superadmin' ||
+      url.pathname === '/view') {
     e.respondWith(
       fetch(e.request, { cache: 'no-store' }).catch(() => {
         // Offline fallback - try to serve from cache
@@ -44,10 +54,17 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // NEVER cache SW and manifest
+  if (url.pathname === '/sw.js' || url.pathname === '/manifest.json') {
+    e.respondWith(
+      fetch(e.request, { cache: 'no-store' })
+    );
+    return;
+  }
+
   // Cache static assets (JS, CSS, images) with network-first strategy
   e.respondWith(
-    fetch(e.request).then(response => {
-      // Only cache successful GETs for static assets
+    fetch(e.request, { cache: 'no-store' }).then(response => {
       if (response.ok && e.request.method === 'GET' &&
           (url.pathname.includes('/assets/') || url.pathname.includes('/icon'))) {
         const responseClone = response.clone();
@@ -58,4 +75,11 @@ self.addEventListener('fetch', (e) => {
       return response;
     }).catch(() => caches.match(e.request))
   );
+});
+
+// Listen for messages from clients
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
