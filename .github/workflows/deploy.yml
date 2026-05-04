@@ -34,56 +34,165 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Ensure Production Branch = main
+      - name: Deploy to Cloudflare Pages (Production via Direct Upload API)
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "=== Verifying production_branch ==="
-          curl -s -X PATCH \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -H "Content-Type: application/json" \
-            -d '{"production_branch":"main"}' | python3 -c "
+          python3 << 'PYEOF'
+          import hashlib, json, os, sys, mimetypes, requests
+          from pathlib import Path
+
+          API_TOKEN = os.environ['CLOUDFLARE_API_TOKEN']
+          ACCOUNT_ID = os.environ['CLOUDFLARE_ACCOUNT_ID']
+          PROJECT = 'cotizador-pro'
+          BASE = f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/pages/projects/{PROJECT}'
+          HEADERS = {'Authorization': f'Bearer {API_TOKEN}'}
+
+          # 1. Build manifest from dist/
+          dist = Path('dist')
+          manifest = []
+          for fpath in sorted(dist.rglob('*')):
+              if not fpath.is_file():
+                  continue
+              rel = f'/{fpath.relative_to(dist)}'
+              data = fpath.read_bytes()
+              sha = hashlib.sha256(data).hexdigest()
+              ctype = mimetypes.guess_type(str(fpath))[0] or 'application/octet-stream'
+              manifest.append({
+                  'path': rel,
+                  'sha256': sha,
+                  'content_type': ctype,
+                  'size': len(data)
+              })
+          print(f'  Manifest: {len(manifest)} files')
+
+          # 2. Ensure production_branch = main
+          resp = requests.patch(f'{BASE}', headers={**HEADERS, 'Content-Type': 'application/json'},
+                                json={'production_branch': 'main'})
+          r = resp.json()
+          if r.get('success'):
+              print(f'  production_branch: {r["result"].get("production_branch")}')
+          else:
+              print(f'  WARNING branch fix: {r.get("errors")}')
+
+          # 3. Create deployment via Direct Upload API
+          print('  Creating production deployment...')
+          create_resp = requests.post(
+              f'{BASE}/deployments',
+              headers={**HEADERS, 'Content-Type': 'application/json'},
+              json={
+                  'manifest': manifest,
+                  'branch': 'main',
+                  'deployment_trigger': {
+                      'type': 'manual',
+                      'metadata': {'branch': 'main', 'deploy_branch': 'main'}
+                  }
+              }
+          )
+          cr = create_resp.json()
+
+          if not cr.get('success'):
+              print(f'  ERROR creating deployment: {cr.get("errors")}')
+              sys.exit(1)
+
+          result = cr['result']
+          jwt_token = result['jwt_token']
+          upload_url = result['upload_url']
+          deployment_id = result.get('id', 'unknown')
+          print(f'  Deployment ID: {deployment_id}')
+          print(f'  Upload URL: {upload_url[:80]}...')
+
+          # 4. Upload all files
+          print(f'  Uploading {len(manifest)} files...')
+          for i, item in enumerate(manifest):
+              fpath = dist / item['path'].lstrip('/')
+              data = fpath.read_bytes()
+              up_resp = requests.put(
+                  f'{upload_url}{item["path"]}',
+                  headers={
+                      'Authorization': f'Bearer {jwt_token}',
+                      'Content-Type': item['content_type']
+                  },
+                  data=data
+              )
+              if up_resp.status_code not in [200, 201, 202]:
+                  print(f'    FAIL {item["path"]}: {up_resp.status_code} {up_resp.text[:100]}')
+              elif (i + 1) % 20 == 0:
+                  print(f'    Uploaded {i+1}/{len(manifest)}...')
+
+          print(f'  All files uploaded!')
+
+          # 5. Finalize deployment
+          finalize_resp = requests.patch(
+              f'{BASE}/deployments/{deployment_id}',
+              headers={**HEADERS, 'Content-Type': 'application/json'},
+              json={'is_production': True, 'deployment_trigger': {'type': 'manual', 'metadata': {'branch': 'main'}}}
+          )
+          fr = finalize_resp.json()
+          if fr.get('success'):
+              dep = fr['result']
+              print(f'  Finalized! is_production: {dep.get("is_production")}  url: {dep.get("url")}')
+          else:
+              print(f'  Finalize response: {fr}')
+
+          # 6. Verify
+          print()
+          print('=== VERIFICATION ===')
+          time.sleep(5)
+
+          # Check the latest deployment
+          list_resp = requests.get(f'{BASE}/deployments?per_page=5', headers=HEADERS)
+          lr = list_resp.json()
+          if lr.get('success'):
+              for dep in lr['result'][:5]:
+                  is_prod = dep.get('is_production')
+                  marker = '>>> PRODUCTION <<<' if is_prod else 'preview'
+                  print(f'  [{marker:20s}] id={dep["id"][:12]}  branch={dep.get("deployment_trigger",{}).get("metadata",{}).get("branch","?")}  url={dep.get("url","?")}')
+
+          # Check live site
+          import urllib.request
+          try:
+              req = urllib.request.Request('https://cotizador-pro.pages.dev/app.html')
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  html = resp.read().decode('utf-8')
+                  import re
+                  js_match = re.search(r'app-[^\"]+\.js', html)
+                  js = js_match.group(0) if js_match else 'NOT FOUND'
+                  print(f'\n  Live site: cotizador-pro.pages.dev => JS: {js}')
+          except Exception as e:
+              print(f'\n  Error checking live site: {e}')
+
+          print('\n  DONE!')
+          PYEOF
+
+      - name: Purge Cloudflare Cache
+        if: always()
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          # Purge everything to ensure fresh content
+          ZONE_ID=$(curl -s "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          print(d.get('result',{}).get('id',''))
+          ")
+          
+          if [ -n "$ZONE_ID" ]; then
+            echo "  Purging cache for project..."
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro/cache" \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d '{"files":["/*"]}' | python3 -c "
           import json,sys
           d=json.load(sys.stdin)
           if d.get('success'):
-              print(f'  production_branch: {d[\"result\"].get(\"production_branch\")}')
+              print('  Cache purged!')
           else:
-              print(f'  WARNING: {d.get(\"errors\",[])}')
+              print(f'  Cache purge result: {d.get(\"errors\",\"unknown\")}')
           "
-
-      - name: Deploy to Cloudflare Pages (Production)
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: cotizador-pro
-          directory: dist
-          branch: main
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Verify Production Deployment
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          echo "=== Checking if deployment is now PRODUCTION ==="
-          sleep 10
-          curl -s \
-            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro/deployments?per_page=3" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
-          import json, sys
-          d = json.load(sys.stdin)
-          for dep in d.get('result', []):
-              is_prod = dep.get('is_production')
-              branch = dep.get('deployment_trigger', {}).get('metadata', {}).get('branch', '?')
-              url = dep.get('url', '?')
-              status = '>>> PRODUCTION <<<' if is_prod else 'preview'
-              print(f'  [{status:20s}] branch={branch}  url={url}  id={dep.get(\"id\",\"?\")[:12]}')
-          "
-          echo ""
-          echo "=== Checking live site ==="
-          HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" "https://cotizador-pro.pages.dev/app.html")
-          JS_BUNDLE=$(curl -sL "https://cotizador-pro.pages.dev/app.html" | grep -oP 'app-[^"]+\.js' | head -1)
-          echo "  cotizador-pro.pages.dev => HTTP $HTTP_CODE | JS: $JS_BUNDLE"
+          else
+            echo "  Skipping cache purge (no project ID)"
+          fi
