@@ -40,7 +40,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           python3 << 'PYEOF'
-          import hashlib, json, os, sys, mimetypes, requests
+          import hashlib, json, os, sys, time, mimetypes, requests
           from pathlib import Path
 
           API_TOKEN = os.environ['CLOUDFLARE_API_TOKEN']
@@ -49,9 +49,10 @@ jobs:
           BASE = f'https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/pages/projects/{PROJECT}'
           HEADERS = {'Authorization': f'Bearer {API_TOKEN}'}
 
-          # 1. Build manifest from dist/
+          # 1. Build manifest from dist/ (flat object: path -> sha256 hash)
           dist = Path('dist')
-          manifest = []
+          manifest = {}
+          files_info = {}
           for fpath in sorted(dist.rglob('*')):
               if not fpath.is_file():
                   continue
@@ -59,12 +60,8 @@ jobs:
               data = fpath.read_bytes()
               sha = hashlib.sha256(data).hexdigest()
               ctype = mimetypes.guess_type(str(fpath))[0] or 'application/octet-stream'
-              manifest.append({
-                  'path': rel,
-                  'sha256': sha,
-                  'content_type': ctype,
-                  'size': len(data)
-              })
+              manifest[rel] = sha
+              files_info[rel] = {'content_type': ctype, 'data': data}
           print(f'  Manifest: {len(manifest)} files')
 
           # 2. Ensure production_branch = main
@@ -81,60 +78,59 @@ jobs:
           create_resp = requests.post(
               f'{BASE}/deployments',
               headers={**HEADERS, 'Content-Type': 'application/json'},
-              json={
-                  'manifest': manifest,
-                  'branch': 'main',
-                  'deployment_trigger': {
-                      'type': 'manual',
-                      'metadata': {'branch': 'main', 'deploy_branch': 'main'}
-                  }
-              }
+              json={'manifest': manifest, 'branch': 'main'}
           )
           cr = create_resp.json()
 
           if not cr.get('success'):
               print(f'  ERROR creating deployment: {cr.get("errors")}')
+              # Debug: print full response
+              print(f'  Full response: {json.dumps(cr, indent=2)[:500]}')
               sys.exit(1)
 
           result = cr['result']
-          jwt_token = result['jwt_token']
-          upload_url = result['upload_url']
+          # Debug: print available keys
+          print(f'  Response keys: {list(result.keys())}')
+
+          # Try different possible key names for JWT
+          jwt_token = result.get('jwt_token') or result.get('jwt') or result.get('access_token')
+          upload_url = result.get('upload_url')
           deployment_id = result.get('id', 'unknown')
+
+          if not jwt_token:
+              print(f'  ERROR: No JWT token found. Full result: {json.dumps(result, indent=2)[:1000]}')
+              sys.exit(1)
+
           print(f'  Deployment ID: {deployment_id}')
           print(f'  Upload URL: {upload_url[:80]}...')
 
           # 4. Upload all files
           print(f'  Uploading {len(manifest)} files...')
-          for i, item in enumerate(manifest):
-              fpath = dist / item['path'].lstrip('/')
-              data = fpath.read_bytes()
+          uploaded = 0
+          for i, (rel_path, info) in enumerate(sorted(files_info.items())):
               up_resp = requests.put(
-                  f'{upload_url}{item["path"]}',
+                  f'{upload_url}{rel_path}',
                   headers={
                       'Authorization': f'Bearer {jwt_token}',
-                      'Content-Type': item['content_type']
+                      'Content-Type': info['content_type']
                   },
-                  data=data
+                  data=info['data']
               )
               if up_resp.status_code not in [200, 201, 202]:
-                  print(f'    FAIL {item["path"]}: {up_resp.status_code} {up_resp.text[:100]}')
-              elif (i + 1) % 20 == 0:
-                  print(f'    Uploaded {i+1}/{len(manifest)}...')
+                  print(f'    FAIL {rel_path}: {up_resp.status_code} {up_resp.text[:100]}')
+              uploaded += 1
+              if uploaded % 20 == 0:
+                  print(f'    Uploaded {uploaded}/{len(manifest)}...')
 
-          print(f'  All files uploaded!')
+          print(f'  All {uploaded} files uploaded!')
 
-          # 5. Finalize deployment
-          finalize_resp = requests.patch(
-              f'{BASE}/deployments/{deployment_id}',
-              headers={**HEADERS, 'Content-Type': 'application/json'},
-              json={'is_production': True, 'deployment_trigger': {'type': 'manual', 'metadata': {'branch': 'main'}}}
-          )
-          fr = finalize_resp.json()
-          if fr.get('success'):
-              dep = fr['result']
-              print(f'  Finalized! is_production: {dep.get("is_production")}  url: {dep.get("url")}')
-          else:
-              print(f'  Finalize response: {fr}')
+          # 5. Check deployment status
+          check_resp = requests.get(f'{BASE}/deployments/{deployment_id}', headers=HEADERS)
+          dr = check_resp.json()
+          if dr.get('success'):
+              dep = dr['result']
+              print(f'  Deployment is_production: {dep.get("is_production")}  url: {dep.get("url")}')
+              print(f'  Latest stage: {dep.get("latest_stage", {}).get("name")}')
 
           # 6. Verify
           print()
