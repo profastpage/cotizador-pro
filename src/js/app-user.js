@@ -510,8 +510,8 @@ function addItem() {
           </div>
         </div>
         <div class="form-group">
-          <label class="form-label">Descripción</label>
-          <input type="text" class="form-input item-desc" placeholder="Descripción del producto/servicio">
+          <label class="form-label">Descripción del Producto/Servicio <span class="desc-hint">Puedes usar emojis para detallar mejor</span></label>
+          <textarea class="form-input item-desc item-desc-textarea" rows="3" placeholder="Ej: 💻 Desarrollo de página web responsive\n   Incluye diseño, maquetación y programación\n   Entrega en 5 días hábiles"></textarea>
         </div>
         <div class="item-subtotal">S/ 0.00</div>
       </div>
@@ -522,7 +522,20 @@ function addItem() {
   const card = container.querySelector(`[data-item-id="${itemId}"]`);
   card.querySelector('.item-qty').addEventListener('input', (e) => updateItem(itemId, 'quantity', parseFloat(e.target.value) || 0));
   card.querySelector('.item-price').addEventListener('input', (e) => updateItem(itemId, 'unitPrice', parseFloat(e.target.value) || 0));
-  card.querySelector('.item-desc').addEventListener('input', (e) => updateItem(itemId, 'description', e.target.value));
+  card.querySelector('.item-desc').addEventListener('input', (e) => {
+    updateItem(itemId, 'description', e.target.value);
+    autoResizeTextarea(e.target);
+  });
+  // Auto-resize al cargar
+  const textarea = card.querySelector('.item-desc-textarea');
+  if (textarea) autoResizeTextarea(textarea);
+}
+
+// Auto-resize textarea para que crezca con el contenido
+function autoResizeTextarea(textarea) {
+  if (!textarea) return;
+  textarea.style.height = 'auto';
+  textarea.style.height = Math.max(textarea.scrollHeight, 72) + 'px';
 }
 
 function removeItem(id) {
@@ -596,6 +609,9 @@ function updateSummary() {
 function updateReview() {
   const clientName = document.getElementById('client-name').value;
   const clientDoc = document.getElementById('client-document').value;
+  const clientEmail = document.getElementById('client-email').value;
+  const clientPhone = document.getElementById('client-phone').value;
+  const clientAddress = document.getElementById('client-address').value;
   
   let subtotal = 0;
   for (let idx = 0; idx < quoteItems.length; idx++) {
@@ -610,12 +626,30 @@ function updateReview() {
     else { igv = subtotal * 0.18; total = subtotal + igv; }
   } else { total = subtotal; }
 
+  // Formatear descripción para la vista de revisión (convertir \n a <br>)
+  const formatDesc = (desc) => {
+    if (!desc) return '<em style="color:var(--color-text-muted);">Sin descripción</em>';
+    return desc.replace(/\n/g, '<br>');
+  };
+
   document.getElementById('quote-review').innerHTML = `
     <div class="review-section"><div class="review-section-title">Cliente</div>
-      <p><strong>${clientName}</strong></p>${clientDoc ? `<p>RUC/DNI: ${clientDoc}</p>` : ''}
+      <p><strong>${clientName}</strong></p>
+      ${clientDoc ? `<p>RUC/DNI: ${clientDoc}</p>` : ''}
+      ${clientEmail ? `<p>Email: ${clientEmail}</p>` : ''}
+      ${clientPhone ? `<p>Tel: ${clientPhone}</p>` : ''}
+      ${clientAddress ? `<p>Dirección: ${clientAddress}</p>` : ''}
     </div>
-    <div class="review-section"><div class="review-section-title">Items</div>
-      ${quoteItems.map(item => `<div class="review-item"><span>${item.quantity}x ${item.description}</span><span>${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</span></div>`).join('')}
+    <div class="review-section"><div class="review-section-title">Items (${quoteItems.length})</div>
+      ${quoteItems.map(item => `
+        <div class="review-item-full">
+          <div class="review-item-header">
+            <span class="review-item-qty">${item.quantity}x</span>
+            <span class="review-item-desc">${formatDesc(item.description)}</span>
+            <span class="review-item-price">${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</span>
+          </div>
+        </div>
+      `).join('')}
     </div>
     <div class="quote-summary">
       <div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
@@ -836,16 +870,40 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
     const price = item.unitPrice || 0;
     const lineTotal = qty * price;
 
-    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, 8, 'F'); }
+    // Limpiar descripción: mantener emojis pero normalizar saltos de línea
+    const rawDesc = item.description || '';
+    const cleanDesc = rawDesc.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    const splitDesc = pdf.splitTextToSize(cleanDesc, 80);
+    const rowHeight = Math.max(splitDesc.length * 5, 8);
+
+    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, rowHeight, 'F'); }
+
+    // Verificar si necesitamos nueva página
+    if (tableY + rowHeight > 260) {
+      pdf.addPage();
+      tableY = 20;
+      // Reimprimir encabezado de tabla en nueva página
+      pdf.setFillColor(...BLUE);
+      pdf.rect(20, tableY, 170, 9, 'F');
+      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
+      pdf.text('CANT.', 25, tableY + 6);
+      pdf.text('DESCRIPCIÓN', 45, tableY + 6);
+      pdf.text('P. UNIT.', 130, tableY + 6);
+      pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
+      pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
+      tableY += 9;
+    }
 
     pdf.setTextColor(...DARK);
+    pdf.setFont(undefined, 'normal');
     pdf.text(String(qty), 25, tableY + 5.5);
-    const desc = item.description || '';
-    const splitDesc = pdf.splitTextToSize(desc, 80);
-    pdf.text(splitDesc[0] || '', 45, tableY + 5.5);
+    // Renderizar todas las líneas de la descripción (incluye emojis)
+    if (splitDesc.length > 0) {
+      pdf.text(splitDesc, 45, tableY + 5.5);
+    }
     pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
     pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
-    tableY += 8;
+    tableY += rowHeight;
   }
 
   // Totals
