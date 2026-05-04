@@ -1,0 +1,35 @@
+name: Fix Production Branch
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Production branch name'
+        required: false
+        default: 'main'
+
+jobs:
+  fix-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Production Branch
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BRANCH: ${{ github.event.inputs.branch || 'main' }}
+        run: |
+          echo "Setting production branch to $BRANCH..."
+          RESPONSE=$(curl -s -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/pages/projects/cotizador-pro" \
+            -H "Authorization: Bearer $CF_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"production_branch\":\"$BRANCH\"}")
+          echo "$RESPONSE"
+          SUCCESS=$(echo "$RESPONSE" | python3 -c "import json,sys; print(json.load(sys.stdin).get('success',''))")
+          if [ "$SUCCESS" = "True" ]; then
+            echo "Production branch set to $BRANCH successfully!"
+          else
+            echo "Failed to set production branch"
+            echo "$RESPONSE"
+            exit 1
+          fi
