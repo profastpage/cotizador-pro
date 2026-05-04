@@ -628,7 +628,6 @@ function updateSummary() {
     const item = quoteItems[idx];
     const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
     if (item.isOptional) {
-      // Opcional: el subtotal base usa el precio normal, pero calculamos la diferencia
       subtotalBase += lineTotal;
       const optLineTotal = (item.quantity || 0) * (item.optionalPrice || 0);
       subtotalOptional += (optLineTotal - lineTotal);
@@ -639,17 +638,22 @@ function updateSummary() {
   
   const subtotal = subtotalBase;
   const subtotalWithOptional = subtotalBase + subtotalOptional;
+  const isIGVIncluded = igvEnabled && igvType === 'included';
   
-  // Calcular IGV y totales (precio base sin opcionales)
+  // Calcular IGV y totales
   let igv = 0;
   let total = 0;
   let igvFull = 0;
   let totalFull = 0;
+  let displaySubtotal = subtotal;
   
   if (igvEnabled) {
     if (igvType === 'included') {
+      // Cuando IGV esta incluido: total = subtotal (precio con IGV)
+      // Mostrar base neta como subtotal, IGV desglosado, total = precio ingresado
       total = subtotal;
       igv = total - (total / 1.18);
+      displaySubtotal = total / 1.18; // Base neta sin IGV
       totalFull = subtotalWithOptional;
       igvFull = totalFull - (totalFull / 1.18);
     } else {
@@ -665,7 +669,13 @@ function updateSummary() {
 
   const hasOptional = quoteItems.some(i => i.isOptional);
   
-  document.getElementById('summary-subtotal').textContent = formatCurrency(subtotal);
+  // Actualizar labels segun tipo IGV
+  const subtotalLabel = document.getElementById('summary-subtotal').parentElement.querySelector('span:first-child');
+  if (subtotalLabel) subtotalLabel.textContent = isIGVIncluded ? 'Subtotal (base):' : 'Subtotal:';
+  const igvLabel = document.getElementById('summary-igv').parentElement.querySelector('span:first-child');
+  if (igvLabel) igvLabel.textContent = isIGVIncluded ? 'IGV (18% incl.):' : 'IGV (18%):';
+  
+  document.getElementById('summary-subtotal').textContent = formatCurrency(displaySubtotal);
   document.getElementById('summary-igv').textContent = formatCurrency(igv);
   document.getElementById('summary-total').textContent = formatCurrency(total);
   
@@ -736,10 +746,19 @@ function updateReview() {
   const subtotal = subtotalBase;
   const subtotalWithOpt = subtotalBase + subtotalOptional;
   
-  let igv = 0, total = 0, totalFull = 0;
+  const isIGVIncluded = igvEnabled && igvType === 'included';
+  let igv = 0, total = 0, totalFull = 0, displaySubtotal = subtotal;
   if (igvEnabled) {
-    if (igvType === 'included') { total = subtotal; igv = total - (total / 1.18); totalFull = subtotalWithOpt; }
-    else { igv = subtotal * 0.18; total = subtotal + igv; totalFull = subtotalWithOpt * 1.18; }
+    if (igvType === 'included') {
+      total = subtotal;
+      igv = total - (total / 1.18);
+      displaySubtotal = total / 1.18;
+      totalFull = subtotalWithOpt;
+    } else {
+      igv = subtotal * 0.18;
+      total = subtotal + igv;
+      totalFull = subtotalWithOpt * 1.18;
+    }
   } else { total = subtotal; totalFull = subtotalWithOpt; }
   
   const hasOptional = quoteItems.some(i => i.isOptional);
@@ -769,8 +788,8 @@ function updateReview() {
       `).join('')}
     </div>
     <div class="quote-summary">
-      <div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
-      ${igvEnabled ? `<div class="summary-row"><span>IGV (18%):</span><span>${formatCurrency(igv)}</span></div>` : ''}
+      <div class="summary-row"><span>${isIGVIncluded ? 'Subtotal (base):' : 'Subtotal:'}</span><span>${formatCurrency(displaySubtotal)}</span></div>
+      ${igvEnabled ? `<div class="summary-row"><span>${isIGVIncluded ? 'IGV (18% incl.):' : 'IGV (18%):'}</span><span>${formatCurrency(igv)}</span></div>` : ''}
       <div class="summary-row summary-total"><span>TOTAL:</span><span>${formatCurrency(total)}</span></div>
       ${hasOptional ? `
         <div class="summary-optional-divider"></div>
@@ -849,23 +868,19 @@ async function loadClients() {
 // PDF GENERATION - Centralized
 // ==========================================================
 
-// Load jsPDF dynamically (single source of truth)
-async function loadJsPDF() {
-  if (window.jspdf) return window.jspdf;
+// Load html2pdf.js for emoji support and professional PDF layout
+async function loadPdfLib() {
+  if (window.html2pdf) return;
   return new Promise((resolve, reject) => {
     const scriptTag = document.createElement('script');
-    scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-    // Timeout: reject after 15 seconds to avoid infinite hang
+    scriptTag.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js';
     const timeoutId = setTimeout(() => {
       reject(new Error('Tiempo de espera agotado al cargar la librería PDF. Verifica tu conexión a internet.'));
-    }, 15000);
+    }, 20000);
     scriptTag.onload = () => {
       clearTimeout(timeoutId);
-      if (window.jspdf) {
-        resolve(window.jspdf);
-      } else {
-        reject(new Error('La librería PDF no se cargó correctamente. Intenta recargar la página.'));
-      }
+      if (window.html2pdf) resolve();
+      else reject(new Error('La librería PDF no se cargó correctamente. Intenta recargar la página.'));
     };
     scriptTag.onerror = () => {
       clearTimeout(timeoutId);
@@ -875,240 +890,193 @@ async function loadJsPDF() {
   });
 }
 
-// Centralized PDF renderer - used by both generatePDF and downloadQuote
-async function renderPDF(company, clientName, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType = 'cotizacion') {
-  const { jsPDF } = await loadJsPDF();
-  const pdf = new jsPDF();
-
-  // Colors
-  const BLUE = [30, 64, 175];
-  const LIGHT_BLUE = [240, 244, 255];
-  const GRAY_BG = [245, 247, 250];
-  const GRAY_TEXT = [100, 116, 139];
-  const DARK = [15, 23, 42];
-  const GREEN = [5, 150, 105];
+// Centralized PDF renderer - uses html2pdf.js for emoji + professional layout
+async function renderPDF(company, client, items, quoteNumber, issueDate, dueDate, subtotal, igvAmount, total, igvEnabled, igvType, documentType = 'cotizacion', fileName = 'documento.pdf') {
+  await loadPdfLib();
 
   const docTypeInfo = DOCUMENT_TYPES[documentType] || DOCUMENT_TYPES.cotizacion;
 
-  // ==========================================
-  // HEADER - Company Info + Title
-  // ==========================================
-  pdf.setFontSize(11);
-  pdf.setFont(undefined, 'bold');
-  pdf.setTextColor(...DARK);
-  pdf.text(company.name || 'Mi Empresa', 20, 20);
+  // Fix client data: support both string (legacy) and object
+  const clientObj = typeof client === 'string' ? { name: client, document: '', email: '', phone: '', address: '' } : (client || {});
+  const clientName = clientObj.name || 'Sin nombre';
+  const clientDoc = clientObj.document || '';
+  const clientEmail = clientObj.email || '';
+  const clientPhone = clientObj.phone || '';
+  const clientAddress = clientObj.address || '';
 
-  pdf.setFontSize(8);
-  pdf.setFont(undefined, 'normal');
-  pdf.setTextColor(...GRAY_TEXT);
+  // Calculate correct display values for IGV included
+  const isIGVIncluded = igvEnabled && igvType === 'included';
+  const displaySubtotal = isIGVIncluded ? total / 1.18 : subtotal;
+  const displayIGV = isIGVIncluded ? total - (total / 1.18) : igvAmount;
+  const displayTotal = total;
 
-  let companyY = 27;
-  if (company.address) { pdf.text(company.address, 20, companyY); companyY += 5; }
-  if (company.email) { pdf.text(company.email, 20, companyY); companyY += 5; }
-  if (company.phone) { pdf.text(company.phone, 20, companyY); companyY += 5; }
+  // Calculate optional items
+  let subtotalOptional = 0;
+  items.forEach(item => {
+    if (item.isOptional) {
+      subtotalOptional += ((item.quantity || 0) * (item.optionalPrice || 0)) - ((item.quantity || 0) * (item.unitPrice || 0));
+    }
+  });
+  const hasOptional = subtotalOptional > 0;
+  const totalWithOptional = displayTotal + (hasOptional ? (igvEnabled && igvType === 'apart' ? subtotalOptional * 1.18 : subtotalOptional) : 0);
 
-  pdf.setFontSize(22);
-  pdf.setFont(undefined, 'bold');
-  pdf.setTextColor(...BLUE);
-  pdf.text(docTypeInfo.headerTitle, 190, 20, { align: 'right' });
-
-  pdf.setFontSize(8);
-  pdf.setFont(undefined, 'normal');
-  pdf.setTextColor(...GRAY_TEXT);
-  pdf.text(`RUC: ${company.ruc || 'N/A'}`, 190, 27, { align: 'right' });
-  if (company.phone) pdf.text(`Tel: ${company.phone}`, 190, 32, { align: 'right' });
-  if (company.email) pdf.text(company.email, 190, 37, { align: 'right' });
-
-  pdf.setDrawColor(...BLUE);
-  pdf.setLineWidth(1);
-  pdf.line(20, 42, 190, 42);
-
-  // ==========================================
-  // QUOTE INFO BAR
-  // ==========================================
-  const barY = 47;
-  pdf.setFillColor(...LIGHT_BLUE);
-  pdf.roundedRect(20, barY, 170, 14, 2, 2, 'F');
-
-  pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('NÚMERO:', 25, barY + 5);
-  pdf.setFontSize(9); pdf.setTextColor(...DARK);
-  pdf.text(`#${String(quoteNumber).padStart(3, '0')}`, 25, barY + 10);
-
-  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('FECHA EMISIÓN:', 65, barY + 5);
-  pdf.setFontSize(9); pdf.setTextColor(...DARK);
-  pdf.text(issueDate || '-', 65, barY + 10);
-
-  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('FECHA VENCIMIENTO:', 105, barY + 5);
-  pdf.setFontSize(9); pdf.setTextColor(...DARK);
-  pdf.text(dueDate || '-', 105, barY + 10);
-
-  pdf.setFontSize(8); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('MONEDA:', 155, barY + 5);
-  pdf.setFontSize(9); pdf.setTextColor(...DARK);
-  pdf.text('PEN (Soles)', 155, barY + 10);
-
-  // ==========================================
-  // CLIENT DATA SECTION
-  // ==========================================
-  const clientY = 68;
-  pdf.setFillColor(...BLUE);
-  pdf.roundedRect(20, clientY, 170, 8, 2, 2, 'F');
-  pdf.setFontSize(9); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('DATOS DEL CLIENTE', 25, clientY + 5.5);
-
-  const boxY = clientY + 11;
-  pdf.setFillColor(...GRAY_BG);
-  pdf.roundedRect(20, boxY, 170, 28, 2, 2, 'F');
-
-  pdf.setFontSize(8); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...DARK);
-  pdf.setFont(undefined, 'bold'); pdf.text('RUC/DNI:', 25, boxY + 7);
-  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 55, boxY + 7);
-
-  pdf.setFont(undefined, 'bold'); pdf.text('RAZÓN SOCIAL:', 110, boxY + 7);
-  pdf.setFont(undefined, 'normal'); pdf.text(clientName, 145, boxY + 7);
-
-  // ==========================================
-  // ITEMS TABLE
-  // ==========================================
-  let tableY = boxY + 35;
-  pdf.setFillColor(...BLUE);
-  pdf.rect(20, tableY, 170, 9, 'F');
-
-  pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-  pdf.text('CANT.', 25, tableY + 6);
-  pdf.text('DESCRIPCIÓN', 45, tableY + 6);
-  pdf.text('P. UNIT.', 130, tableY + 6);
-  pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
-
-  pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
-  tableY += 9;
-
-  for (let rowIdx = 0; rowIdx < items.length; rowIdx++) {
-    const item = items[rowIdx];
+  // Build items HTML
+  const itemsHTML = items.map((item, idx) => {
     const qty = item.quantity || 0;
     const price = item.unitPrice || 0;
     const lineTotal = qty * price;
     const isOpt = item.isOptional === true;
+    const desc = (item.description || 'Sin descripción').replace(/\n/g, '<br>');
     const optPrice = isOpt ? (item.optionalPrice || 0) : 0;
     const optLineTotal = isOpt ? qty * optPrice : 0;
+    const rowClass = isOpt ? 'row-optional' : idx % 2 === 0 ? 'row-even' : 'row-odd';
 
-    // Limpiar descripción: mantener emojis pero normalizar saltos de línea
-    const rawDesc = item.description || '';
-    const cleanDesc = (isOpt ? '[OPCIONAL] ' : '') + rawDesc.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-    const splitDesc = pdf.splitTextToSize(cleanDesc, isOpt ? 72 : 80);
-    const rowHeight = Math.max(splitDesc.length * 5, isOpt ? 13 : 8);
+    return `
+      <tr class="${rowClass}">
+        <td style="text-align:center;padding:5px 4px;font-size:9px;width:28px;border:1px solid #e2e8f0;vertical-align:top;">${qty}</td>
+        <td style="padding:5px 6px;font-size:9px;border:1px solid #e2e8f0;line-height:1.35;">
+          ${isOpt ? '<span style="background:#f59e0b;color:#fff;padding:0px 5px;border-radius:3px;font-size:7px;font-weight:700;margin-right:4px;">OPCIONAL</span>' : ''}
+          ${desc}
+          ${isOpt && optPrice > 0 ? `<div style="font-size:7.5px;color:#92400e;margin-top:2px;">Si incluye: S/ ${optPrice.toFixed(2)} c/u = S/ ${optLineTotal.toFixed(2)}</div>` : ''}
+        </td>
+        <td style="text-align:right;padding:5px 6px;font-size:9px;width:50px;border:1px solid #e2e8f0;white-space:nowrap;">S/ ${price.toFixed(2)}</td>
+        <td style="text-align:right;padding:5px 6px;font-size:9px;width:50px;border:1px solid #e2e8f0;font-weight:600;white-space:nowrap;">S/ ${lineTotal.toFixed(2)}</td>
+      </tr>`;
+  }).join('');
 
-    if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, rowHeight, 'F'); }
-    
-    // Fondo amarillo claro para opcionales
-    if (isOpt) { pdf.setFillColor(255, 251, 235); pdf.rect(20, tableY, 170, rowHeight, 'F'); }
+  // Build HTML template
+  const templateHTML = `
+    <div style="width:210mm;padding:8mm 12mm;font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;color:#1e293b;line-height:1.35;box-sizing:border-box;">
+      
+      <!-- HEADER -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:800;color:#1e3a8a;margin-bottom:1px;">${company.name || 'Mi Empresa'}</div>
+          ${company.ruc ? `<div style="font-size:8px;color:#64748b;">RUC: ${company.ruc}</div>` : ''}
+          ${company.address ? `<div style="font-size:8px;color:#64748b;">${company.address}</div>` : ''}
+          <div style="font-size:8px;color:#64748b;">${[company.phone, company.email].filter(Boolean).join(' | ')}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:900;color:#1e3a8a;letter-spacing:1px;">${docTypeInfo.headerTitle}</div>
+          <div style="font-size:11px;color:#3b82f6;font-weight:700;margin-top:1px;">N° ${String(quoteNumber).padStart(3, '0')}</div>
+        </div>
+      </div>
 
-    // Verificar si necesitamos nueva página
-    if (tableY + rowHeight > 260) {
-      pdf.addPage();
-      tableY = 20;
-      pdf.setFillColor(...BLUE);
-      pdf.rect(20, tableY, 170, 9, 'F');
-      pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
-      pdf.text('CANT.', 25, tableY + 6);
-      pdf.text('DESCRIPCIÓN', 45, tableY + 6);
-      pdf.text('P. UNIT.', 130, tableY + 6);
-      pdf.text('TOTAL', 170, tableY + 6, { align: 'right' });
-      pdf.setFont(undefined, 'normal'); pdf.setFontSize(8);
-      tableY += 9;
-    }
+      <!-- Blue gradient line -->
+      <div style="height:2.5px;background:linear-gradient(90deg,#1e3a8a,#3b82f6,#60a5fa);margin-bottom:5px;border-radius:2px;"></div>
 
-    pdf.setTextColor(...DARK);
-    pdf.setFont(undefined, 'normal');
-    pdf.text(String(qty), 25, tableY + 5.5);
-    if (splitDesc.length > 0) {
-      pdf.text(splitDesc, 45, tableY + 5.5);
-    }
-    pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
-    pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
-    
-    // Para opcionales, mostrar precio alternativo
-    if (isOpt && optPrice > 0) {
-      const optY = tableY + 10;
-      pdf.setFontSize(7); pdf.setTextColor(180, 130, 0);
-      pdf.text(`  Si incluye: S/ ${optPrice.toFixed(2)} c/u = S/ ${optLineTotal.toFixed(2)}`, 45, optY);
-    }
-    
-    tableY += rowHeight;
+      <!-- INFO BAR -->
+      <div style="display:flex;flex-wrap:wrap;gap:6px 18px;background:#eff6ff;padding:5px 10px;border-radius:5px;margin-bottom:5px;font-size:8.5px;border:1px solid #bfdbfe;">
+        <div><span style="color:#64748b;">Emisión:</span> <strong>${issueDate || '-'}</strong></div>
+        <div><span style="color:#64748b;">Vencimiento:</span> <strong>${dueDate || '-'}</strong></div>
+        <div><span style="color:#64748b;">Moneda:</span> <strong>PEN Soles</strong></div>
+        <div><span style="color:#64748b;">IGV:</span> <strong>${igvEnabled ? (igvType === 'included' ? 'Incluido 18%' : '18%') : 'Exento'}</strong></div>
+      </div>
+
+      <!-- CLIENT DATA -->
+      <div style="margin-bottom:5px;">
+        <div style="font-size:9px;font-weight:700;color:#fff;background:#1e3a8a;padding:3px 10px;border-radius:4px 4px 0 0;margin-bottom:0;">DATOS DEL CLIENTE</div>
+        <div style="background:#f8fafc;padding:5px 10px;border-radius:0 0 4px 4px;border:1px solid #e2e8f0;border-top:none;">
+          <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:120px;"><span style="color:#64748b;font-size:7.5px;">RAZÓN SOCIAL</span><br><strong style="font-size:9.5px;">${clientName}</strong></div>
+            ${clientDoc ? `<div style="min-width:100px;"><span style="color:#64748b;font-size:7.5px;">RUC/DNI</span><br><strong style="font-size:9.5px;">${clientDoc}</strong></div>` : ''}
+          </div>
+          <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:2px;">
+            ${clientEmail ? `<div><span style="color:#64748b;font-size:7.5px;">EMAIL</span><br><span style="font-size:8.5px;">${clientEmail}</span></div>` : ''}
+            ${clientPhone ? `<div><span style="color:#64748b;font-size:7.5px;">TELÉFONO</span><br><span style="font-size:8.5px;">${clientPhone}</span></div>` : ''}
+            ${clientAddress ? `<div style="flex:1;min-width:120px;"><span style="color:#64748b;font-size:7.5px;">DIRECCIÓN</span><br><span style="font-size:8.5px;">${clientAddress}</span></div>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- ITEMS TABLE -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:5px;">
+        <thead>
+          <tr style="background:#1e3a8a;color:#fff;">
+            <th style="padding:4px 4px;text-align:center;font-size:8px;font-weight:700;width:28px;border:1px solid #1e3a8a;">CANT.</th>
+            <th style="padding:4px 6px;text-align:left;font-size:8px;font-weight:700;border:1px solid #1e3a8a;">DESCRIPCIÓN</th>
+            <th style="padding:4px 6px;text-align:right;font-size:8px;font-weight:700;width:50px;border:1px solid #1e3a8a;">P. UNIT.</th>
+            <th style="padding:4px 6px;text-align:right;font-size:8px;font-weight:700;width:50px;border:1px solid #1e3a8a;">IMPORTE</th>
+          </tr>
+        </thead>
+        <tbody>${itemsHTML}</tbody>
+      </table>
+
+      <!-- TOTALS SECTION -->
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px;">
+        <div style="width:185px;">
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:9px;">
+            <span style="color:#64748b;">Subtotal${isIGVIncluded ? ' (base):' : ':'}</span>
+            <span style="font-weight:600;">S/ ${displaySubtotal.toFixed(2)}</span>
+          </div>
+          ${igvEnabled ? `
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:9px;color:#64748b;">
+            <span>IGV (18%):</span>
+            <span>S/ ${displayIGV.toFixed(2)}</span>
+          </div>
+          ${isIGVIncluded ? `<div style="font-size:7px;color:#059669;padding:0 0 2px 0;">Incluido en el precio</div>` : ''}
+          ` : ''}
+          <div style="height:1.5px;background:linear-gradient(90deg,#1e3a8a,#3b82f6);margin:3px 0;border-radius:1px;"></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:14px;">
+            <span style="font-weight:900;color:#1e3a8a;">TOTAL:</span>
+            <span style="font-weight:900;color:#1e3a8a;">S/ ${displayTotal.toFixed(2)}</span>
+          </div>
+          ${hasOptional ? `
+          <div style="margin-top:4px;background:linear-gradient(135deg,#fffbeb,#fef3c7);border:1px solid #fbbf24;border-radius:5px;padding:4px 8px;">
+            <div style="display:flex;justify-content:space-between;font-size:7.5px;color:#92400e;">
+              <span>Extras opcionales:</span>
+              <span>+S/ ${igvEnabled && igvType === 'apart' ? (subtotalOptional * 1.18).toFixed(2) : subtotalOptional.toFixed(2)}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:11px;color:#92400e;margin-top:1px;">
+              <span style="font-weight:700;">TOTAL CON OPCIONALES:</span>
+              <span style="font-weight:900;">S/ ${totalWithOptional.toFixed(2)}</span>
+            </div>
+          </div>
+          ` : ''}
+        </div>
+      </div>
+
+      <!-- FOOTER -->
+      <div style="border-top:2px solid #1e3a8a;padding-top:5px;text-align:center;">
+        <div style="font-size:13px;font-weight:800;color:#1e3a8a;">${docTypeInfo.footerText}</div>
+        <div style="font-size:7px;color:#94a3b8;margin-top:1px;">Documento generado por CotizaPro &mdash; Sistema de Cotizaciones Profesionales</div>
+      </div>
+    </div>
+  `;
+
+  // Create temporary container for rendering
+  const container = document.createElement('div');
+  container.id = 'pdf-temp-render';
+  container.style.cssText = 'position:fixed;left:-9999px;top:0;width:210mm;z-index:-1;background:#fff;';
+  container.innerHTML = templateHTML;
+  document.body.appendChild(container);
+
+  // Style for table rows
+  const styleEl = document.createElement('style');
+  styleEl.textContent = `
+    #pdf-temp-render .row-even td { background: #f8fafc; }
+    #pdf-temp-render .row-odd td { background: #ffffff; }
+    #pdf-temp-render .row-optional td { background: #fffbeb !important; }
+  `;
+  container.insertBefore(styleEl, container.firstChild);
+
+  try {
+    const opt = {
+      margin: 0,
+      filename: fileName,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    await html2pdf().from(container.firstElementChild).set(opt).save();
+  } finally {
+    // Always clean up
+    container.remove();
   }
 
-  // Totals - calcular opcionales
-  let subtotalOptional = 0;
-  for (let oi = 0; oi < items.length; oi++) {
-    if (items[oi].isOptional) {
-      subtotalOptional += ((items[oi].quantity || 0) * (items[oi].optionalPrice || 0)) - ((items[oi].quantity || 0) * (items[oi].unitPrice || 0));
-    }
-  }
-  const hasOptional = subtotalOptional > 0;
-  const totalWithOptional = total + (hasOptional ? (igvEnabled && igvType === 'apart' ? subtotalOptional * 1.18 : subtotalOptional) : 0);
-
-  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
-  pdf.line(20, tableY + 2, 190, tableY + 2);
-  tableY += 8;
-
-  pdf.setFontSize(10); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('SUBTOTAL:', 120, tableY);
-  pdf.setTextColor(...DARK);
-  pdf.text(`S/ ${subtotal.toFixed(2)}`, 188, tableY, { align: 'right' });
-  tableY += 6;
-
-  if (igvEnabled) {
-    pdf.setTextColor(...GRAY_TEXT);
-    pdf.text('IGV (18%):', 120, tableY);
-    pdf.setTextColor(...DARK);
-    pdf.text(`S/ ${igvAmount.toFixed(2)}`, 188, tableY, { align: 'right' });
-    tableY += 4;
-    if (igvType === 'included') {
-      pdf.setFontSize(7); pdf.setTextColor(...GREEN);
-      pdf.text('(Incluido en el precio)', 120, tableY);
-      pdf.setTextColor(...DARK); pdf.setFontSize(9);
-      tableY += 5;
-    } else { tableY += 2; }
-  }
-
-  tableY += 2;
-  pdf.line(120, tableY, 190, tableY);
-  tableY += 7;
-  pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-  pdf.text('TOTAL:', 120, tableY);
-  pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
-
-  // Sección de opcionales en PDF
-  if (hasOptional) {
-    tableY += 4;
-    pdf.setDrawColor(245, 158, 11); pdf.setLineWidth(0.5);
-    pdf.setFillColor(255, 251, 235);
-    const optBoxH = 18;
-    pdf.roundedRect(120, tableY, 70, optBoxH, 2, 2, 'F');
-    pdf.setDrawColor(245, 158, 11);
-    pdf.roundedRect(120, tableY, 70, optBoxH, 2, 2, 'S');
-    
-    pdf.setFontSize(7); pdf.setTextColor(180, 130, 0);
-    pdf.text('CON OPCIONALES:', 125, tableY + 6);
-    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(180, 130, 0);
-    const extraText = igvEnabled && igvType === 'apart' ? `+S/ ${(subtotalOptional * 1.18).toFixed(2)}` : `+S/ ${subtotalOptional.toFixed(2)}`;
-    pdf.text(extraText, 160, tableY + 6);
-    pdf.setFontSize(13); pdf.setFont(undefined, 'bold'); pdf.setTextColor(180, 100, 0);
-    pdf.text(`S/ ${totalWithOptional.toFixed(2)}`, 188, tableY + 14, { align: 'right' });
-  }
-
-  // Footer
-  pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
-  pdf.line(20, 278, 190, 278);
-  pdf.setFontSize(11); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
-  pdf.text(docTypeInfo.footerText, 105, 286, { align: 'center' });
-  pdf.setFontSize(7); pdf.setFont(undefined, 'normal'); pdf.setTextColor(...GRAY_TEXT);
-  pdf.text('Documento generado por CotizaPro - Sistema de Cotizaciones Profesionales', 105, 292, { align: 'center' });
-
-  return { pdf, docTypeInfo };
+  return docTypeInfo;
 }
 
 // ==========================================================
@@ -1169,6 +1137,8 @@ async function generatePDF() {
     const clientPhone = document.getElementById('client-phone').value || '';
     const clientAddress = document.getElementById('client-address').value || '';
 
+    const clientData = { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress };
+
     const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
     const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
 
@@ -1192,7 +1162,7 @@ async function generatePDF() {
       userId: currentUser.uid,
       number: quoteNumber,
       documentType,
-      client: { name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress },
+      client: clientData,
       items: quoteItems, issueDate, dueDate,
       subtotal, igv: igvAmount, total: grandTotal, igvEnabled, igvType,
       createdAt: new Date().toISOString()
@@ -1213,12 +1183,12 @@ async function generatePDF() {
 
     // Guardar cliente en Firestore y localStorage (no bloqueante)
     try {
-      await saveClient({ name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress });
+      await saveClient(clientData);
     } catch (clientErr) {
       console.warn('No se pudo guardar el cliente en Firestore:', clientErr);
     }
     // Siempre guardar en localStorage como respaldo
-    saveToLocal('clients', { id: `local_${Date.now()}`, name: clientName, document: clientDoc, email: clientEmail, phone: clientPhone, address: clientAddress, userId: currentUser.uid, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    saveToLocal('clients', { id: `local_${Date.now()}`, ...clientData, userId: currentUser.uid, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
 
     // Actualizar contador de cotizaciones usadas (no bloqueante)
     try {
@@ -1227,11 +1197,9 @@ async function generatePDF() {
       console.warn('No se pudo actualizar contador:', counterErr);
     }
 
-    // Use centralized PDF renderer
-    const { pdf, docTypeInfo } = await renderPDF(company, clientName, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType);
-
+    // Use centralized PDF renderer (saves directly)
     const fileName = `Cotizacion-${String(quoteNumber).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
-    pdf.save(fileName);
+    await renderPDF(company, clientData, quoteItems, quoteNumber, issueDate, dueDate, subtotal, igvAmount, grandTotal, igvEnabled, igvType, documentType, fileName);
 
     showToast('¡PDF generado exitosamente!');
     resetWizard();
@@ -1516,12 +1484,19 @@ window.downloadQuote = async function(id) {
     }
 
     const clientName = quote.client?.name || 'Sin nombre';
-    const clientDocument = quote.client?.document || '';
+    const clientData = {
+      name: clientName,
+      document: quote.client?.document || '',
+      email: quote.client?.email || '',
+      phone: quote.client?.phone || '',
+      address: quote.client?.address || ''
+    };
 
-    // Use centralized PDF renderer
-    const { pdf } = await renderPDF(
+    // Use centralized PDF renderer (saves directly)
+    const fileName = `Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`;
+    await renderPDF(
       company,
-      clientName,
+      clientData,
       quote.items || [],
       quote.number || 0,
       quote.issueDate,
@@ -1532,10 +1507,9 @@ window.downloadQuote = async function(id) {
       quote.igvEnabled,
       quote.igvType || 'apart',
       quote.documentType || 'cotizacion',
-      clientDocument
+      fileName
     );
 
-    pdf.save(`Cotizacion-${String(quote.number || 0).padStart(3, '0')}-${clientName.replace(/[^a-zA-Z0-9]/g, '-')}.pdf`);
     showToast('PDF generado exitosamente');
   } catch (error) {
     console.error('Download error:', error);
