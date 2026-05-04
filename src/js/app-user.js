@@ -490,12 +490,17 @@ function prevStep() {
 
 function addItem() {
   const itemId = Date.now().toString();
-  quoteItems.push({ id: itemId, quantity: 1, unitPrice: 0, description: '' });
+  quoteItems.push({ id: itemId, quantity: 1, unitPrice: 0, description: '', isOptional: false, optionalPrice: 0 });
   const container = document.getElementById('items-container');
   const html = `
     <div class="item-card" data-item-id="${itemId}">
       <div class="item-header">
         <span class="item-number">Item ${quoteItems.length}</span>
+        <label class="optional-toggle" title="Marcar como producto/servicio opcional">
+          <input type="checkbox" class="item-optional-check" onchange="window.toggleOptional('${itemId}', this.checked)">
+          <span class="optional-toggle-slider"></span>
+          <span class="optional-toggle-label">⭐ Opcional</span>
+        </label>
         <button class="btn-remove-item" onclick="window.removeItem('${itemId}')">✕</button>
       </div>
       <div class="item-fields">
@@ -509,11 +514,23 @@ function addItem() {
             <input type="number" class="form-input item-price" value="0" min="0" step="0.01" inputmode="decimal">
           </div>
         </div>
+        <div class="item-optional-fields hidden" data-optional-fields="${itemId}">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">💰 Precio con opcional</label>
+              <input type="number" class="form-input item-optional-price" value="0" min="0" step="0.01" inputmode="decimal" placeholder="Precio si el cliente incluye este opcional">
+            </div>
+          </div>
+        </div>
         <div class="form-group">
           <label class="form-label">Descripción del Producto/Servicio <span class="desc-hint">Puedes usar emojis para detallar mejor</span></label>
           <textarea class="form-input item-desc item-desc-textarea" rows="3" placeholder="Ej: 💻 Desarrollo de página web responsive\n   Incluye diseño, maquetación y programación\n   Entrega en 5 días hábiles"></textarea>
         </div>
-        <div class="item-subtotal">S/ 0.00</div>
+        <div class="item-subtotal-row">
+          <span class="item-subtotal-label">Subtotal:</span>
+          <span class="item-subtotal">S/ 0.00</span>
+          <span class="item-optional-badge hidden" data-optional-badge="${itemId}">⭐ +S/ 0.00 si incluye opcional</span>
+        </div>
       </div>
     </div>
   `;
@@ -522,6 +539,7 @@ function addItem() {
   const card = container.querySelector(`[data-item-id="${itemId}"]`);
   card.querySelector('.item-qty').addEventListener('input', (e) => updateItem(itemId, 'quantity', parseFloat(e.target.value) || 0));
   card.querySelector('.item-price').addEventListener('input', (e) => updateItem(itemId, 'unitPrice', parseFloat(e.target.value) || 0));
+  card.querySelector('.item-optional-price').addEventListener('input', (e) => updateItem(itemId, 'optionalPrice', parseFloat(e.target.value) || 0));
   card.querySelector('.item-desc').addEventListener('input', (e) => {
     updateItem(itemId, 'description', e.target.value);
     autoResizeTextarea(e.target);
@@ -529,6 +547,45 @@ function addItem() {
   // Auto-resize al cargar
   const textarea = card.querySelector('.item-desc-textarea');
   if (textarea) autoResizeTextarea(textarea);
+}
+
+// Toggle item optional status
+window.toggleOptional = function(id, checked) {
+  const item = quoteItems.find(i => i.id === id);
+  if (!item) return;
+  item.isOptional = checked;
+  const card = document.querySelector(`[data-item-id="${id}"]`);
+  const optFields = card.querySelector(`[data-optional-fields="${id}"]`);
+  const optBadge = card.querySelector(`[data-optional-badge="${id}"]`);
+  if (checked) {
+    card.classList.add('item-card-optional');
+    optFields.classList.remove('hidden');
+    optBadge.classList.remove('hidden');
+    if (!item.optionalPrice || item.optionalPrice <= item.unitPrice) {
+      item.optionalPrice = (item.unitPrice || 0) + (item.unitPrice * 0.20);
+      card.querySelector('.item-optional-price').value = item.optionalPrice.toFixed(2);
+    }
+  } else {
+    card.classList.remove('item-card-optional');
+    optFields.classList.add('hidden');
+    optBadge.classList.add('hidden');
+  }
+  updateItemDisplay(id);
+  updateSummary();
+};
+
+// Update individual item display
+function updateItemDisplay(id) {
+  const item = quoteItems.find(i => i.id === id);
+  if (!item) return;
+  const card = document.querySelector(`[data-item-id="${id}"]`);
+  const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
+  card.querySelector('.item-subtotal').textContent = formatCurrency(lineTotal);
+  if (item.isOptional) {
+    const optLineTotal = (item.quantity || 0) * (item.optionalPrice || 0);
+    const diff = optLineTotal - lineTotal;
+    card.querySelector(`[data-optional-badge="${id}"]`).textContent = `⭐ +S/ ${diff.toFixed(2)} si incluye opcional`;
+  }
 }
 
 // Auto-resize textarea para que crezca con el contenido
@@ -554,8 +611,7 @@ function updateItem(id, field, value) {
   const item = quoteItems.find(i => i.id === id);
   if (item) {
     item[field] = value;
-    const card = document.querySelector(`[data-item-id="${id}"]`);
-    card.querySelector('.item-subtotal').textContent = formatCurrency((item.quantity || 0) * (item.unitPrice || 0));
+    updateItemDisplay(id);
     updateSummary();
   }
 }
@@ -564,36 +620,85 @@ function updateSummary() {
   const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
   const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
   
-  let subtotal = 0;
+  // Separar items base y opcionales
+  let subtotalBase = 0;
+  let subtotalOptional = 0;
+  
   for (let idx = 0; idx < quoteItems.length; idx++) {
-    subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
+    const item = quoteItems[idx];
+    const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
+    if (item.isOptional) {
+      // Opcional: el subtotal base usa el precio normal, pero calculamos la diferencia
+      subtotalBase += lineTotal;
+      const optLineTotal = (item.quantity || 0) * (item.optionalPrice || 0);
+      subtotalOptional += (optLineTotal - lineTotal);
+    } else {
+      subtotalBase += lineTotal;
+    }
   }
   
+  const subtotal = subtotalBase;
+  const subtotalWithOptional = subtotalBase + subtotalOptional;
+  
+  // Calcular IGV y totales (precio base sin opcionales)
   let igv = 0;
   let total = 0;
+  let igvFull = 0;
+  let totalFull = 0;
   
   if (igvEnabled) {
     if (igvType === 'included') {
       total = subtotal;
       igv = total - (total / 1.18);
+      totalFull = subtotalWithOptional;
+      igvFull = totalFull - (totalFull / 1.18);
     } else {
       igv = subtotal * 0.18;
       total = subtotal + igv;
+      igvFull = subtotalWithOptional * 0.18;
+      totalFull = subtotalWithOptional + igvFull;
     }
   } else {
     total = subtotal;
+    totalFull = subtotalWithOptional;
   }
 
+  const hasOptional = quoteItems.some(i => i.isOptional);
+  
   document.getElementById('summary-subtotal').textContent = formatCurrency(subtotal);
   document.getElementById('summary-igv').textContent = formatCurrency(igv);
   document.getElementById('summary-total').textContent = formatCurrency(total);
+  
+  // Mostrar/ocultar sección de opcionales
+  const optSection = document.getElementById('summary-optional-section');
+  const optRow = document.getElementById('summary-optional-row');
+  const optTotalRow = document.getElementById('summary-optional-total-row');
+  
+  if (hasOptional) {
+    if (optSection) optSection.classList.remove('hidden');
+    if (optRow) {
+      optRow.classList.remove('hidden');
+      optRow.querySelector('#summary-optional-extra').textContent = formatCurrency(subtotalOptional);
+    }
+    if (optTotalRow) {
+      optTotalRow.classList.remove('hidden');
+      optTotalRow.querySelector('#summary-total-with-optional').textContent = formatCurrency(totalFull);
+    }
+  } else {
+    if (optSection) optSection.classList.add('hidden');
+    if (optRow) optRow.classList.add('hidden');
+    if (optTotalRow) optTotalRow.classList.add('hidden');
+  }
   
   const igvRow = document.getElementById('summary-igv-row');
   if (igvRow) igvRow.style.display = igvEnabled ? '' : 'none';
   
   const note = document.getElementById('summary-note');
   if (note) {
-    if (!igvEnabled) {
+    if (hasOptional) {
+      note.textContent = '⭐ Los items opcionales se agregan al total si el cliente los incluye';
+      note.style.color = 'var(--color-warning)';
+    } else if (!igvEnabled) {
       note.textContent = 'Precios sin IGV';
       note.style.color = 'var(--color-gray-500)';
     } else if (igvType === 'included') {
@@ -613,20 +718,31 @@ function updateReview() {
   const clientPhone = document.getElementById('client-phone').value;
   const clientAddress = document.getElementById('client-address').value;
   
-  let subtotal = 0;
-  for (let idx = 0; idx < quoteItems.length; idx++) {
-    subtotal += (quoteItems[idx].quantity || 0) * (quoteItems[idx].unitPrice || 0);
-  }
-  
   const igvEnabled = document.getElementById('igv-enabled')?.checked ?? true;
   const igvType = document.querySelector('input[name="igv-type"]:checked')?.value || 'apart';
-  let igv = 0, total = 0;
+  
+  // Calcular totales separando base y opcionales
+  let subtotalBase = 0, subtotalOptional = 0;
+  for (let idx = 0; idx < quoteItems.length; idx++) {
+    const item = quoteItems[idx];
+    const lineTotal = (item.quantity || 0) * (item.unitPrice || 0);
+    if (item.isOptional) {
+      subtotalBase += lineTotal;
+      subtotalOptional += ((item.quantity || 0) * (item.optionalPrice || 0)) - lineTotal;
+    } else {
+      subtotalBase += lineTotal;
+    }
+  }
+  const subtotal = subtotalBase;
+  const subtotalWithOpt = subtotalBase + subtotalOptional;
+  
+  let igv = 0, total = 0, totalFull = 0;
   if (igvEnabled) {
-    if (igvType === 'included') { total = subtotal; igv = total - (total / 1.18); }
-    else { igv = subtotal * 0.18; total = subtotal + igv; }
-  } else { total = subtotal; }
-
-  // Formatear descripción para la vista de revisión (convertir \n a <br>)
+    if (igvType === 'included') { total = subtotal; igv = total - (total / 1.18); totalFull = subtotalWithOpt; }
+    else { igv = subtotal * 0.18; total = subtotal + igv; totalFull = subtotalWithOpt * 1.18; }
+  } else { total = subtotal; totalFull = subtotalWithOpt; }
+  
+  const hasOptional = quoteItems.some(i => i.isOptional);
   const formatDesc = (desc) => {
     if (!desc) return '<em style="color:var(--color-text-muted);">Sin descripción</em>';
     return desc.replace(/\n/g, '<br>');
@@ -642,19 +758,25 @@ function updateReview() {
     </div>
     <div class="review-section"><div class="review-section-title">Items (${quoteItems.length})</div>
       ${quoteItems.map(item => `
-        <div class="review-item-full">
+        <div class="review-item-full ${item.isOptional ? 'review-item-optional' : ''}">
           <div class="review-item-header">
-            <span class="review-item-qty">${item.quantity}x</span>
-            <span class="review-item-desc">${formatDesc(item.description)}</span>
+            <span class="review-item-qty">${item.isOptional ? '⭐' : ''}${item.quantity}x</span>
+            <span class="review-item-desc">${item.isOptional ? '<span class="optional-tag">OPCIONAL</span>' : ''}${formatDesc(item.description)}</span>
             <span class="review-item-price">${formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</span>
           </div>
+          ${item.isOptional ? `<div class="review-optional-info">💰 Si incluye opcional: ${formatCurrency((item.quantity || 0) * (item.optionalPrice || 0))}</div>` : ''}
         </div>
       `).join('')}
     </div>
     <div class="quote-summary">
       <div class="summary-row"><span>Subtotal:</span><span>${formatCurrency(subtotal)}</span></div>
-      <div class="summary-row"><span>IGV (18%):</span><span>${formatCurrency(igv)}</span></div>
+      ${igvEnabled ? `<div class="summary-row"><span>IGV (18%):</span><span>${formatCurrency(igv)}</span></div>` : ''}
       <div class="summary-row summary-total"><span>TOTAL:</span><span>${formatCurrency(total)}</span></div>
+      ${hasOptional ? `
+        <div class="summary-optional-divider"></div>
+        <div class="summary-row summary-optional-row"><span>⭐ Extras opcionales:</span><span>${formatCurrency(subtotalOptional)}</span></div>
+        <div class="summary-row summary-total summary-total-full"><span>TOTAL CON OPCIONALES:</span><span>${formatCurrency(totalFull)}</span></div>
+      ` : ''}
     </div>
   `;
 }
@@ -869,20 +991,25 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
     const qty = item.quantity || 0;
     const price = item.unitPrice || 0;
     const lineTotal = qty * price;
+    const isOpt = item.isOptional === true;
+    const optPrice = isOpt ? (item.optionalPrice || 0) : 0;
+    const optLineTotal = isOpt ? qty * optPrice : 0;
 
     // Limpiar descripción: mantener emojis pero normalizar saltos de línea
     const rawDesc = item.description || '';
-    const cleanDesc = rawDesc.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-    const splitDesc = pdf.splitTextToSize(cleanDesc, 80);
-    const rowHeight = Math.max(splitDesc.length * 5, 8);
+    const cleanDesc = (isOpt ? '[OPCIONAL] ' : '') + rawDesc.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+    const splitDesc = pdf.splitTextToSize(cleanDesc, isOpt ? 72 : 80);
+    const rowHeight = Math.max(splitDesc.length * 5, isOpt ? 13 : 8);
 
     if (rowIdx % 2 === 0) { pdf.setFillColor(249, 250, 251); pdf.rect(20, tableY, 170, rowHeight, 'F'); }
+    
+    // Fondo amarillo claro para opcionales
+    if (isOpt) { pdf.setFillColor(255, 251, 235); pdf.rect(20, tableY, 170, rowHeight, 'F'); }
 
     // Verificar si necesitamos nueva página
     if (tableY + rowHeight > 260) {
       pdf.addPage();
       tableY = 20;
-      // Reimprimir encabezado de tabla en nueva página
       pdf.setFillColor(...BLUE);
       pdf.rect(20, tableY, 170, 9, 'F');
       pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(255, 255, 255);
@@ -897,16 +1024,32 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
     pdf.setTextColor(...DARK);
     pdf.setFont(undefined, 'normal');
     pdf.text(String(qty), 25, tableY + 5.5);
-    // Renderizar todas las líneas de la descripción (incluye emojis)
     if (splitDesc.length > 0) {
       pdf.text(splitDesc, 45, tableY + 5.5);
     }
     pdf.text(`S/ ${price.toFixed(2)}`, 130, tableY + 5.5);
     pdf.text(`S/ ${lineTotal.toFixed(2)}`, 188, tableY + 5.5, { align: 'right' });
+    
+    // Para opcionales, mostrar precio alternativo
+    if (isOpt && optPrice > 0) {
+      const optY = tableY + 10;
+      pdf.setFontSize(7); pdf.setTextColor(180, 130, 0);
+      pdf.text(`  Si incluye: S/ ${optPrice.toFixed(2)} c/u = S/ ${optLineTotal.toFixed(2)}`, 45, optY);
+    }
+    
     tableY += rowHeight;
   }
 
-  // Totals
+  // Totals - calcular opcionales
+  let subtotalOptional = 0;
+  for (let oi = 0; oi < items.length; oi++) {
+    if (items[oi].isOptional) {
+      subtotalOptional += ((items[oi].quantity || 0) * (items[oi].optionalPrice || 0)) - ((items[oi].quantity || 0) * (items[oi].unitPrice || 0));
+    }
+  }
+  const hasOptional = subtotalOptional > 0;
+  const totalWithOptional = total + (hasOptional ? (igvEnabled && igvType === 'apart' ? subtotalOptional * 1.18 : subtotalOptional) : 0);
+
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1.5);
   pdf.line(20, tableY + 2, 190, tableY + 2);
   tableY += 8;
@@ -937,6 +1080,25 @@ async function renderPDF(company, clientName, items, quoteNumber, issueDate, due
   pdf.setFontSize(14); pdf.setFont(undefined, 'bold'); pdf.setTextColor(...BLUE);
   pdf.text('TOTAL:', 120, tableY);
   pdf.text(`S/ ${total.toFixed(2)}`, 188, tableY, { align: 'right' });
+
+  // Sección de opcionales en PDF
+  if (hasOptional) {
+    tableY += 4;
+    pdf.setDrawColor(245, 158, 11); pdf.setLineWidth(0.5);
+    pdf.setFillColor(255, 251, 235);
+    const optBoxH = 18;
+    pdf.roundedRect(120, tableY, 70, optBoxH, 2, 2, 'F');
+    pdf.setDrawColor(245, 158, 11);
+    pdf.roundedRect(120, tableY, 70, optBoxH, 2, 2, 'S');
+    
+    pdf.setFontSize(7); pdf.setTextColor(180, 130, 0);
+    pdf.text('CON OPCIONALES:', 125, tableY + 6);
+    pdf.setFontSize(8); pdf.setFont(undefined, 'bold'); pdf.setTextColor(180, 130, 0);
+    const extraText = igvEnabled && igvType === 'apart' ? `+S/ ${(subtotalOptional * 1.18).toFixed(2)}` : `+S/ ${subtotalOptional.toFixed(2)}`;
+    pdf.text(extraText, 160, tableY + 6);
+    pdf.setFontSize(13); pdf.setFont(undefined, 'bold'); pdf.setTextColor(180, 100, 0);
+    pdf.text(`S/ ${totalWithOptional.toFixed(2)}`, 188, tableY + 14, { align: 'right' });
+  }
 
   // Footer
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(1);
