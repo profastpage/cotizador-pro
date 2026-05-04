@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - master
-  workflow_dispatch: # Permite disparar manualmente
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -39,6 +39,18 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+
+      - name: Fix Production Branch
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Setting production branch to main..."
+          curl -s -X PATCH \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"production_branch":"main"}' | python3 -c "import json,sys; d=json.load(sys.stdin); print('Branch update:', d.get('success'), d.get('errors', []))"
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
