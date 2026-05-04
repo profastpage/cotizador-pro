@@ -1,0 +1,78 @@
+name: Diagnose Cloudflare Pages
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Cloudflare Project & Deployments
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "=========================================="
+          echo "CLOUDFLARE PAGES DIAGNOSTIC"
+          echo "=========================================="
+          
+          echo ""
+          echo "=== 1. PROJECT SETTINGS ==="
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          if d.get('success'):
+              r = d['result']
+              print(f'  name:              {r.get(\"name\")}')
+              print(f'  subdomain:         {r.get(\"subdomain\")}')
+              print(f'  production_branch: {r.get(\"production_branch\")}')
+              print(f'  created_on:        {r.get(\"created_on\")}')
+              print(f'  domains:           {r.get(\"domains\", [])}')
+          else:
+              print('  ERROR:', d.get('errors'))
+          "
+          
+          echo ""
+          echo "=== 2. RECENT DEPLOYMENTS (latest 10) ==="
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro/deployments?per_page=10" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          if d.get('success'):
+              for dep in d.get('result', []):
+                  is_prod = '  >>> PRODUCTION <<<' if dep.get('is_production') else ''
+                  latest = '  [LATEST]' if dep.get('latest_stage', {}).get('name') == 'production' else ''
+                  print(f'  ID: {dep.get(\"id\", \"?\")[:12]}  branch: {dep.get(\"source\", {}).get(\"production_branch\", \"?\"):<8}  production: {str(dep.get(\"deployment_trigger\", {}).get(\"metadata\", {}).get(\"branch\", \"?\")):<8}  is_production: {dep.get(\"is_production\")}{is_prod}{latest}  created: {dep.get(\"created_on\", \"\")[:19]}')
+                  print(f'    URL: {dep.get(\"url\", \"?\")}')
+                  if dep.get('is_production'):
+                      print(f'    ** THIS IS THE PRODUCTION DEPLOYMENT **')
+          else:
+              print('  ERROR:', d.get('errors'))
+          "
+          
+          echo ""
+          echo "=== 3. PRODUCTION DEPLOYMENT DETAILS ==="
+          curl -s \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/cotizador-pro/deployments?per_page=50" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" | python3 -c "
+          import json, sys
+          d = json.load(sys.stdin)
+          if d.get('success'):
+              prods = [dep for dep in d.get('result', []) if dep.get('is_production')]
+              if prods:
+                  p = prods[0]
+                  print(f'  Production Deployment ID: {p.get(\"id\")}')
+                  print(f'  URL: {p.get(\"url\")}')
+                  print(f'  Branch: {p.get(\"deployment_trigger\", {}).get(\"metadata\", {}).get(\"branch\")}')
+                  print(f'  Created: {p.get(\"created_on\")}')
+                  print(f'  Environment: {p.get(\"environment\")}')
+                  print(f'  Latest stage: {p.get(\"latest_stage\", {}).get(\"name\")}')
+              else:
+                  print('  *** NO PRODUCTION DEPLOYMENT FOUND ***')
+                  print('  This explains why the main URL shows old content!')
+          else:
+              print('  ERROR:', d.get('errors'))
+          "
